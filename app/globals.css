@@ -31,6 +31,24 @@ img { display: block; max-width: 100%; }
 
 ::selection { background: var(--honey-light); color: var(--ink); }
 
+.login-page { position:relative; min-height:100vh; overflow:hidden; display:grid; place-items:center; padding:32px 20px; color:var(--paper); background:radial-gradient(circle at 68% 40%,rgba(213,148,31,.2),transparent 28%),radial-gradient(circle at 20% 80%,rgba(100,116,88,.14),transparent 32%),var(--ink); }
+.login-texture { position:absolute; inset:0; opacity:.11; background-image:radial-gradient(rgba(255,255,255,.8) .6px,transparent .7px); background-size:7px 7px; mix-blend-mode:soft-light; }
+.login-card { position:relative; z-index:1; width:min(570px,100%); padding:clamp(38px,7vw,72px); border:1px solid rgba(243,238,224,.18); background:rgba(23,21,15,.6); box-shadow:0 36px 120px rgba(0,0,0,.35); backdrop-filter:blur(16px); }
+.login-mark { width:54px; height:42px; position:relative; margin-bottom:38px; color:var(--honey-light); }
+.login-mark i { position:absolute; width:24px; height:28px; border:1.5px solid currentColor; clip-path:polygon(25% 5%,75% 5%,100% 50%,75% 95%,25% 95%,0 50%); }
+.login-mark i:nth-child(1) { left:0; top:9px; }.login-mark i:nth-child(2) { left:16px; top:0; }.login-mark i:nth-child(3) { left:31px; top:10px; }
+.login-kicker { margin:0 0 18px; color:var(--honey-light); text-transform:uppercase; letter-spacing:.18em; font-size:10px; font-weight:700; }
+.login-card h1 { font-size:clamp(52px,9vw,78px); }
+.login-copy { max-width:430px; margin:26px 0 34px; color:rgba(243,238,224,.62); line-height:1.7; }
+.login-card form label { display:block; margin-bottom:9px; text-transform:uppercase; letter-spacing:.13em; font-size:9px; font-weight:700; color:rgba(243,238,224,.58); }
+.login-field { display:flex; border-bottom:1px solid rgba(243,238,224,.45); }
+.login-field:focus-within { border-color:var(--honey-light); }
+.login-field input { min-width:0; flex:1; height:58px; padding:0 12px 0 0; border:0; outline:0; background:transparent; color:var(--paper); font-size:20px; letter-spacing:.08em; }
+.login-field button { flex:0 0 auto; display:flex; align-items:center; gap:22px; padding:0 3px 0 20px; border:0; background:transparent; color:var(--honey-light); cursor:pointer; text-transform:uppercase; letter-spacing:.1em; font-size:10px; font-weight:700; }
+.login-field button span { font-size:20px; }.login-field button:disabled { opacity:.55; cursor:wait; }
+.login-error { margin:12px 0 0; color:#f2a68e; font-size:12px; }
+.login-note { margin:38px 0 0; color:rgba(243,238,224,.38); font-size:10px; }.login-note span { margin-right:8px; color:var(--honey); }
+
 .site-header {
   position: absolute;
   z-index: 20;
