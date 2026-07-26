@@ -230,8 +230,9 @@ export default function Home() {
       return;
     }
     setSubmitting(true);
-    setStatus("Saving your experience securely…");
+    setStatus("Preserving your experience securely…");
     const payload = new FormData();
+    payload.append("form-name", "honeycomb-experience");
     payload.append("title", title.trim());
     payload.append("location", location.trim());
     payload.append("experienceYear", year.trim());
@@ -241,24 +242,13 @@ export default function Home() {
     payload.append("recordingMode", mode);
     if (mediaFile) payload.append("media", mediaFile, mediaFile instanceof File ? mediaFile.name : `experience.${mode === "video" ? "webm" : "webm"}`);
     try {
-      const response = await fetch("/api/experiences", { method: "POST", body: payload });
-      const data = await response.json() as { experience?: Record<string, unknown>; error?: string };
-      if (!response.ok) throw new Error(data.error || "Unable to save");
-      const created: Story = {
-        id: `new-${String(data.experience?.id ?? Date.now())}`,
-        title: title.trim(),
-        location: location.trim() || "Location withheld",
-        year: year.trim() || "—",
-        type: "Other",
-        excerpt: storyText.trim(),
-        initials: "YOU",
-        color: "honey",
-        privacy,
-      };
-      if (privacy !== "archive") setStories((current) => [created, ...current]);
-      setSelectedStory(created);
+      if (mediaFile && mediaFile.size > 7 * 1024 * 1024) {
+        throw new Error("For this preview, recordings must be under 7 MB. Larger direct uploads will be enabled in the media-storage phase.");
+      }
+      const response = await fetch("/__forms.html", { method: "POST", body: payload });
+      if (!response.ok) throw new Error("Unable to preserve this experience right now.");
       setStep(4);
-      setStatus(privacy === "archive" ? "Your experience is archived and not publicly visible." : "Your experience has joined the archive.");
+      setStatus("Your experience has been preserved privately and added to the review queue. Nothing is published automatically.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Something went wrong while saving. Please try again.");
     } finally {
@@ -457,7 +447,8 @@ export default function Home() {
             )}
 
             {step === 3 && (
-              <form onSubmit={submitExperience}>
+              <form name="honeycomb-experience" method="POST" encType="multipart/form-data" data-netlify="true" onSubmit={submitExperience}>
+                <input type="hidden" name="form-name" value="honeycomb-experience" />
                 <p className="eyebrow"><span /> Step 3 of 3</p>
                 <h2 id="recorder-title">Tell us what happened.</h2>
                 <div className="form-grid">

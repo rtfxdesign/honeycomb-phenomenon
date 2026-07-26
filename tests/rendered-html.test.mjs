@@ -15,18 +15,19 @@ test("defines the complete Honeycomb experience", async () => {
   assert.doesNotMatch(`${page}\n${layout}`, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 
-test("removes the disposable starter and declares archive storage", async () => {
-  const [page, layout, packageJson, hosting] = await Promise.all([
+test("declares the Netlify moderation and hosting surfaces", async () => {
+  const [page, layout, packageJson, netlifyConfig, forms] = await Promise.all([
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/layout.tsx", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
-    readFile(new URL("../.openai/hosting.json", import.meta.url), "utf8"),
+    readFile(new URL("../netlify.toml", import.meta.url), "utf8"),
+    readFile(new URL("../public/__forms.html", import.meta.url), "utf8"),
   ]);
   assert.match(page, /Record your story/);
-  assert.match(page, /api\/experiences/);
+  assert.match(page, /review queue/);
   assert.match(layout, /og\.png/);
   assert.doesNotMatch(packageJson, /react-loading-skeleton/);
-  assert.match(hosting, /"d1": "DB"/);
-  assert.match(hosting, /"r2": "ARCHIVE_MEDIA"/);
+  assert.match(netlifyConfig, /publish = "\.next"/);
+  assert.match(forms, /honeycomb-experience/);
   await assert.rejects(access(new URL("../app/_sites-preview", import.meta.url)));
 });
