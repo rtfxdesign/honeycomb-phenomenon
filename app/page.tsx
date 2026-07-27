@@ -135,6 +135,7 @@ export default function Home() {
   const [honeycombImages, setHoneycombImages] = useState<string[]>([]);
   const [tags, setTags] = useState<string[]>([]);
   const [removedTags, setRemovedTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -190,6 +191,17 @@ export default function Home() {
     }, 1000);
     return () => clearTimeout(timeout);
   }, [storyText, removedTags, tags]);
+
+  const handleAddTag = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      const newTag = tagInput.trim().replace(/^#/, '').replace(/,/g, '');
+      if (newTag && !tags.includes(newTag)) {
+        setTags(current => [...current, newTag]);
+      }
+      setTagInput("");
+    }
+  };
 
   const openRecorder = () => {
     setModalOpen(true);
@@ -306,36 +318,26 @@ export default function Home() {
       }
     }
 
-    // Step 2: Submit metadata (+ small media fallback) via Netlify Forms
-    const payload = new FormData();
-    payload.append("form-name", "honeycomb-experience");
-    payload.append("title", title.trim());
-    payload.append("location", location.trim());
-    payload.append("experienceYear", year.trim());
-    payload.append("experienceType", "Other");
-    payload.append("transcript", storyText.trim());
-    payload.append("privacy", privacy);
-    payload.append("recordingMode", mode);
-    if (mediaKey) {
-      // R2 upload succeeded — store the object key, not the file
-      payload.append("mediaKey", mediaKey);
-    } else if (mediaFile && mediaFile.size <= 7 * 1024 * 1024) {
-      // Small file fallback via Netlify Forms
-      payload.append("media", mediaFile, mediaFile instanceof File ? mediaFile.name : `experience.webm`);
-    }
-
-    if (photoKey) {
-      payload.append("photoKey", photoKey);
-    } else if (photoFile && photoFile.size <= 7 * 1024 * 1024) {
-      payload.append("photo", photoFile, photoFile.name);
-    }
-
-    if (tags.length > 0) {
-      payload.append("hashtags", tags.join(", "));
-    }
+    // Step 2: Submit metadata (+ media keys) via the new JSON API
+    const payloadData = {
+      title: title.trim(),
+      location: location.trim(),
+      experienceYear: year.trim(),
+      experienceType: "Other",
+      transcript: storyText.trim(),
+      privacy,
+      recordingMode: mode,
+      mediaKey: mediaKey || undefined,
+      photoKey: photoKey || undefined,
+      hashtags: tags
+    };
 
     try {
-      const response = await fetch("/__forms.html", { method: "POST", body: payload });
+      const response = await fetch("/api/submit-experience", { 
+        method: "POST", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payloadData) 
+      });
       if (!response.ok) throw new Error("Unable to preserve this experience right now.");
       setStep(4);
       setStatus("Your experience has been preserved privately and added to the review queue. Nothing is published automatically.");
@@ -559,27 +561,31 @@ export default function Home() {
                   <label className="field"><span>Year</span><input value={year} onChange={(event) => setYear(event.target.value)} inputMode="numeric" placeholder="1986" /></label>
                   <label className="field field-wide"><span>Your experience</span><textarea value={storyText} onChange={(event) => setStoryText(event.target.value)} placeholder="Begin wherever feels right…" rows={6} required /></label>
                   
-                  {tags.length > 0 && (
-                    <div className="field field-wide tags-container">
-                      <span style={{ fontSize: "0.8rem", opacity: 0.7, marginBottom: "0.5rem", display: "block" }}>Suggested tags based on your story:</span>
-                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
-                        {tags.map(tag => (
-                          <span key={tag} style={{ backgroundColor: "var(--line)", padding: "0.2rem 0.6rem", borderRadius: "100px", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
-                            #{tag}
-                            <button 
-                              type="button" 
-                              onClick={() => {
-                                setTags(current => current.filter(t => t !== tag));
-                                setRemovedTags(current => [...current, tag]);
-                              }}
-                              style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", opacity: 0.7, padding: 0 }}
-                              aria-label={`Remove tag ${tag}`}
-                            >×</button>
-                          </span>
-                        ))}
-                      </div>
+                  <div className="field field-wide tags-container">
+                    <span>Tags & Keywords</span>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem", marginBottom: "0.5rem" }}>
+                      {tags.map(tag => (
+                        <span key={tag} style={{ backgroundColor: "var(--line)", padding: "0.2rem 0.6rem", borderRadius: "100px", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                          #{tag}
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              setTags(current => current.filter(t => t !== tag));
+                              setRemovedTags(current => [...current, tag]);
+                            }}
+                            style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", opacity: 0.7, padding: 0 }}
+                            aria-label={`Remove tag ${tag}`}
+                          >×</button>
+                        </span>
+                      ))}
                     </div>
-                  )}
+                    <input 
+                      value={tagInput}
+                      onChange={(e) => setTagInput(e.target.value)}
+                      onKeyDown={handleAddTag}
+                      placeholder="Type a custom tag and press Enter"
+                    />
+                  </div>
                 </div>
                 <div className="capture-tools">
                   <button type="button" onClick={toggleDictation} className={dictating ? "is-live" : ""}>{dictating ? "■ Stop dictation" : "◌ Dictate"}</button>

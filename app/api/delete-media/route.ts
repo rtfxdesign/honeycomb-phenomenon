@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
 function getR2Client() {
   return new S3Client({
@@ -14,30 +14,54 @@ function getR2Client() {
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
-    return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
-  }
-
   try {
-    const { key } = await request.json();
+    const { submissionKey } = await request.json();
 
-    if (!key) {
-      return NextResponse.json({ error: "Media key is required" }, { status: 400 });
+    if (!submissionKey || !submissionKey.startsWith("submissions/")) {
+      return NextResponse.json({ error: "Invalid submission key" }, { status: 400 });
     }
 
     const client = getR2Client();
 
-    // Delete the object entirely from R2
-    await client.send(
-      new DeleteObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: key,
-      })
-    );
+    // 1. Fetch the JSON submission to find its media keys
+    const getCmd = new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: submissionKey,
+    });
+    
+    try {
+      const response = await client.send(getCmd);
+      const bodyStr = await response.Body?.transformToString();
+      if (bodyStr) {
+        const data = JSON.parse(bodyStr);
+        
+        // 2. Delete associated media files
+        if (data.mediaKey) {
+          await client.send(new DeleteObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: data.mediaKey,
+          }));
+        }
+        if (data.photoKey) {
+          await client.send(new DeleteObjectCommand({
+            Bucket: process.env.R2_BUCKET_NAME,
+            Key: data.photoKey,
+          }));
+        }
+      }
+    } catch (err) {
+      console.warn("Could not fetch submission for media deletion, attempting to delete JSON anyway.", err);
+    }
+
+    // 3. Delete the JSON submission itself
+    await client.send(new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: submissionKey,
+    }));
 
     return NextResponse.json({ success: true });
   } catch (error) {
-    console.error("Failed to delete media:", error);
-    return NextResponse.json({ error: "Failed to delete media" }, { status: 500 });
+    console.error("Failed to delete submission:", error);
+    return NextResponse.json({ error: "Failed to delete" }, { status: 500 });
   }
 }

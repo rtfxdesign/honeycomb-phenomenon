@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, CopyObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 function getR2Client() {
   return new S3Client({
@@ -14,45 +14,80 @@ function getR2Client() {
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
-    return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
-  }
-
   try {
-    const { key } = await request.json();
+    const { submissionKey } = await request.json();
 
-    if (!key) {
-      return NextResponse.json({ error: "Media key is required" }, { status: 400 });
+    if (!submissionKey || !submissionKey.startsWith("submissions/")) {
+      return NextResponse.json({ error: "Invalid submission key" }, { status: 400 });
     }
 
-    if (key.startsWith("approved/")) {
-      return NextResponse.json({ error: "Media is already approved" }, { status: 400 });
-    }
-
-    const bucketName = process.env.R2_BUCKET_NAME!;
-    const newKey = `approved/${key}`;
     const client = getR2Client();
 
-    // 1. Copy the object to the approved/ folder
-    await client.send(
-      new CopyObjectCommand({
-        Bucket: bucketName,
-        CopySource: encodeURI(`${bucketName}/${key}`),
+    // 1. Fetch the JSON submission
+    const getCmd = new GetObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: submissionKey,
+    });
+    const response = await client.send(getCmd);
+    const bodyStr = await response.Body?.transformToString();
+    if (!bodyStr) throw new Error("Empty submission file");
+    
+    const data = JSON.parse(bodyStr);
+
+    // Helper to move a media file to approved
+    const moveMediaToApproved = async (oldKey: string) => {
+      // oldKey might be "image/xyz.png"
+      const parts = oldKey.split("/");
+      const filename = parts.pop();
+      const folder = parts.join("/"); // "image", "video", or "audio"
+      
+      const newKey = `approved/${folder}/${filename}`;
+
+      await client.send(new CopyObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        CopySource: `${process.env.R2_BUCKET_NAME}/${oldKey}`,
         Key: newKey,
-      })
-    );
+      }));
 
-    // 2. Delete the original object to keep the inbox clean
-    await client.send(
-      new DeleteObjectCommand({
-        Bucket: bucketName,
-        Key: key,
-      })
-    );
+      await client.send(new DeleteObjectCommand({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Key: oldKey,
+      }));
 
-    return NextResponse.json({ success: true, newKey });
+      return newKey;
+    };
+
+    // 2. Move associated media files
+    if (data.mediaKey && !data.mediaKey.startsWith("approved/")) {
+      data.mediaKey = await moveMediaToApproved(data.mediaKey);
+    }
+    if (data.photoKey && !data.photoKey.startsWith("approved/")) {
+      data.photoKey = await moveMediaToApproved(data.photoKey);
+    }
+
+    // 3. Update the JSON status and save it to approved/submissions/
+    data.status = "approved";
+    data.approvedAt = new Date().toISOString();
+
+    const filename = submissionKey.split("/").pop();
+    const newSubmissionKey = `approved/submissions/${filename}`;
+
+    await client.send(new PutObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: newSubmissionKey,
+      Body: JSON.stringify(data, null, 2),
+      ContentType: "application/json",
+    }));
+
+    // 4. Delete the old JSON submission
+    await client.send(new DeleteObjectCommand({
+      Bucket: process.env.R2_BUCKET_NAME,
+      Key: submissionKey,
+    }));
+
+    return NextResponse.json({ success: true, newSubmissionKey });
   } catch (error) {
-    console.error("Failed to approve media:", error);
-    return NextResponse.json({ error: "Failed to approve media" }, { status: 500 });
+    console.error("Failed to approve submission:", error);
+    return NextResponse.json({ error: "Failed to approve" }, { status: 500 });
   }
 }
