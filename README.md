@@ -63,13 +63,11 @@ Because this project handles sensitive user data, security is paramount. The pro
 
 ---
 
-## 🤝 Contributing
+## 🤝 Contributing Experiences
 
-This is a community-driven effort. If you are a developer, designer, or researcher interested in anomalous experiences, we would love your help. 
+While the codebase itself is maintained internally, the project is fueled entirely by the community sharing their experiences. 
 
-1. Check the [Issues](https://github.com/rtfxdesign/honeycomb-phenomenon/issues) tab for tasks.
-2. Fork the repository and create a feature branch.
-3. Submit a Pull Request.
+If you have a story to tell, we welcome your contribution directly through the platform. Head over to [projecthoneycomb.site](https://www.projecthoneycomb.site) and click "Share your experience" to safely and securely add your voice to the archive.
 
 ## 📄 License
 
