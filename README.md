@@ -1,96 +1,89 @@
-# vinext-starter
+# 🐝 Project Honeycomb
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+A safe, searchable living archive for anomalous human experiences, built one voice at a time.
 
-## Prerequisites
+**Live site:** [projecthoneycomb.site](https://www.projecthoneycomb.site)
 
-- Node.js `>=22.13.0`
+---
 
-## Quick Start
+## Development (Cloud — Recommended)
 
-```bash
-npm install
-npm run dev
-npm run build
-```
+No local setup needed. Edit code entirely from your browser using GitHub Codespaces:
 
-This starter does not use `wrangler.jsonc`.
+1. Go to the [repo on GitHub](https://github.com/rtfxdesign/honeycomb-phenomenon)
+2. Click **Code → Codespaces → Create codespace on main**
+3. Once the environment loads, run: `npm run dev`
+4. Edit code in the browser-based VS Code
+5. Commit and push — Netlify auto-deploys to production
 
-## Included Shape
+> **Note:** GitHub provides 120 free core-hours/month for Codespaces.
 
-- edit site code under `app/`
-- `.openai/hosting.json` declares optional Sites D1 and R2 bindings
-- `vite.config.ts` simulates declared bindings for local development
-- `db/schema.ts` starts intentionally empty
-- `examples/d1/` contains an optional D1 example surface
-- `drizzle.config.ts` supports local migration generation when needed
+## Development (Local — Optional)
 
-## Workspace Auth Headers
+If you prefer working locally:
 
-OpenAI workspace sites can read the current user's email from
-`oai-authenticated-user-email`.
+1. Clone: `git clone https://github.com/rtfxdesign/honeycomb-phenomenon.git`
+2. Install: `npm install` (requires Node ≥22.13.0)
+3. Dev server: `npm run dev`
+4. Build: `npm run build`
 
-SIWC-authenticated workspace sites may also receive
-`oai-authenticated-user-full-name` when the user's SIWC profile has a non-empty
-`name` claim. The full-name value is percent-encoded UTF-8 and is accompanied by
-`oai-authenticated-user-full-name-encoding: percent-encoded-utf-8`.
+---
 
-Treat the full name as optional and fall back to email when it is absent:
+## Deployment
 
-```tsx
-import { headers } from "next/headers";
+Deployment is automatic via Netlify CI/CD. No manual uploads needed.
 
-export default async function Home() {
-  const requestHeaders = await headers();
-  const email = requestHeaders.get("oai-authenticated-user-email");
-  const encodedFullName = requestHeaders.get("oai-authenticated-user-full-name");
-  const fullName =
-    encodedFullName &&
-    requestHeaders.get("oai-authenticated-user-full-name-encoding") ===
-      "percent-encoded-utf-8"
-      ? decodeURIComponent(encodedFullName)
-      : null;
+| Trigger | Result |
+|---------|--------|
+| Push to `main` | Netlify builds and deploys to production |
+| Push to any other branch | Netlify creates a deploy preview URL |
+| Rollback | Use Netlify dashboard to revert to any previous deploy |
 
-  const displayName = fullName ?? email;
-  // ...
-}
-```
+### Recommended workflow
 
-## Optional Dispatch-Owned ChatGPT Sign-In
+1. Create a branch in GitHub
+2. Make and commit your changes
+3. Push the branch
+4. Review the Netlify deploy preview
+5. Merge into `main`
+6. Netlify publishes to production automatically
 
-Import the ready-to-use helpers from `app/chatgpt-auth.ts` when the site needs
-optional or required ChatGPT sign-in:
+### Managed in Netlify (not in this repo)
 
-- Use `getChatGPTUser()` for optional signed-in UI.
-- Use `requireChatGPTUser(returnTo)` for server-rendered pages that should send
-  anonymous visitors through Sign in with ChatGPT.
-- Use `chatGPTSignInPath(returnTo)` and `chatGPTSignOutPath(returnTo)` for
-  browser links or actions.
-- Pass a same-origin relative `returnTo` path for the destination after sign-in
-  or sign-out. The helper validates and safely encodes it.
-- Mark protected pages with `export const dynamic = "force-dynamic"` because
-  they depend on per-request identity headers.
+- Visitor password & access control
+- Domain & DNS configuration (`projecthoneycomb.site`)
+- HTTPS certificate
+- Form submissions & uploaded media
+- Environment variables & secrets
 
-Dispatch owns `/signin-with-chatgpt`, `/signout-with-chatgpt`, `/callback`, the
-OAuth cookies, and identity header injection. Do not implement app routes for
-those reserved paths. Routes that do not import and call the helper remain
-anonymous-compatible.
+---
 
-SIWC establishes identity only; it does not prove workspace membership. Use the
-Sites hosting platform's access policy controls for workspace-wide restrictions,
-or enforce explicit server-side membership or allowlist checks.
+## Project Structure
 
-Use SIWC for account pages, user-specific dashboards, saved records, and write
-actions tied to the current ChatGPT user. Leave public content anonymous.
+- `app/` — Site source code (Next.js pages, components, styles)
+- `public/` — Static assets (images, icons, forms)
+- `examples/d1/` — Optional Cloudflare D1 example
+- `tests/` — Automated tests
+- `.devcontainer/` — GitHub Codespaces configuration
+- `netlify.toml` — Netlify build settings
+
+## Tech Stack
+
+- **Framework:** Next.js 16 on [vinext](https://github.com/cloudflare/vinext) (Cloudflare)
+- **Database:** Cloudflare D1 + Drizzle ORM
+- **Forms:** Netlify Forms
+- **Hosting:** Netlify (CI/CD from GitHub)
+- **Source control:** GitHub (`rtfxdesign/honeycomb-phenomenon`)
 
 ## Useful Commands
 
-- `npm run dev`: start local development
-- `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
-- `npm run db:generate`: generate Drizzle migrations after schema changes
+| Command | Description |
+|---------|-------------|
+| `npm run dev` | Start local dev server |
+| `npm run build` | Build for production |
+| `npm test` | Build and run tests |
+| `npm run lint` | Run ESLint |
+| `npm run db:generate` | Generate Drizzle migrations after schema changes |
 
 ## Learn More
 
