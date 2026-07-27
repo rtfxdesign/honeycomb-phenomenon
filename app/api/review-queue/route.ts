@@ -93,7 +93,7 @@ export async function GET(request: NextRequest) {
 
     // Filter out failed parses and sort by date descending
     const validSubmissions = submissions
-      .filter((s) => s !== null)
+      .filter((s): s is NonNullable<typeof s> => s !== null && s.lastModified != null)
       .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
 
     return NextResponse.json({ submissions: validSubmissions });
