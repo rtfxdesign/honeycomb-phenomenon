@@ -51,18 +51,6 @@ We welcome contributions! The easiest way to contribute to Project Honeycomb is 
 
 ---
 
-## 🔒 Security & Environment Variables
-
-Because this project handles sensitive user data, security is paramount. The production environment relies on the following environment variables (managed securely in Netlify):
-
-- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET_NAME` (For Cloudflare R2 media ingestion)
-- `ARCJET_KEY` (For firewall protection)
-- `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN` (For error monitoring)
-
-*Note: If R2 or Arcjet keys are missing in a local environment, the application will gracefully fall back to a basic text-only/small-file submission mode to ensure local development doesn't break.*
-
----
-
 ## 🤝 Contributing Experiences
 
 While the codebase itself is maintained internally, the project is fueled entirely by the community sharing their experiences. 
