@@ -8,7 +8,7 @@ A safe, searchable living archive for anomalous human experiences, built one voi
 
 ## 🌟 About the Project
 
-Project Honeycomb is an open-source initiative designed to provide a secure, private, and stigma-free platform for individuals to document and share anomalous experiences (UAP sightings, high strangeness, and unexplained phenomena). 
+Project Honeycomb is an initiative designed to provide a secure, private, and stigma-free platform for individuals to document and share anomalous experiences (UAP sightings, high strangeness, and unexplained phenomena). 
 
 The goal of this project is to create a collective history, allowing experiencers to dictate or record their stories seamlessly while maintaining complete control over their privacy.
 
@@ -40,6 +40,3 @@ This project is built for speed, security, and scale:
 
 While the codebase is maintained internally, the ultimate goal is to fuel the project entirely by the community sharing their experiences. Once we officially launch, experiencers will be able to safely and securely add their voice to the archive.
 
-## 📄 License
-
-This project is open source. 
