@@ -33,11 +33,12 @@ This project is built for speed, security, and scale:
 
 ---
 
-## 🤝 Contributing Experiences
+## 🚧 Project Status: Under Development
 
-While the codebase itself is maintained internally, the project is fueled entirely by the community sharing their experiences. 
+> [!WARNING]
+> **Note:** This project is currently in a private development phase for internal demos. The platform is **not** currently open to public submissions.
 
-If you have a story to tell, we welcome your contribution directly through the platform. Head over to [projecthoneycomb.site](https://www.projecthoneycomb.site) and click "Share your experience" to safely and securely add your voice to the archive.
+While the codebase is maintained internally, the ultimate goal is to fuel the project entirely by the community sharing their experiences. Once we officially launch, experiencers will be able to safely and securely add their voice to the archive.
 
 ## 📄 License
 
