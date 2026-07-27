@@ -41,5 +41,22 @@
     "vite": "8.0.13",
     "wrangler": "4.92.0"
   },
-  "type": "module"
+  "type": "module",
+  "description": "A safe, searchable living archive for anomalous human experiences, built one voice at a time.",
+  "main": "index.js",
+  "directories": {
+    "example": "examples",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rtfxdesign/honeycomb-phenomenon.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/rtfxdesign/honeycomb-phenomenon/issues"
+  },
+  "homepage": "https://github.com/rtfxdesign/honeycomb-phenomenon#readme"
 }
