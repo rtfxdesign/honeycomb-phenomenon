@@ -14,6 +14,7 @@ type Story = {
   color: string;
   privacy?: string;
   photoUrl?: string;
+  hashtags?: string[];
 };
 
 type RecordingMode = "video" | "audio" | "text";
@@ -168,6 +169,7 @@ export default function Home() {
           color: "honey",
           privacy: String(row.privacy ?? "public"),
           photoUrl: row.photoUrl ? String(row.photoUrl) : undefined,
+          hashtags: Array.isArray(row.hashtags) ? row.hashtags.map(String) : [],
         }));
         if (saved.length) setStories([...saved, ...seedStories]);
       })
@@ -463,6 +465,15 @@ export default function Home() {
                 <p className="detail-location">⌖ {selectedStory.location}</p>
                 <blockquote>“{selectedStory.excerpt}”</blockquote>
                 <div className="audio-line"><button aria-label="Play excerpt">▶</button><i /><span>02:14</span></div>
+                {selectedStory.hashtags && selectedStory.hashtags.length > 0 && (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem", marginTop: "1.2rem" }}>
+                    {selectedStory.hashtags.map(tag => (
+                      <span key={tag} style={{ backgroundColor: "var(--line)", padding: "0.25rem 0.6rem", borderRadius: "100px", fontSize: "0.75rem", opacity: 0.8 }}>
+                        #{tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
                 <p className="prototype-label">Prototype story · identities are illustrative</p>
               </>
             )}
