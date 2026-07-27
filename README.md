@@ -6,86 +6,71 @@ A safe, searchable living archive for anomalous human experiences, built one voi
 
 ---
 
-## Development (Cloud — Recommended)
+## 🌟 About the Project
 
-No local setup needed. Edit code entirely from your browser using GitHub Codespaces:
+Project Honeycomb is an open-source initiative designed to provide a secure, private, and stigma-free platform for individuals to document and share anomalous experiences (UAP sightings, high strangeness, and unexplained phenomena). 
 
-1. Go to the [repo on GitHub](https://github.com/rtfxdesign/honeycomb-phenomenon)
-2. Click **Code → Codespaces → Create codespace on main**
+The goal of this project is to create a collective history, allowing experiencers to dictate or record their stories seamlessly while maintaining complete control over their privacy.
+
+### Core Principles
+- **Privacy First:** All submissions default to private. No one's story is published without explicit consent.
+- **Accessible Design:** A warm, inviting, and highly polished interface that feels premium and safe.
+- **Multi-Modal Intake:** Users can submit their experiences via text, audio dictation, or direct video recording.
+
+---
+
+## 🛠 Tech Stack & Architecture
+
+This project is built for speed, security, and scale:
+
+- **Framework:** Next.js 16 (App Router) powered by [vinext](https://github.com/cloudflare/vinext)
+- **Styling:** Vanilla CSS with custom design tokens for a unique, modern aesthetic
+- **Media Storage:** Cloudflare R2 via presigned URLs for large, direct-to-cloud video uploads
+- **Security & Bot Protection:** [Arcjet](https://arcjet.com) (WAF, Rate Limiting, Bot Detection)
+- **Error Tracking:** [Sentry](https://sentry.io)
+- **Database (Upcoming):** Cloudflare D1 + Drizzle ORM
+- **Hosting & CI/CD:** Netlify
+
+---
+
+## 🚀 Getting Started (Developers)
+
+We welcome contributions! The easiest way to contribute to Project Honeycomb is to use GitHub Codespaces, which requires zero local setup.
+
+### The Cloud Workflow (Recommended)
+1. Fork or clone this repository.
+2. Click **Code → Codespaces → Create codespace on main**.
 3. Once the environment loads, run: `npm run dev`
-4. Edit code in the browser-based VS Code
-5. Commit and push — Netlify auto-deploys to production
+4. Edit code in the browser-based VS Code.
 
-> **Note:** GitHub provides 120 free core-hours/month for Codespaces.
-
-## Development (Local — Optional)
-
-If you prefer working locally:
-
-1. Clone: `git clone https://github.com/rtfxdesign/honeycomb-phenomenon.git`
-2. Install: `npm install` (requires Node ≥22.13.0)
-3. Dev server: `npm run dev`
-4. Build: `npm run build`
+### The Local Workflow
+1. Clone the repo: `git clone https://github.com/rtfxdesign/honeycomb-phenomenon.git`
+2. Install dependencies: `npm install` *(Requires Node ≥22.13.0)*
+3. Start the dev server: `npm run dev`
+4. Build for production: `npm run build`
 
 ---
 
-## Deployment
+## 🔒 Security & Environment Variables
 
-Deployment is automatic via Netlify CI/CD. No manual uploads needed.
+Because this project handles sensitive user data, security is paramount. The production environment relies on the following environment variables (managed securely in Netlify):
 
-| Trigger | Result |
-|---------|--------|
-| Push to `main` | Netlify builds and deploys to production |
-| Push to any other branch | Netlify creates a deploy preview URL |
-| Rollback | Use Netlify dashboard to revert to any previous deploy |
+- `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_ENDPOINT`, `R2_BUCKET_NAME` (For Cloudflare R2 media ingestion)
+- `ARCJET_KEY` (For firewall protection)
+- `NEXT_PUBLIC_SENTRY_DSN`, `SENTRY_DSN` (For error monitoring)
 
-### Recommended workflow
-
-1. Create a branch in GitHub
-2. Make and commit your changes
-3. Push the branch
-4. Review the Netlify deploy preview
-5. Merge into `main`
-6. Netlify publishes to production automatically
-
-### Managed in Netlify (not in this repo)
-
-- Visitor password & access control
-- Domain & DNS configuration (`projecthoneycomb.site`)
-- HTTPS certificate
-- Form submissions & uploaded media
-- Environment variables & secrets
+*Note: If R2 or Arcjet keys are missing in a local environment, the application will gracefully fall back to a basic text-only/small-file submission mode to ensure local development doesn't break.*
 
 ---
 
-## Project Structure
+## 🤝 Contributing
 
-- `app/` — Site source code (Next.js pages, components, styles)
-- `public/` — Static assets (images, icons, forms)
-- `examples/d1/` — Optional Cloudflare D1 example
-- `tests/` — Automated tests
-- `.devcontainer/` — GitHub Codespaces configuration
-- `netlify.toml` — Netlify build settings
+This is a community-driven effort. If you are a developer, designer, or researcher interested in anomalous experiences, we would love your help. 
 
-## Tech Stack
+1. Check the [Issues](https://github.com/rtfxdesign/honeycomb-phenomenon/issues) tab for tasks.
+2. Fork the repository and create a feature branch.
+3. Submit a Pull Request.
 
-- **Framework:** Next.js 16 on [vinext](https://github.com/cloudflare/vinext) (Cloudflare)
-- **Database:** Cloudflare D1 + Drizzle ORM
-- **Forms:** Netlify Forms
-- **Hosting:** Netlify (CI/CD from GitHub)
-- **Source control:** GitHub (`rtfxdesign/honeycomb-phenomenon`)
+## 📄 License
 
-## Useful Commands
-
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start local dev server |
-| `npm run build` | Build for production |
-| `npm test` | Build and run tests |
-| `npm run lint` | Run ESLint |
-| `npm run db:generate` | Generate Drizzle migrations after schema changes |
-
-## Learn More
-
-- [vinext Documentation](https://github.com/cloudflare/vinext)
-- [Drizzle D1 Guide](https://orm.drizzle.team/docs/get-started/d1-new)
+This project is open source. 
