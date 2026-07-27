@@ -50,6 +50,24 @@ export default function ReviewDashboard() {
     }
   };
 
+  const handleDelete = async (key: string) => {
+    if (!confirm("Are you sure you want to permanently delete this media?")) return;
+    try {
+      const res = await fetch("/api/delete-media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key })
+      });
+      if (!res.ok) throw new Error("Failed to delete");
+      
+      // Remove from local state
+      setFiles(current => current.filter(f => f.key !== key));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to delete media. Check console.");
+    }
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -140,14 +158,22 @@ export default function ReviewDashboard() {
                 </a>
               </div>
               
-              {!isApproved && (
+              <div style={{ display: "flex", gap: "0.5rem", marginTop: "1rem" }}>
+                {!isApproved && (
+                  <button
+                    onClick={() => handleApprove(file.key)}
+                    style={{ flex: 1, padding: "0.5rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: "500" }}
+                  >
+                    Approve
+                  </button>
+                )}
                 <button
-                  onClick={() => handleApprove(file.key)}
-                  style={{ width: "100%", marginTop: "1rem", padding: "0.5rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: "500" }}
+                  onClick={() => handleDelete(file.key)}
+                  style={{ flex: 1, padding: "0.5rem", border: "none", borderRadius: "4px", backgroundColor: "#d9534f", color: "#fff", cursor: "pointer", fontWeight: "500" }}
                 >
-                  Approve Media
+                  Reject / Delete
                 </button>
-              )}
+              </div>
             </div>
           )
         })}
