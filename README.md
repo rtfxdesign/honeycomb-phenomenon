@@ -33,24 +33,6 @@ This project is built for speed, security, and scale:
 
 ---
 
-## 🚀 Getting Started (Developers)
-
-We welcome contributions! The easiest way to contribute to Project Honeycomb is to use GitHub Codespaces, which requires zero local setup.
-
-### The Cloud Workflow (Recommended)
-1. Fork or clone this repository.
-2. Click **Code → Codespaces → Create codespace on main**.
-3. Once the environment loads, run: `npm run dev`
-4. Edit code in the browser-based VS Code.
-
-### The Local Workflow
-1. Clone the repo: `git clone https://github.com/rtfxdesign/honeycomb-phenomenon.git`
-2. Install dependencies: `npm install` *(Requires Node ≥22.13.0)*
-3. Start the dev server: `npm run dev`
-4. Build for production: `npm run build`
-
----
-
 ## 🤝 Contributing Experiences
 
 While the codebase itself is maintained internally, the project is fueled entirely by the community sharing their experiences. 
