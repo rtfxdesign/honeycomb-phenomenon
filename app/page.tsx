@@ -126,11 +126,13 @@ export default function Home() {
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [storyText, setStoryText] = useState("");
   const [mediaFile, setMediaFile] = useState<File | Blob | null>(null);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [recording, setRecording] = useState(false);
   const [dictating, setDictating] = useState(false);
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
+  const [honeycombImages, setHoneycombImages] = useState<string[]>([]);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -154,6 +156,15 @@ export default function Home() {
         if (saved.length) setStories([...saved, ...seedStories]);
       })
       .catch(() => undefined);
+
+    fetch("/api/honeycomb-images")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.images && data.images.length > 0) {
+          setHoneycombImages(data.images.map((img: any) => img.url));
+        }
+      })
+      .catch(console.error);
   }, []);
 
   const openRecorder = () => {
@@ -261,6 +272,16 @@ export default function Home() {
       setStatus("Preserving your experience securely…");
     }
 
+    let photoKey = "";
+    if (photoFile) {
+      try {
+        const result = await uploadToR2(photoFile, photoFile.name, () => {});
+        photoKey = result.key;
+      } catch (error) {
+        console.warn("Photo upload to R2 failed", error);
+      }
+    }
+
     // Step 2: Submit metadata (+ small media fallback) via Netlify Forms
     const payload = new FormData();
     payload.append("form-name", "honeycomb-experience");
@@ -277,6 +298,12 @@ export default function Home() {
     } else if (mediaFile && mediaFile.size <= 7 * 1024 * 1024) {
       // Small file fallback via Netlify Forms
       payload.append("media", mediaFile, mediaFile instanceof File ? mediaFile.name : `experience.webm`);
+    }
+
+    if (photoKey) {
+      payload.append("photoKey", photoKey);
+    } else if (photoFile && photoFile.size <= 7 * 1024 * 1024) {
+      payload.append("photo", photoFile, photoFile.name);
     }
 
     try {
@@ -318,15 +345,26 @@ export default function Home() {
 
         <div className="hero-visual" aria-label="An organic constellation of archived voices">
           <div className="hero-halo" />
-          {heroCells.map(([left, top], index) => (
-            <div
-              key={`${left}-${top}`}
-              className={`hero-cell ${index === 8 ? "hero-cell-focus" : ""} ${index % 5 === 0 ? "hero-cell-ink" : ""}`}
-              style={{ left: `${left}%`, top: `${top}%`, animationDelay: `${index * -0.19}s` }}
-            >
-              <span>{heroLabels[index % heroLabels.length]}</span>
-            </div>
-          ))}
+          {heroCells.map(([left, top], index) => {
+            const bgUrl = honeycombImages.length > 0 ? honeycombImages[index % honeycombImages.length] : null;
+            return (
+              <div
+                key={`${left}-${top}`}
+                className={`hero-cell ${index === 8 ? "hero-cell-focus" : ""} ${index % 5 === 0 ? "hero-cell-ink" : ""}`}
+                style={{ 
+                  left: `${left}%`, 
+                  top: `${top}%`, 
+                  animationDelay: `${index * -0.19}s`,
+                  backgroundImage: bgUrl ? `url(${bgUrl})` : undefined,
+                  backgroundSize: "cover",
+                  backgroundPosition: "center",
+                  border: bgUrl ? "none" : undefined
+                }}
+              >
+                {!bgUrl && <span>{heroLabels[index % heroLabels.length]}</span>}
+              </div>
+            );
+          })}
           <div className="hero-caption"><b>02:14</b><span>Every cell is a voice.<br />Every voice changes the whole.</span></div>
         </div>
       </section>
@@ -498,6 +536,9 @@ export default function Home() {
                   {mode !== "text" && <button type="button" onClick={recording ? stopRecording : startRecording} className={recording ? "is-live" : ""}>{recording ? "■ Stop recording" : `● Record ${mode}`}</button>}
                   {mode !== "text" && <label className="upload-button">↑ Upload {mode}<input type="file" accept={mode === "video" ? "video/*" : "audio/*"} onChange={(event) => setMediaFile(event.target.files?.[0] ?? null)} /></label>}
                   {mediaFile && <span className="media-ready">✓ Media ready ({formatBytes(mediaFile.size)})</span>}
+                  
+                  <label className="upload-button">↑ Attach a photo<input type="file" accept="image/*" onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)} /></label>
+                  {photoFile && <span className="media-ready">✓ Photo ready ({formatBytes(photoFile.size)})</span>}
                   {submitting && uploadPercent > 0 && uploadPercent < 100 && (
                     <div className="upload-progress" role="progressbar" aria-valuenow={uploadPercent} aria-valuemin={0} aria-valuemax={100}>
                       <div className="upload-progress-bar" style={{ width: `${uploadPercent}%` }} />

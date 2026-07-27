@@ -32,6 +32,24 @@ export default function ReviewDashboard() {
       });
   }, []);
 
+  const handleApprove = async (key: string) => {
+    try {
+      const res = await fetch("/api/approve-media", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key })
+      });
+      if (!res.ok) throw new Error("Failed to approve");
+      const data = await res.json();
+      
+      // Update local state to reflect the new key
+      setFiles(current => current.map(f => f.key === key ? { ...f, key: data.newKey } : f));
+    } catch (err) {
+      console.error(err);
+      alert("Failed to approve media. Check console.");
+    }
+  };
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return "0 Bytes";
     const k = 1024;
@@ -77,15 +95,23 @@ export default function ReviewDashboard() {
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: "1rem" }}>
         {files.map((file) => {
           const viewUrl = `/api/view-media?key=${encodeURIComponent(file.key)}`;
+          const isApproved = file.key.startsWith("approved/");
           
           return (
-            <div key={file.key} style={{ border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem", backgroundColor: "rgba(0,0,0,0.02)" }}>
+            <div key={file.key} style={{ border: "1px solid var(--line)", borderRadius: "8px", padding: "1rem", backgroundColor: isApproved ? "rgba(0, 255, 100, 0.05)" : "rgba(0,0,0,0.02)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "1rem" }}>
                 <div style={{ wordBreak: "break-all", fontWeight: "500", marginRight: "1rem" }}>
                   {file.key.split('/').pop()}
                 </div>
-                <div style={{ fontSize: "0.8rem", padding: "0.2rem 0.5rem", borderRadius: "100px", backgroundColor: "var(--line)", whiteSpace: "nowrap" }}>
-                  {file.key.split('/')[0]}
+                <div style={{ display: "flex", gap: "0.5rem" }}>
+                  {isApproved && (
+                    <div style={{ fontSize: "0.8rem", padding: "0.2rem 0.5rem", borderRadius: "100px", backgroundColor: "#007067", color: "#fff", whiteSpace: "nowrap" }}>
+                      Approved
+                    </div>
+                  )}
+                  <div style={{ fontSize: "0.8rem", padding: "0.2rem 0.5rem", borderRadius: "100px", backgroundColor: "var(--line)", whiteSpace: "nowrap" }}>
+                    {file.key.split('/').pop()?.split('.').pop()?.toUpperCase() || "FILE"}
+                  </div>
                 </div>
               </div>
               
@@ -113,6 +139,15 @@ export default function ReviewDashboard() {
                   Download / View
                 </a>
               </div>
+              
+              {!isApproved && (
+                <button
+                  onClick={() => handleApprove(file.key)}
+                  style={{ width: "100%", marginTop: "1rem", padding: "0.5rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: "500" }}
+                >
+                  Approve Media
+                </button>
+              )}
             </div>
           )
         })}
