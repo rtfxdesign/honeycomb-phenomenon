@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { uploadToR2, formatBytes } from "@/app/lib/upload";
 
 type Story = {
   id: string;
@@ -129,6 +130,7 @@ export default function Home() {
   const [dictating, setDictating] = useState(false);
   const [status, setStatus] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [uploadPercent, setUploadPercent] = useState(0);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -230,7 +232,36 @@ export default function Home() {
       return;
     }
     setSubmitting(true);
-    setStatus("Preserving your experience securely…");
+    setUploadPercent(0);
+
+    let mediaKey = "";
+
+    // Step 1: If there's a media file, upload it directly to R2
+    if (mediaFile) {
+      const filename = mediaFile instanceof File ? mediaFile.name : `experience-${Date.now()}.webm`;
+      try {
+        setStatus(`Uploading ${formatBytes(mediaFile.size)}…`);
+        const result = await uploadToR2(mediaFile, filename, (progress) => {
+          setUploadPercent(progress.percent);
+          setStatus(`Uploading… ${progress.percent}% (${formatBytes(progress.loaded)} / ${formatBytes(progress.total)})`);
+        });
+        mediaKey = result.key;
+        setStatus("Upload complete. Saving your experience…");
+      } catch (error) {
+        // R2 not configured or upload failed — fall back to Netlify Forms for small files
+        if (mediaFile.size > 7 * 1024 * 1024) {
+          setStatus(error instanceof Error ? error.message : "Media upload failed. Please try again or continue without media.");
+          setSubmitting(false);
+          return;
+        }
+        // Small file: fall through to Netlify Forms with the file attached
+        setStatus("Preserving your experience securely…");
+      }
+    } else {
+      setStatus("Preserving your experience securely…");
+    }
+
+    // Step 2: Submit metadata (+ small media fallback) via Netlify Forms
     const payload = new FormData();
     payload.append("form-name", "honeycomb-experience");
     payload.append("title", title.trim());
@@ -240,11 +271,15 @@ export default function Home() {
     payload.append("transcript", storyText.trim());
     payload.append("privacy", privacy);
     payload.append("recordingMode", mode);
-    if (mediaFile) payload.append("media", mediaFile, mediaFile instanceof File ? mediaFile.name : `experience.${mode === "video" ? "webm" : "webm"}`);
+    if (mediaKey) {
+      // R2 upload succeeded — store the object key, not the file
+      payload.append("mediaKey", mediaKey);
+    } else if (mediaFile && mediaFile.size <= 7 * 1024 * 1024) {
+      // Small file fallback via Netlify Forms
+      payload.append("media", mediaFile, mediaFile instanceof File ? mediaFile.name : `experience.webm`);
+    }
+
     try {
-      if (mediaFile && mediaFile.size > 7 * 1024 * 1024) {
-        throw new Error("For this preview, recordings must be under 7 MB. Larger direct uploads will be enabled in the media-storage phase.");
-      }
       const response = await fetch("/__forms.html", { method: "POST", body: payload });
       if (!response.ok) throw new Error("Unable to preserve this experience right now.");
       setStep(4);
@@ -253,6 +288,7 @@ export default function Home() {
       setStatus(error instanceof Error ? error.message : "Something went wrong while saving. Please try again.");
     } finally {
       setSubmitting(false);
+      setUploadPercent(0);
     }
   };
 
@@ -461,7 +497,13 @@ export default function Home() {
                   <button type="button" onClick={toggleDictation} className={dictating ? "is-live" : ""}>{dictating ? "■ Stop dictation" : "◌ Dictate"}</button>
                   {mode !== "text" && <button type="button" onClick={recording ? stopRecording : startRecording} className={recording ? "is-live" : ""}>{recording ? "■ Stop recording" : `● Record ${mode}`}</button>}
                   {mode !== "text" && <label className="upload-button">↑ Upload {mode}<input type="file" accept={mode === "video" ? "video/*" : "audio/*"} onChange={(event) => setMediaFile(event.target.files?.[0] ?? null)} /></label>}
-                  {mediaFile && <span className="media-ready">✓ Media ready</span>}
+                  {mediaFile && <span className="media-ready">✓ Media ready ({formatBytes(mediaFile.size)})</span>}
+                  {submitting && uploadPercent > 0 && uploadPercent < 100 && (
+                    <div className="upload-progress" role="progressbar" aria-valuenow={uploadPercent} aria-valuemin={0} aria-valuemax={100}>
+                      <div className="upload-progress-bar" style={{ width: `${uploadPercent}%` }} />
+                      <span>{uploadPercent}%</span>
+                    </div>
+                  )}
                 </div>
                 {status && <p className="form-status" role="status">{status}</p>}
                 <div className="modal-actions"><button type="button" className="back-action" onClick={() => setStep(2)}>← Back</button><button className="primary-action" disabled={submitting}>{submitting ? "Saving…" : "Add to the archive"} <span>↗</span></button></div>
