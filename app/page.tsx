@@ -13,6 +13,7 @@ type Story = {
   initials: string;
   color: string;
   privacy?: string;
+  photoUrl?: string;
 };
 
 type RecordingMode = "video" | "audio" | "text";
@@ -99,11 +100,22 @@ function StoryOrbit({ stories, query, onSelect }: { stories: Story[]; query: str
               className={`story-node ${isMatch ? "is-match" : "is-dimmed"} tone-${story.color}`}
               key={story.id}
               onClick={() => onSelect(story)}
-              style={{ "--x": `${x}px`, "--y": `${y}px`, "--delay": `${index * 22}ms` } as React.CSSProperties}
+              style={{ 
+                "--x": `${x}px`, 
+                "--y": `${y}px`, 
+                "--delay": `${index * 22}ms`,
+                backgroundImage: story.photoUrl ? `url(${story.photoUrl})` : undefined,
+                backgroundSize: "cover",
+                backgroundPosition: "center"
+              } as React.CSSProperties}
               aria-label={`Open ${story.title}, ${story.location}, ${story.year}`}
             >
-              <span>{story.initials}</span>
-              <small>{story.year}</small>
+              {!story.photoUrl && (
+                <>
+                  <span>{story.initials}</span>
+                  <small>{story.year}</small>
+                </>
+              )}
             </button>
           );
         })}
@@ -155,6 +167,7 @@ export default function Home() {
           initials: String(row.displayName ?? row.display_name ?? "A").slice(0, 2).toUpperCase(),
           color: "honey",
           privacy: String(row.privacy ?? "public"),
+          photoUrl: row.photoUrl ? String(row.photoUrl) : undefined,
         }));
         if (saved.length) setStories([...saved, ...seedStories]);
       })
@@ -434,7 +447,17 @@ export default function Home() {
           <aside className="story-detail" aria-live="polite">
             {selectedStory && (
               <>
-                <div className={`detail-portrait tone-${selectedStory.color}`}><span>{selectedStory.initials}</span></div>
+                <div 
+                  className={`detail-portrait tone-${selectedStory.color}`}
+                  style={selectedStory.photoUrl ? {
+                    backgroundImage: `url(${selectedStory.photoUrl})`,
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    border: 'none'
+                  } : undefined}
+                >
+                  {!selectedStory.photoUrl && <span>{selectedStory.initials}</span>}
+                </div>
                 <p className="detail-meta">{selectedStory.type} · {selectedStory.year}</p>
                 <h3>{selectedStory.title}</h3>
                 <p className="detail-location">⌖ {selectedStory.location}</p>
