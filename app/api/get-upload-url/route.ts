@@ -45,9 +45,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Determine folder based on content type
+    let folder = "misc";
+    if (contentType.startsWith("video/")) folder = "video";
+    else if (contentType.startsWith("audio/")) folder = "audio";
+    else if (contentType.startsWith("text/")) folder = "text";
+    else if (contentType.startsWith("image/")) folder = "image";
+
     // Sanitize filename and create a unique key
     const sanitized = filename.replace(/[^a-zA-Z0-9._-]/g, "_");
-    const key = `uploads/${Date.now()}-${sanitized}`;
+    const key = `${folder}/${Date.now()}-${sanitized}`;
 
     const client = getR2Client();
     const command = new PutObjectCommand({
