@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { uploadToR2, formatBytes } from "@/app/lib/upload";
+import InteractiveBackground from "@/app/components/InteractiveBackground";
 
 type Story = {
   id: string;
@@ -377,6 +378,7 @@ export default function Home() {
       </header>
 
       <section className="hero" aria-labelledby="hero-title">
+        <InteractiveBackground />
         <div className="hero-copy">
           <p className="eyebrow"><span /> A living archive of anomalous experience</p>
           <h1 id="hero-title">Your experience.<br /><em>Our collective history.</em></h1>
