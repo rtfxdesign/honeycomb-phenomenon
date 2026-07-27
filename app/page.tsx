@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { uploadToR2, formatBytes } from "@/app/lib/upload";
 import InteractiveBackground from "@/app/components/InteractiveBackground";
+import SplashScreen from "@/app/components/SplashScreen";
 
 type Story = {
   id: string;
@@ -128,6 +129,7 @@ function StoryOrbit({ stories, query, onSelect }: { stories: Story[]; query: str
 }
 
 export default function Home() {
+  const [showSplash, setShowSplash] = useState<boolean | null>(null);
   const [stories, setStories] = useState<Story[]>(seedStories);
   const [query, setQuery] = useState("");
   const [selectedStory, setSelectedStory] = useState<Story | null>(seedStories[0]);
@@ -154,6 +156,11 @@ export default function Home() {
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const speechRef = useRef<SpeechRecognitionLike | null>(null);
+
+  // Desktop splash screen detection
+  useEffect(() => {
+    setShowSplash(window.innerWidth >= 1200);
+  }, []);
 
   useEffect(() => {
     fetch("/api/experiences?limit=40")
@@ -365,8 +372,13 @@ export default function Home() {
     }
   };
 
+  // Don't render anything until we know if we should show splash (prevents flash)
+  if (showSplash === null) return null;
+
   return (
-    <main id="top">
+    <>
+      {showSplash && <SplashScreen onEnter={() => setShowSplash(false)} />}
+      <main id="top" style={showSplash ? { display: "none" } : undefined}>
       <header className="site-header">
         <Logo />
         <nav aria-label="Main navigation">
@@ -656,5 +668,6 @@ export default function Home() {
         </div>
       )}
     </main>
+    </>
   );
 }
