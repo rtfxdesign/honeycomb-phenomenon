@@ -133,6 +133,8 @@ export default function Home() {
   const [submitting, setSubmitting] = useState(false);
   const [uploadPercent, setUploadPercent] = useState(0);
   const [honeycombImages, setHoneycombImages] = useState<string[]>([]);
+  const [tags, setTags] = useState<string[]>([]);
+  const [removedTags, setRemovedTags] = useState<string[]>([]);
   const recorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -166,6 +168,28 @@ export default function Home() {
       })
       .catch(console.error);
   }, []);
+
+  useEffect(() => {
+    if (!storyText.trim()) return;
+    const timeout = setTimeout(() => {
+      fetch("/api/generate-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: storyText })
+      })
+      .then(res => res.json())
+      .then(data => {
+        if (data.tags) {
+          const newTags = data.tags.filter((t: string) => !removedTags.includes(t) && !tags.includes(t));
+          if (newTags.length > 0) {
+            setTags(current => [...current, ...newTags]);
+          }
+        }
+      })
+      .catch(console.error);
+    }, 1000);
+    return () => clearTimeout(timeout);
+  }, [storyText, removedTags, tags]);
 
   const openRecorder = () => {
     setModalOpen(true);
@@ -304,6 +328,10 @@ export default function Home() {
       payload.append("photoKey", photoKey);
     } else if (photoFile && photoFile.size <= 7 * 1024 * 1024) {
       payload.append("photo", photoFile, photoFile.name);
+    }
+
+    if (tags.length > 0) {
+      payload.append("hashtags", tags.join(", "));
     }
 
     try {
@@ -530,6 +558,28 @@ export default function Home() {
                   <label className="field"><span>Place</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Hudson Valley, NY" /></label>
                   <label className="field"><span>Year</span><input value={year} onChange={(event) => setYear(event.target.value)} inputMode="numeric" placeholder="1986" /></label>
                   <label className="field field-wide"><span>Your experience</span><textarea value={storyText} onChange={(event) => setStoryText(event.target.value)} placeholder="Begin wherever feels right…" rows={6} required /></label>
+                  
+                  {tags.length > 0 && (
+                    <div className="field field-wide tags-container">
+                      <span style={{ fontSize: "0.8rem", opacity: 0.7, marginBottom: "0.5rem", display: "block" }}>Suggested tags based on your story:</span>
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: "0.5rem" }}>
+                        {tags.map(tag => (
+                          <span key={tag} style={{ backgroundColor: "var(--line)", padding: "0.2rem 0.6rem", borderRadius: "100px", fontSize: "0.85rem", display: "flex", alignItems: "center", gap: "0.4rem" }}>
+                            #{tag}
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                setTags(current => current.filter(t => t !== tag));
+                                setRemovedTags(current => [...current, tag]);
+                              }}
+                              style={{ background: "none", border: "none", cursor: "pointer", color: "inherit", opacity: 0.7, padding: 0 }}
+                              aria-label={`Remove tag ${tag}`}
+                            >×</button>
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
                 <div className="capture-tools">
                   <button type="button" onClick={toggleDictation} className={dictating ? "is-live" : ""}>{dictating ? "■ Stop dictation" : "◌ Dictate"}</button>
