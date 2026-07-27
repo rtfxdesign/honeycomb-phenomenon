@@ -376,7 +376,7 @@ export default function Home() {
         <div className="hero-visual" aria-label="An organic constellation of archived voices">
           <div className="hero-halo" />
           {heroCells.map(([left, top], index) => {
-            const bgUrl = honeycombImages.length > 0 ? honeycombImages[index % honeycombImages.length] : null;
+            const bgUrl = index < honeycombImages.length ? honeycombImages[index] : null;
             return (
               <div
                 key={`${left}-${top}`}
