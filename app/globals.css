@@ -51,8 +51,11 @@
 /* ───────────────────────────── base ───────────────────────────── */
 
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--color-bg);overflow:hidden}
+html,body{margin:0;height:100%;background:var(--color-bg)}
 body{color:var(--cream);font-family:Inter,Arial,sans-serif}
+/* the archive page is a fixed full-viewport layer, so it opts into no scrolling
+   without hiding overflow for scrollable pages like /review */
+body:has(.hc-page){overflow:hidden}
 a{color:var(--text-gold);text-decoration:none}a:hover{color:var(--interactive-hover)}
 button{font:inherit;color:inherit}
 
