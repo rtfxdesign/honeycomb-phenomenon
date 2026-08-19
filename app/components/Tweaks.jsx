@@ -96,15 +96,16 @@ const __TWEAKS_STYLE = `
 `;
 
 export function useTweaks(defaults) {
-  const [values, setValues] = React.useState(() => {
-    if (typeof window === 'undefined') return defaults;
+  // first render matches the server (defaults); saved values apply after
+  // hydration so SSR markup never disagrees with the client
+  const [values, setValues] = React.useState(defaults);
+  React.useEffect(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-      return { ...defaults, ...saved };
-    } catch {
-      return defaults;
-    }
-  });
+      if (Object.keys(saved).length) setValues((prev) => ({ ...prev, ...saved }));
+    } catch { /* private mode */ }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const setTweak = React.useCallback((keyOrEdits, val) => {
     const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
       ? keyOrEdits : { [keyOrEdits]: val };

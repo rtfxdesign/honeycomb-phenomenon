@@ -167,7 +167,39 @@ function StoryPanel({ page, person, onClose, openRecorder }) {
           <PanelFooter />
         </>
       )}
-      {person && (
+      {person && person.experience && (
+        <>
+          <div className="story-content">
+            <p className="record-label">
+              FROM THE ARCHIVE{person.experience.displayName ? ` · ${String(person.experience.displayName).toUpperCase()}` : ''}
+            </p>
+            <h1>{person.experience.title}</h1>
+            <div className="panel-copy">
+              <dl className="story-meta">
+                <div><dt>WHERE</dt><dd>{person.experience.location || 'Location withheld'}</dd></div>
+                <div><dt>WHEN</dt><dd>{person.experience.experienceYear || '—'}</dd></div>
+              </dl>
+              {person.experience.mediaUrl && person.experience.recordingMode === 'video' && (
+                <video className="story-media" src={person.experience.mediaUrl} controls playsInline preload="metadata" />
+              )}
+              {person.experience.mediaUrl && person.experience.recordingMode === 'audio' && (
+                <audio className="story-media" src={person.experience.mediaUrl} controls preload="metadata" />
+              )}
+              {person.experience.transcript && <p className="story-summary">{person.experience.transcript}</p>}
+              {(person.experience.hashtags || []).length > 0 && (
+                <div className="story-tags">
+                  {person.experience.hashtags.map((tag) => <span key={tag}>#{String(tag).toUpperCase()}</span>)}
+                </div>
+              )}
+              <button className="story-action" type="button" onClick={openRecorder}>
+                ADD YOUR OWN EXPERIENCE <span aria-hidden="true">→</span>
+              </button>
+            </div>
+          </div>
+          <PanelFooter />
+        </>
+      )}
+      {person && !person.experience && (
         <>
           <div className="story-content">
             <p className="record-label">FROM THE ARCHIVE · {person.name.toUpperCase()}</p>
@@ -228,7 +260,7 @@ function Gate({ onEnter, size }) {
 
 // ── archive field (design project, + person panel wiring + touch panning) ───
 
-function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect }) {
+function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences }) {
   const [vp, setVp] = useState(() => (typeof window === 'undefined' ? [1280, 800] : [window.innerWidth, window.innerHeight]));
   useEffect(() => {
     const onR = () => setVp([window.innerWidth, window.innerHeight]);
@@ -349,7 +381,24 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect }) {
     }
     return base.map((b) => result.has(b.k) ? { ...b, kin: kinSet.has(b.k), ...result.get(b.k) } : b);
   }, [base, focusKey, cols, rows, cx, cy, t.clusterShare, t.pull, t.push, t.dormantRespond, t.seed, size, W, H]);
-  const faceOf = useMemo(() => { const m = new Map(); let i = 0; for (const b of base) { if (b.t === 'b' && i < FACES.length) m.set(b.k, FACES[i++]); } return m; }, [base]);
+  // bright cells hold the community faces first; approved archive submissions
+  // (from /api/experiences) claim the remaining bright cells, their attached
+  // photo becoming the cell face
+  const faceOf = useMemo(() => {
+    const m = new Map();
+    let i = 0, e = 0;
+    for (const b of base) {
+      if (b.t !== 'b') continue;
+      if (i < FACES.length) {
+        m.set(b.k, FACES[i++]);
+      } else if (e < experiences.length) {
+        const exp = experiences[e++];
+        const name = exp.displayName || exp.title || 'Archive voice';
+        m.set(b.k, { src: exp.photoUrl || null, photo: true, name, person: { name, experience: exp } });
+      }
+    }
+    return m;
+  }, [base, experiences]);
   // vines grow from the bottom and climb the cluster's outer silhouette — left and
   // right edge chains plus sprouts under the lowest cells — wrapping the formation
   // as currently shaped; they render beneath the cells, never obscuring comb contents
@@ -410,7 +459,13 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect }) {
                        onClick={() => toggleCell(b)}
                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCell(b); } }}>
                     <img src="/assets/cell-bright.png" alt="" />
-                    {t.showFaces && faceOf.get(b.k) && <img className="cell-face" src={faceOf.get(b.k).src} alt={faceOf.get(b.k).name} />}
+                    {t.showFaces && faceOf.get(b.k) && faceOf.get(b.k).src && (
+                      <img
+                        className={faceOf.get(b.k).photo ? 'cell-face cell-face-photo' : 'cell-face'}
+                        src={faceOf.get(b.k).src}
+                        alt={faceOf.get(b.k).name}
+                      />
+                    )}
                   </div>
                 )
                 : <img src="/assets/cell-bright.png" alt="" className="cell-dormant" style={{ width: '100%' }} />}
@@ -432,6 +487,15 @@ export default function HoneycombApp() {
   const [person, setPerson] = useState(null);
   const [focusKey, setFocusKey] = useState(null);
   const [recorderOpen, setRecorderOpen] = useState(false);
+  const [experiences, setExperiences] = useState([]);
+
+  // approved archive submissions join the field as additional bright cells
+  useEffect(() => {
+    fetch('/api/experiences')
+      .then((r) => (r.ok ? r.json() : { experiences: [] }))
+      .then((d) => setExperiences((d.experiences || []).filter((e) => e.privacy !== 'archive')))
+      .catch(() => undefined);
+  }, []);
 
   // restore unlocked session (30 days) on the client only
   useEffect(() => {
@@ -489,6 +553,7 @@ export default function HoneycombApp() {
             focusKey={focusKey}
             setFocusKey={setFocusKey}
             onPersonSelect={onPersonSelect}
+            experiences={experiences}
           />
         )}
       </div>

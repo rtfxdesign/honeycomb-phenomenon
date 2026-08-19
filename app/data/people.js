@@ -13,6 +13,17 @@ export const PEOPLE = [
   { key: 'Doug_V', name: 'Doug', video: null, about: PLACEHOLDER },
   { key: 'Finn_S', name: 'Finn', video: null, about: PLACEHOLDER },
   { key: 'George_K', name: 'George Kendle', video: null, about: PLACEHOLDER },
+  {
+    key: 'John_B',
+    name: 'John Berg',
+    video: '/videos/john-berg.mp4',
+    about: [
+      'Hi, my name is John Berg and I am reporting an instance of witnessing a UAP. This had to have been around 2015 when I was working at the US State Department and I was leaving work. So it was after 5 p.m. in Washington DC and I don’t remember the exact streets, the cross streets I was at, but it was maybe K and 17 maybe in any case, you know, it was after work, so the sidewalks were pretty full with other people who had just gotten off work, and I happened to glance up into the sky and sort of in the direction of sort of the Potomac River, maybe around the Georgetown University area, like in the sky. I noticed the white orb. I would guess that this thing was probably about the size of a sedan, and that the elevation may have been around 1000ft, no lower than that, maybe 5 to 700ft high. But I noticed in the sky as I glanced towards the horizon above the edge of the buildings, and I just sort of stopped and stared at it for a while, and I kept thinking, I should take a picture of this. I should take a picture of this. But I didn’t because I was kind of transfixed.',
+      'I’d look away and glance up and down the street to see if anybody else on the sidewalks had noticed, and nobody was taking any notice that glanced back up. It was still there, it just hovering, stationary. And it wasn’t a balloon because it wasn’t drifting. It was like dead in the sky. I wasn’t the planet. It was clearly an orb because the sun was up and it was shining on the orb.',
+      'And the orb had a side that was reflecting the sunlight and the side that was dark. You know, that the sun was shining on. So I knew it was a circular white orb, and I was headed somewhere, I think, meeting some friends for a happy hour or something. And I was about to be running late, so I stopped staring at this thing, but it was very transfixing.',
+      'And that was my first UAP UFO witness account. Thank you.',
+    ],
+  },
   { key: 'Jorge_L', name: 'Jorge', video: null, about: PLACEHOLDER },
   {
     key: 'Liz_P',
