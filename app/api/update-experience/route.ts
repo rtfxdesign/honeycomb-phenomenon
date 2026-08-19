@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthed } from "../../lib/auth";
 import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 
 function getR2Client() {
@@ -28,6 +29,7 @@ const EDITABLE_FIELDS = [
 ] as const;
 
 export async function POST(request: NextRequest) {
+  if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
     return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
   }

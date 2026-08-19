@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthed } from "../../lib/auth";
 import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
@@ -15,6 +16,7 @@ function getR2Client() {
 }
 
 export async function GET(request: NextRequest) {
+  if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const searchParams = request.nextUrl.searchParams;
   const key = searchParams.get("key");
 

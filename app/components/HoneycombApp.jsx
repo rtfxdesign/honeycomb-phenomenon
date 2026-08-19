@@ -12,7 +12,7 @@ import {
   useTweaks, TweaksPanel, TweakSection, TweakSlider, TweakToggle,
   TweakRadio, TweakSelect, TweakColor, TweakButton,
 } from './Tweaks';
-import { FACES } from '../data/people';
+import { PEOPLE } from '../data/people';
 import { PAGES } from '../data/pages';
 import RecorderModal from './RecorderModal';
 
@@ -238,7 +238,26 @@ function PanelFooter() {
 
 function Gate({ onEnter, size }) {
   const [pw, setPw] = useState('');
-  const submit = (e) => { e.preventDefault(); onEnter(); };
+  const [checking, setChecking] = useState(false);
+  const [wrong, setWrong] = useState(false);
+  const submit = async (e) => {
+    e.preventDefault();
+    setChecking(true);
+    setWrong(false);
+    try {
+      const res = await fetch('/api/unlock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pw }),
+      });
+      if (res.ok) onEnter();
+      else setWrong(true);
+    } catch {
+      setWrong(true);
+    } finally {
+      setChecking(false);
+    }
+  };
   return (
     <div>
       <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 14 * size * 0.751 + size, height: 6 * size * 0.428 + size, opacity: 0.5, zIndex: 2 }}>
@@ -249,8 +268,9 @@ function Gate({ onEnter, size }) {
         <h1 className="gate-title">Enter the <em>Honeycomb.</em></h1>
         <p className="gate-body">This living archive is shared by invitation. Enter the password to continue.</p>
         <form className="gate-form" onSubmit={submit}>
-          <Input label="Password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder="" autoFocus />
-          <Button type="submit">Enter</Button>
+          <Input label="Password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
+                 hint={wrong ? 'That password was not recognized.' : undefined} invalid={wrong} autoFocus />
+          <Button type="submit" disabled={checking}>{checking ? 'Checking…' : 'Enter'}</Button>
         </form>
         <p className="gate-note"><span>✦</span> The session stays unlocked for 30 days on this device.</p>
       </div>
@@ -260,7 +280,7 @@ function Gate({ onEnter, size }) {
 
 // ── archive field (design project, + person panel wiring + touch panning) ───
 
-function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences }) {
+function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences, faces }) {
   const [vp, setVp] = useState(() => (typeof window === 'undefined' ? [1280, 800] : [window.innerWidth, window.innerHeight]));
   useEffect(() => {
     const onR = () => setVp([window.innerWidth, window.innerHeight]);
@@ -389,8 +409,8 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     let i = 0, e = 0;
     for (const b of base) {
       if (b.t !== 'b') continue;
-      if (i < FACES.length) {
-        m.set(b.k, FACES[i++]);
+      if (i < faces.length) {
+        m.set(b.k, faces[i++]);
       } else if (e < experiences.length) {
         const exp = experiences[e++];
         const name = exp.displayName || exp.title || 'Archive voice';
@@ -398,7 +418,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
       }
     }
     return m;
-  }, [base, experiences]);
+  }, [base, experiences, faces]);
   // vines grow from the bottom and climb the cluster's outer silhouette — left and
   // right edge chains plus sprouts under the lowest cells — wrapping the formation
   // as currently shaped; they render beneath the cells, never obscuring comb contents
@@ -488,6 +508,7 @@ export default function HoneycombApp() {
   const [focusKey, setFocusKey] = useState(null);
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [experiences, setExperiences] = useState([]);
+  const [people, setPeople] = useState(PEOPLE);
 
   // approved archive submissions join the field as additional bright cells
   useEffect(() => {
@@ -496,6 +517,20 @@ export default function HoneycombApp() {
       .then((d) => setExperiences((d.experiences || []).filter((e) => e.privacy !== 'archive')))
       .catch(() => undefined);
   }, []);
+
+  // community-face info (name, about, video) is editable from /review;
+  // the API merges those edits over the built-in defaults
+  useEffect(() => {
+    fetch('/api/people')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d && Array.isArray(d.people) && d.people.length) setPeople(d.people); })
+      .catch(() => undefined);
+  }, []);
+
+  const faces = useMemo(
+    () => people.map((p) => ({ src: '/uploads/' + p.key + '.webp', name: p.name, person: p })),
+    [people]
+  );
 
   // restore unlocked session (30 days) on the client only
   useEffect(() => {
@@ -554,6 +589,7 @@ export default function HoneycombApp() {
             setFocusKey={setFocusKey}
             onPersonSelect={onPersonSelect}
             experiences={experiences}
+            faces={faces}
           />
         )}
       </div>

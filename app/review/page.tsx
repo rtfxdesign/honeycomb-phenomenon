@@ -35,6 +35,19 @@ interface EditState {
   hashtags: string;
 }
 
+interface Person {
+  key: string;
+  name: string;
+  about: string[];
+  video: string | null;
+}
+
+interface PersonEditState {
+  name: string;
+  about: string;
+  video: string;
+}
+
 export default function ReviewDashboard() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
@@ -43,14 +56,29 @@ export default function ReviewDashboard() {
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [personEditKey, setPersonEditKey] = useState<string | null>(null);
+  const [personEdit, setPersonEdit] = useState<PersonEditState | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [password, setPassword] = useState("");
+  const [authError, setAuthError] = useState("");
 
-  useEffect(() => {
+  const loadAll = () => {
+    setLoading(true);
+    setError("");
     fetch("/api/review-queue")
       .then((res) => {
+        if (res.status === 401) {
+          setAuthRequired(true);
+          setLoading(false);
+          return null;
+        }
         if (!res.ok) throw new Error("Failed to load submissions");
         return res.json();
       })
       .then((data) => {
+        if (!data) return;
+        setAuthRequired(false);
         setSubmissions(data.submissions || []);
         setLoading(false);
       })
@@ -59,7 +87,33 @@ export default function ReviewDashboard() {
         setError("Could not load submissions from R2 bucket.");
         setLoading(false);
       });
-  }, []);
+    fetch("/api/people")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.people) setPeople(data.people); })
+      .catch((err) => console.error(err));
+  };
+
+  useEffect(loadAll, []);
+
+  const handleUnlock = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setAuthError("");
+    try {
+      const res = await fetch("/api/unlock", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password }),
+      });
+      if (!res.ok) {
+        setAuthError("That password was not recognized.");
+        return;
+      }
+      setPassword("");
+      loadAll();
+    } catch {
+      setAuthError("Could not verify the password. Try again.");
+    }
+  };
 
   const handleApprove = async (submissionKey: string) => {
     try {
@@ -143,6 +197,33 @@ export default function ReviewDashboard() {
     }
   };
 
+  const savePerson = async (key: string) => {
+    if (!personEdit) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/people", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          key,
+          name: personEdit.name,
+          about: personEdit.about.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean),
+          video: personEdit.video.trim() || null,
+        })
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      const result = await res.json();
+      setPeople(current => current.map(p => (p.key === key ? { ...p, ...result.person } : p)));
+      setPersonEditKey(null);
+      setPersonEdit(null);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to save person. Check console.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString(undefined, {
       month: "short",
@@ -161,6 +242,69 @@ export default function ReviewDashboard() {
 
   const pending = submissions.filter(s => !s.submissionKey.startsWith("approved/"));
   const approved = submissions.filter(s => s.submissionKey.startsWith("approved/"));
+
+  const renderPersonCard = (person: Person) => {
+    const isEditing = personEditKey === person.key && personEdit;
+    return (
+      <div key={person.key} style={{ display: "flex", flexDirection: "column", border: "1px solid var(--line)", borderRadius: "8px", overflow: "hidden", backgroundColor: "rgba(242,191,73,0.04)" }}>
+        <div style={{ padding: "1.2rem 1.5rem", borderBottom: "1px solid var(--line)", display: "flex", gap: "1rem", alignItems: "center" }}>
+          <img src={`/uploads/${person.key}.webp`} alt={person.name} style={{ width: "64px", height: "54px", objectFit: "contain", flexShrink: 0 }} />
+          {isEditing ? (
+            <div style={{ flex: 1 }}>
+              <span style={labelStyle}>Name (shown on the cell and panel)</span>
+              <input style={inputStyle} value={personEdit.name} onChange={e => setPersonEdit({ ...personEdit, name: e.target.value })} />
+            </div>
+          ) : (
+            <div>
+              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>{person.name}</h3>
+              <div style={{ fontSize: "0.8rem", opacity: 0.55, marginTop: "0.2rem" }}>
+                {person.video ? `🎬 ${person.video}` : "No video yet"}
+              </div>
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "1.2rem 1.5rem", flex: 1 }}>
+          {isEditing ? (
+            <div style={{ display: "grid", gap: "0.8rem" }}>
+              <div>
+                <span style={labelStyle}>Panel text (separate paragraphs with a blank line)</span>
+                <textarea style={{ ...inputStyle, resize: "vertical" }} rows={7} value={personEdit.about} onChange={e => setPersonEdit({ ...personEdit, about: e.target.value })} />
+              </div>
+              <div>
+                <span style={labelStyle}>Video path or URL (e.g. /videos/john-berg.mp4 — blank for none)</span>
+                <input style={inputStyle} value={personEdit.video} onChange={e => setPersonEdit({ ...personEdit, video: e.target.value })} />
+              </div>
+            </div>
+          ) : (
+            <div style={{ fontSize: "0.9rem", lineHeight: 1.55, opacity: 0.85, display: "grid", gap: "0.6rem" }}>
+              {person.about.map((p, i) => <p key={i} style={{ margin: 0 }}>{p}</p>)}
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "1rem 1.5rem", borderTop: "1px solid var(--line)", display: "flex", gap: "0.5rem", backgroundColor: "rgba(0,0,0,0.1)" }}>
+          {isEditing ? (
+            <>
+              <button onClick={() => savePerson(person.key)} disabled={saving}
+                      style={{ flex: 1, padding: "0.6rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: "500", opacity: saving ? 0.6 : 1 }}>
+                {saving ? "Saving…" : "Save changes"}
+              </button>
+              <button onClick={() => { setPersonEditKey(null); setPersonEdit(null); }} disabled={saving}
+                      style={{ flex: 1, padding: "0.6rem", border: "1px solid var(--line)", borderRadius: "4px", backgroundColor: "transparent", color: "inherit", cursor: "pointer" }}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => { setPersonEditKey(person.key); setPersonEdit({ name: person.name, about: person.about.join("\n\n"), video: person.video || "" }); }}
+              style={{ flex: 1, padding: "0.6rem", border: "1px solid var(--line)", borderRadius: "4px", backgroundColor: "transparent", color: "inherit", cursor: "pointer", fontWeight: "500" }}
+            >
+              Edit
+            </button>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   const renderCard = (submission: Submission) => {
     const isApproved = submission.submissionKey.startsWith("approved/");
@@ -349,7 +493,22 @@ export default function ReviewDashboard() {
       {loading && <div style={{ opacity: 0.5 }}>Loading securely...</div>}
       {error && <div style={{ color: "#d9534f" }}>{error}</div>}
 
-      {!loading && !error && (
+      {authRequired && !loading && (
+        <form onSubmit={handleUnlock} style={{ maxWidth: "360px", margin: "4rem auto", padding: "2rem", border: "1px solid var(--line)", borderRadius: "8px", display: "grid", gap: "1rem" }}>
+          <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>Moderator access</h2>
+          <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.65 }}>Enter the archive password to open the review dashboard.</p>
+          <input
+            type="password" value={password} onChange={e => setPassword(e.target.value)} autoFocus
+            style={inputStyle} placeholder="Password"
+          />
+          {authError && <div style={{ color: "#d9534f", fontSize: "0.85rem" }}>{authError}</div>}
+          <button type="submit" style={{ padding: "0.7rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: 500 }}>
+            Unlock
+          </button>
+        </form>
+      )}
+
+      {!loading && !error && !authRequired && (
         <>
           <h2 style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0 0 1rem" }}>Pending review ({pending.length})</h2>
           {pending.length === 0 ? (
@@ -367,12 +526,26 @@ export default function ReviewDashboard() {
             These appear as cells in the honeycomb. Edits publish immediately; set privacy to &ldquo;Strictly archived&rdquo; to hide one from the site without deleting it.
           </p>
           {approved.length === 0 ? (
-            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7 }}>
+            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7, marginBottom: "2.5rem" }}>
               Nothing approved yet.
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: "2rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: "2rem", marginBottom: "2.5rem" }}>
               {approved.map(renderCard)}
+            </div>
+          )}
+
+          <h2 style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0 0 0.4rem" }}>Community faces ({people.length})</h2>
+          <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", opacity: 0.6 }}>
+            The named cells in the honeycomb. Edit the name, the panel text, or point one at a video — changes go live immediately.
+          </p>
+          {people.length === 0 ? (
+            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7 }}>
+              Could not load the community faces.
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: "2rem" }}>
+              {people.map(renderPersonCard)}
             </div>
           )}
         </>

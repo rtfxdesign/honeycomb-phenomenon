@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAuthed } from "../../lib/auth";
 import { S3Client, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 
 function getR2Client() {
@@ -14,6 +15,7 @@ function getR2Client() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   try {
     const { submissionKey } = await request.json();
 
