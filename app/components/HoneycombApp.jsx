@@ -469,7 +469,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
         <div className="arch-field" ref={fieldRef} style={{ width: W, height: H, transform: 'translate(-50%,-50%)', marginTop: 12 }} onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
           {vines.map((v) => (
             <div key={v.id} className="vine-sprite" aria-hidden="true" style={{ left: v.x, top: v.y }}>
-              <img src="/uploads/vine-group2-alpha.png" alt="" style={{ height: v.L, transform: `translateX(-34.5%) rotate(${v.rot}deg)`, animationDelay: v.delay + 'ms' }} />
+              <img src="/uploads/vine-sprite.webp" alt="" style={{ height: v.L, transform: `translateX(-48%) rotate(${v.rot}deg)`, animationDelay: v.delay + 'ms' }} />
             </div>
           ))}
           {placed.map((b) => (
@@ -495,7 +495,6 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
           ))}
         </div>
       </div>
-      <p className="arch-tag">{focusKey ? 'Click the lit cell again to release the field' : 'Every experience is treated as a point of light within a shared history'}</p>
     </div>
   );
 }

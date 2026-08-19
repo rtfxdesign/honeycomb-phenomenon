@@ -101,7 +101,9 @@ button{font:inherit;color:inherit}
 .arch-clip::after{bottom:0;background:linear-gradient(0deg,rgba(13,8,6,0.92),transparent)}
 .arch-field{position:absolute;left:50%;top:50%;z-index:4;touch-action:none}
 .vine-sprite{position:absolute;width:0;height:0;pointer-events:none}
-.vine-sprite img{position:absolute;left:0;bottom:0;transform-origin:34.5% 100%;animation:vinegrow 2200ms var(--ease-quiet) both}
+/* max-width:none defeats the Tailwind preflight img reset, which would collapse
+   the vine to 0px inside its zero-width anchor */
+.vine-sprite img{position:absolute;left:0;bottom:0;max-width:none;transform-origin:48% 100%;animation:vinegrow 2200ms var(--ease-quiet) both}
 @keyframes vinegrow{from{clip-path:inset(100% 0 0 0);opacity:0}to{clip-path:inset(0 0 0 0);opacity:0.9}}
 .cell{position:absolute;transition:left 640ms var(--ease-quiet),top 640ms var(--ease-quiet)}
 .cell img{width:100%;display:block}
