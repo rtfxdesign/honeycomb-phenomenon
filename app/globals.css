@@ -105,13 +105,14 @@ button{font:inherit;color:inherit}
 @keyframes vinegrow{from{clip-path:inset(100% 0 0 0);opacity:0}to{clip-path:inset(0 0 0 0);opacity:0.9}}
 .cell{position:absolute;transition:left 640ms var(--ease-quiet),top 640ms var(--ease-quiet)}
 .cell img{width:100%;display:block}
-.cell-bright{cursor:pointer;transition:transform var(--dur-grow) var(--ease-quiet),filter var(--dur-grow) var(--ease-quiet);filter:drop-shadow(0 0 14px rgba(240,168,60,0.28))}
+.cell-bright{cursor:pointer;transition:transform var(--dur-grow) var(--ease-quiet),filter var(--dur-grow) var(--ease-quiet);filter:drop-shadow(0 0 14px rgba(240,168,60,0.28));opacity:var(--cell-opacity,0.9)}
 .cell-bright:hover,.cell-bright:focus-visible{transform:scale(var(--scale-grow));filter:drop-shadow(0 0 22px rgba(240,168,60,0.5));z-index:2;outline:none}
-.cell-dormant{filter:brightness(0.45) saturate(0.5)}
+.cell-dormant{filter:brightness(var(--dormant-brightness,0.72)) saturate(0.85);opacity:var(--cell-opacity,0.9)}
 .hexcell{position:relative;cursor:pointer;outline:none;transition:transform var(--dur-grow) var(--ease-quiet),filter var(--dur-grow) var(--ease-quiet);filter:drop-shadow(0 0 14px rgba(240,168,60,0.28))}
 .hexcell:hover,.hexcell:focus-visible{transform:scale(var(--scale-grow));filter:drop-shadow(0 0 22px rgba(240,168,60,0.5))}
 .hexcell.cell-focus{transform:scale(1.12);filter:drop-shadow(0 0 30px rgba(240,168,60,0.6))}
 .hexcell img{width:100%;display:block}
+.hexcell > img:not(.cell-face){opacity:var(--cell-opacity,0.9)}
 .hexcell .cell-face{position:absolute;left:11%;top:11%;width:78%;pointer-events:none}
 /* raw photos (approved submissions) get the hex mask via CSS since they lack baked-in alpha */
 .hexcell .cell-face-photo{aspect-ratio:749/631;object-fit:cover;clip-path:polygon(25% 2%,75% 2%,98% 50%,75% 98%,25% 98%,2% 50%)}

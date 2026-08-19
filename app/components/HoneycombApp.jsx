@@ -30,6 +30,8 @@ const TWEAK_DEFAULTS = {
   push: 255,
   dormantRespond: false,
   showFaces: true,
+  cellOpacity: 90,
+  dormantBright: 72,
   ground: '#0D0806',
   backdrop: 'Archive texture',
   textureOpacity: 29,
@@ -574,7 +576,7 @@ export default function HoneycombApp() {
   const panelOpen = Boolean(page || person);
 
   return (
-    <div className="hc-page" style={{ background: t.ground }}>
+    <div className="hc-page" style={{ background: t.ground, '--cell-opacity': (t.cellOpacity ?? 90) / 100, '--dormant-brightness': (t.dormantBright ?? 72) / 100 }}>
       <img src={BACKDROPS[t.backdrop] || BACKDROPS['Archive texture']} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
       {t.vignette && <div className="hc-vignette"></div>}
       <div className="hc-view" style={{ opacity: view === 'gate' ? 1 : 0, pointerEvents: view === 'gate' ? 'auto' : 'none' }}>
@@ -607,6 +609,8 @@ export default function HoneycombApp() {
         <TweakSlider label="Bright share" value={t.brightShare} min={10} max={90} unit="%" onChange={(v) => setTweak('brightShare', v)} />
         <TweakRadio label="Distribution" value={t.distribution} options={['even', 'clustered', 'scattered']} onChange={(v) => setTweak('distribution', v)} />
         <TweakToggle label="Show faces" value={t.showFaces} onChange={(v) => setTweak('showFaces', v)} />
+        <TweakSlider label="Cell opacity" value={t.cellOpacity ?? 90} min={40} max={100} unit="%" onChange={(v) => setTweak('cellOpacity', v)} />
+        <TweakSlider label="Dormant brightness" value={t.dormantBright ?? 72} min={30} max={100} unit="%" onChange={(v) => setTweak('dormantBright', v)} />
         <TweakButton label="Reshuffle field" onClick={() => setTweak('seed', (t.seed || 1) + 1)} />
         <TweakSection label="Gravity" />
         <TweakSlider label="Cluster share" value={t.clusterShare} min={0} max={100} unit="%" onChange={(v) => setTweak('clusterShare', v)} />
