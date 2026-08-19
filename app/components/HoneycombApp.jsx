@@ -38,7 +38,12 @@ const TWEAK_DEFAULTS = {
   vignette: true,
   vines: true,
   vineSeed: 1,
+  vineStyle: 'climb',
+  vineSize: 100,
+  vineLength: 100,
 };
+
+const VINE_ASPECT = 571 / 1100; // natural width/height of the vine sprite
 
 const BACKDROPS = {
   'Archive texture': '/assets/archive-background.webp',
@@ -421,39 +426,82 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     }
     return m;
   }, [base, experiences, faces]);
-  // vines grow from the bottom and climb the cluster's outer silhouette — left and
-  // right edge chains plus sprouts under the lowest cells — wrapping the formation
-  // as currently shaped; they render beneath the cells, never obscuring comb contents
+  // vines render beneath the cells, never obscuring comb contents. Three growth
+  // styles: "climb" hugs the left/right silhouette from the bottom up, "wrap"
+  // traces the cluster's whole outer perimeter, "sprawl" rises as undergrowth
+  // beneath the formation.
   const vines = useMemo(() => {
-    if (!t.vines) return [];
+    if (!t.vines || !base.length) return [];
     const rng = mulberry32(t.vineSeed * 40093 + t.seed * 7 + 5);
+    const lenS = (t.vineLength ?? 100) / 100;
+    const style = t.vineStyle || 'climb';
     const out = [];
-    const rowsM = new Map();
-    for (const b of base) { const arr = rowsM.get(b.y) || []; arr.push(b); rowsM.set(b.y, arr); }
-    const ys = [...rowsM.keys()].sort((a, b2) => b2 - a);
-    for (const side of ['L', 'R']) {
-      const chain = ys.map((y) => { const arr = rowsM.get(y); return arr.reduce((m, c) => (side === 'L' ? (c.x < m.x ? c : m) : (c.x > m.x ? c : m)), arr[0]); });
-      const cover = 0.55 + rng() * 0.45;
-      const sgn = side === 'L' ? -1 : 1;
-      for (let i = 0; i < Math.floor((chain.length - 1) * cover); i++) {
-        if (rng() < 0.3) continue;
-        const lo = chain[i], hi = chain[i + 1];
-        // only hug near-adjacent silhouette steps — skip discontinuous jumps that would cross the interior
-        if (Math.abs(hi.x - lo.x) > cx * 1.6 || (lo.y - hi.y) > cy * 4.5) continue;
-        const ax = lo.x + size / 2 + sgn * size * 0.52, ay = lo.y + size * 0.75;
-        const bx = hi.x + size / 2 + sgn * size * 0.52, by = hi.y + size * 0.75;
-        const th = Math.atan2(by - ay, bx - ax) + (rng() - 0.5) * 0.25;
-        out.push({ id: `${t.vineSeed}-${side}${i}`, x: ax, y: ay, rot: th * 180 / Math.PI + 90, L: Math.min(Math.hypot(bx - ax, by - ay) * (2.0 + rng() * 0.6), size * 3.4), delay: i * 170 + (side === 'R' ? 90 : 0) });
+    const grow = (id, x, y, rot, L, delay) => out.push({ id, x, y, rot, L: L * lenS, delay });
+
+    if (style === 'climb') {
+      const rowsM = new Map();
+      for (const b of base) { const arr = rowsM.get(b.y) || []; arr.push(b); rowsM.set(b.y, arr); }
+      const ys = [...rowsM.keys()].sort((a, b2) => b2 - a);
+      for (const side of ['L', 'R']) {
+        const chain = ys.map((y) => { const arr = rowsM.get(y); return arr.reduce((m, c) => (side === 'L' ? (c.x < m.x ? c : m) : (c.x > m.x ? c : m)), arr[0]); });
+        const cover = 0.55 + rng() * 0.45;
+        const sgn = side === 'L' ? -1 : 1;
+        for (let i = 0; i < Math.floor((chain.length - 1) * cover); i++) {
+          if (rng() < 0.3) continue;
+          const lo = chain[i], hi = chain[i + 1];
+          // only hug near-adjacent silhouette steps — skip discontinuous jumps that would cross the interior
+          if (Math.abs(hi.x - lo.x) > cx * 1.6 || (lo.y - hi.y) > cy * 4.5) continue;
+          const ax = lo.x + size / 2 + sgn * size * 0.52, ay = lo.y + size * 0.75;
+          const bx = hi.x + size / 2 + sgn * size * 0.52, by = hi.y + size * 0.75;
+          const th = Math.atan2(by - ay, bx - ax) + (rng() - 0.5) * 0.25;
+          grow(`${t.vineSeed}-${side}${i}`, ax, ay, th * 180 / Math.PI + 90, Math.min(Math.hypot(bx - ax, by - ay) * (2.0 + rng() * 0.6), size * 3.4), i * 170 + (side === 'R' ? 90 : 0));
+        }
+      }
+      const colsM = new Map();
+      for (const b of base) { const c = b.k.split(',')[0]; if (!colsM.has(c) || b.y > colsM.get(c).y) colsM.set(c, b); }
+      for (const b of shuffle([...colsM.values()], rng).slice(0, Math.max(2, Math.round(colsM.size * 0.3)))) {
+        const th = -Math.PI / 2 + (rng() - 0.5) * 0.35;
+        grow(`${t.vineSeed}-B${b.k}`, b.x + size / 2 + (rng() - 0.5) * size * 0.4, b.y + size * 1.02, th * 180 / Math.PI + 90, size * (2.2 + rng() * 1.3), Math.round(rng() * 200));
+      }
+    } else if (style === 'wrap') {
+      // every hex edge facing an empty slot is part of the outer boundary;
+      // vines lie along a sampled subset so the growth rings the formation
+      const occ = new Set(base.map((b) => b.k));
+      const segs = [];
+      for (const b of base) {
+        const [c, r] = b.k.split(',').map(Number);
+        const bx = b.x + size / 2, by = b.y + size * 0.42;
+        for (const [nc, nr] of neighbors([c, r])) {
+          if (occ.has(nc + ',' + nr)) continue;
+          const nx = nc * cx + size / 2, ny = nr * cy + size * 0.42;
+          segs.push({ mx: (bx + nx) / 2, my: (by + ny) / 2, th: Math.atan2(ny - by, nx - bx) });
+        }
+      }
+      const cover = 0.4 + rng() * 0.25;
+      const picked = shuffle(segs, rng).slice(0, Math.max(4, Math.round(segs.length * cover)));
+      picked.forEach((s, i) => {
+        // grow along the edge tangent, leaning slightly outward from the comb
+        const tang = s.th + (rng() < 0.5 ? Math.PI / 2 : -Math.PI / 2) + (rng() - 0.5) * 0.35;
+        grow(`${t.vineSeed}-W${i}`, s.mx + Math.cos(s.th) * size * 0.16, s.my + Math.sin(s.th) * size * 0.16, tang * 180 / Math.PI + 90, size * (1.0 + rng() * 0.8), Math.round(rng() * 700));
+      });
+    } else {
+      // sprawl: undergrowth rising beneath the whole cluster
+      const colsM = new Map();
+      for (const b of base) { const c = b.k.split(',')[0]; if (!colsM.has(c) || b.y > colsM.get(c).y) colsM.set(c, b); }
+      for (const b of [...colsM.values()]) {
+        if (rng() < 0.25) continue;
+        const th = -Math.PI / 2 + (rng() - 0.5) * 0.7;
+        grow(`${t.vineSeed}-S${b.k}`, b.x + size / 2 + (rng() - 0.5) * size * 0.8, b.y + size * (1.0 + rng() * 0.3), th * 180 / Math.PI + 90, size * (2.2 + rng() * 1.8), Math.round(rng() * 500));
+      }
+      const maxY = Math.max(...base.map((b) => b.y));
+      const minX = Math.min(...base.map((b) => b.x)), maxX = Math.max(...base.map((b) => b.x));
+      for (let i = 0; i < 4; i++) {
+        const th = -Math.PI / 2 + (rng() - 0.5) * 0.5;
+        grow(`${t.vineSeed}-R${i}`, minX + rng() * (maxX - minX + size), maxY + size * (1.3 + rng() * 0.4), th * 180 / Math.PI + 90, size * (3 + rng() * 1.5), Math.round(rng() * 700));
       }
     }
-    const colsM = new Map();
-    for (const b of base) { const c = b.k.split(',')[0]; if (!colsM.has(c) || b.y > colsM.get(c).y) colsM.set(c, b); }
-    for (const b of shuffle([...colsM.values()], rng).slice(0, Math.max(2, Math.round(colsM.size * 0.3)))) {
-      const th = -Math.PI / 2 + (rng() - 0.5) * 0.35;
-      out.push({ id: `${t.vineSeed}-B${b.k}`, x: b.x + size / 2 + (rng() - 0.5) * size * 0.4, y: b.y + size * 1.02, rot: th * 180 / Math.PI + 90, L: size * (2.2 + rng() * 1.3), delay: Math.round(rng() * 200) });
-    }
     return out;
-  }, [base, t.vines, t.vineSeed, t.seed, size, cx, cy]);
+  }, [base, t.vines, t.vineSeed, t.vineStyle, t.vineLength, t.seed, size, cx, cy]);
   const toggleCell = (b) => {
     if (b.k === focusKey) {
       setFocusKey(null);
@@ -469,7 +517,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
         <div className="arch-field" ref={fieldRef} style={{ width: W, height: H, transform: 'translate(-50%,-50%)', marginTop: 12 }} onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
           {vines.map((v) => (
             <div key={v.id} className="vine-sprite" aria-hidden="true" style={{ left: v.x, top: v.y }}>
-              <img src="/uploads/vine-sprite.webp" alt="" style={{ height: v.L, transform: `translateX(-48%) rotate(${v.rot}deg)`, animationDelay: v.delay + 'ms' }} />
+              <img src="/uploads/vine-sprite.webp" alt="" style={{ height: v.L, width: v.L * VINE_ASPECT * ((t.vineSize ?? 100) / 100), transform: `translateX(-48%) rotate(${v.rot}deg)`, animationDelay: v.delay + 'ms' }} />
             </div>
           ))}
           {placed.map((b) => (
@@ -621,7 +669,11 @@ export default function HoneycombApp() {
         <TweakSelect label="Texture image" value={t.backdrop} options={Object.keys(BACKDROPS)} onChange={(v) => setTweak('backdrop', v)} />
         <TweakSlider label="Texture" value={t.textureOpacity} min={0} max={70} unit="%" onChange={(v) => setTweak('textureOpacity', v)} />
         <TweakToggle label="Vignette" value={t.vignette} onChange={(v) => setTweak('vignette', v)} />
+        <TweakSection label="Vines" />
         <TweakToggle label="Vines" value={t.vines} onChange={(v) => setTweak('vines', v)} />
+        <TweakRadio label="Growth style" value={t.vineStyle ?? 'climb'} options={['climb', 'wrap', 'sprawl']} onChange={(v) => setTweak('vineStyle', v)} />
+        <TweakSlider label="Vine size" value={t.vineSize ?? 100} min={50} max={200} unit="%" onChange={(v) => setTweak('vineSize', v)} />
+        <TweakSlider label="Vine length" value={t.vineLength ?? 100} min={50} max={200} unit="%" onChange={(v) => setTweak('vineLength', v)} />
         <TweakButton label="Randomize vine growth" onClick={() => setTweak('vineSeed', (t.vineSeed || 1) + 1)} />
         <TweakSection label="Session" />
         <TweakButton label="Reset all tweaks" secondary onClick={resetTweaks} />
