@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const { submissionKey } = await request.json();
 
-    if (!submissionKey || !submissionKey.startsWith("submissions/")) {
+    if (!submissionKey || !(submissionKey.startsWith("submissions/") || submissionKey.startsWith("approved/submissions/"))) {
       return NextResponse.json({ error: "Invalid submission key" }, { status: 400 });
     }
 

@@ -22,13 +22,16 @@ export async function GET(request: NextRequest) {
   const client = getR2Client();
 
   try {
-    const listCommand = new ListObjectsV2Command({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Prefix: "submissions/",
-    });
-
-    const listResponse = await client.send(listCommand);
-    const objects = listResponse.Contents || [];
+    // pending submissions plus published ones, so the dashboard can edit both
+    const prefixes = ["submissions/", "approved/submissions/"];
+    const objects: { Key?: string; LastModified?: Date }[] = [];
+    for (const prefix of prefixes) {
+      const listResponse = await client.send(new ListObjectsV2Command({
+        Bucket: process.env.R2_BUCKET_NAME,
+        Prefix: prefix,
+      }));
+      objects.push(...(listResponse.Contents || []));
+    }
 
     // Filter to only get .json metadata files
     const jsonObjects = objects.filter(obj => obj.Key?.endsWith('.json'));
