@@ -199,7 +199,7 @@ async function seed() {
       experienceYear: s.year,
       experienceType: s.type,
       transcript: s.text,
-      privacy: "public",
+      privacy: s.privacy || "public",
       recordingMode: useVideo ? "video" : "text",
       hashtags: s.tags,
       mediaKey: useVideo ? videoKey : undefined,
