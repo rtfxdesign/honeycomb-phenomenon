@@ -147,22 +147,21 @@ const PENDING = [
 
 // Procedural portraits: warm abstract plates, clearly placeholders rather than
 // invented faces, so the photo path is exercised honestly.
-function portraitSvg(seedIndex, initials) {
-  const hue = 22 + ((seedIndex * 37) % 34);
-  const hue2 = hue + 18;
+function portraitSvg(seedIndex) {
+  // amber range only — these sit among real portraits and must not fight the
+  // warm palette; deliberately abstract rather than an invented face
+  const hue = 26 + ((seedIndex * 13) % 14);
   return `<svg xmlns="http://www.w3.org/2000/svg" width="600" height="600" viewBox="0 0 600 600">
   <defs>
-    <radialGradient id="g" cx="50%" cy="38%" r="70%">
-      <stop offset="0%" stop-color="hsl(${hue2},72%,58%)"/>
-      <stop offset="55%" stop-color="hsl(${hue},58%,32%)"/>
-      <stop offset="100%" stop-color="hsl(${hue - 6},48%,12%)"/>
+    <radialGradient id="g" cx="50%" cy="34%" r="76%">
+      <stop offset="0%" stop-color="hsl(${hue + 8},62%,46%)"/>
+      <stop offset="52%" stop-color="hsl(${hue},52%,26%)"/>
+      <stop offset="100%" stop-color="hsl(${hue - 8},46%,10%)"/>
     </radialGradient>
   </defs>
   <rect width="600" height="600" fill="url(#g)"/>
-  <circle cx="300" cy="232" r="96" fill="rgba(12,7,3,0.34)"/>
-  <path d="M300 350c104 0 168 66 182 160H118c14-94 78-160 182-160z" fill="rgba(12,7,3,0.34)"/>
-  <text x="300" y="560" text-anchor="middle" font-family="Montserrat, sans-serif" font-size="52"
-        font-weight="600" letter-spacing="6" fill="rgba(255,232,190,0.9)">${initials}</text>
+  <circle cx="300" cy="238" r="92" fill="rgba(255,206,132,0.20)"/>
+  <path d="M300 352c102 0 166 66 180 158H120c14-92 78-158 180-158z" fill="rgba(255,206,132,0.20)"/>
 </svg>`;
 }
 
@@ -189,7 +188,7 @@ async function seed() {
     let photoKey;
     if (s.portrait) {
       photoKey = `approved/image/${id}-portrait.svg`;
-      await put(photoKey, portraitSvg(i, initialsOf(s.name)), "image/svg+xml");
+      await put(photoKey, portraitSvg(i), "image/svg+xml");
     }
     const useVideo = videoKey && i === 0;
     const record = {

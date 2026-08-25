@@ -578,17 +578,18 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     const el = fieldRef.current;
     if (!b || !el) return;
     const targetScreenX = panelWidth + (vp[0] - panelWidth) / 2;
-    const cellCenterX = b.x + size / 2;
+    const cellCenterX = b.x + size / 2, cellCenterY = b.y + size * 0.43;
     const desiredX = targetScreenX - vp[0] / 2 - (cellCenterX - W / 2);
+    const desiredY = -(cellCenterY - H / 2);
     panRef.current = {
       x: Math.max(-maxPanX - slack, Math.min(maxPanX + slack, desiredX)),
-      y: panRef.current.y,
+      y: Math.max(-maxPanY, Math.min(maxPanY, desiredY)),
     };
     el.classList.add('arch-field--ease');
     apply();
     const done = setTimeout(() => el.classList.remove('arch-field--ease'), 760);
     return () => clearTimeout(done);
-  }, [panelOpen, focusKey, arranged, vp, panelWidth, size, W, maxPanX, slack, apply]);
+  }, [panelOpen, focusKey, arranged, vp, panelWidth, size, W, H, maxPanX, maxPanY, slack, apply]);
   // vines render beneath the cells, never obscuring comb contents. Three growth
   // styles: "climb" hugs the left/right silhouette from the bottom up, "wrap"
   // traces the cluster's whole outer perimeter, "sprawl" rises as undergrowth
