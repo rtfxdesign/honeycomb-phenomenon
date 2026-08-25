@@ -370,7 +370,16 @@ function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
               {person.experience.mediaUrl && person.experience.recordingMode === 'audio' && (
                 <audio className="story-media" src={person.experience.mediaUrl} controls preload="metadata" />
               )}
-              {person.experience.transcript && <p className="story-summary">{person.experience.transcript}</p>}
+              {person.experience.transcript && (
+                <div className="story-summary">
+                  {/* Dictated accounts run long and arrive with paragraph
+                      breaks in them. Rendering the whole transcript as one
+                      block turned a five-minute testimony into a wall. */}
+                  {String(person.experience.transcript).split(/\n\s*\n/).map((para, i) => (
+                    <p key={i}>{para.trim()}</p>
+                  ))}
+                </div>
+              )}
               {(person.experience.hashtags || []).length > 0 && (
                 <div className="story-tags">
                   {person.experience.hashtags.map((tag) => <span key={tag}>#{String(tag).toUpperCase()}</span>)}
