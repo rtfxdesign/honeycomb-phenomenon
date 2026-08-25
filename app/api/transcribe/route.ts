@@ -108,6 +108,8 @@ export async function POST(request: NextRequest) {
       transcriptModel: result.model,
       transcribedAt: new Date().toISOString(),
       transcriptError: undefined,
+      // Anything the moderator should look at twice before confirming.
+      transcriptWarnings: result.warnings.length ? result.warnings : undefined,
     };
 
     await client.send(
@@ -124,6 +126,7 @@ export async function POST(request: NextRequest) {
       machineTranscript: result.text,
       wordCount: result.wordCount,
       model: result.model,
+      warnings: result.warnings,
     });
   } catch (error) {
     console.error("Transcription failed:", error);

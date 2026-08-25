@@ -53,6 +53,31 @@ async function transcribeAudio(bytes, opts = {}) {
   }
 }
 
+
+function textFromWords(words) {
+  const kept = [];
+  let furthest = -Infinity;
+  let removed = 0;
+  let insideRepeat = false;
+  const SLACK = 0.1;
+  for (const w of words) {
+    const word = typeof w?.word === 'string' ? w.word : '';
+    const start = Number(w?.start);
+    if (!Number.isFinite(start)) { if (word) kept.push(word); continue; }
+    if (start < furthest - SLACK) { insideRepeat = true; removed++; continue; }
+    if (insideRepeat) {
+      if (start <= furthest + SLACK) { removed++; continue; }
+      insideRepeat = false;
+    }
+    furthest = Math.max(furthest, start);
+    if (word) kept.push(word);
+  }
+  const carriesOwnSpacing = kept.some((w) => /^\s/.test(w));
+  const joined = carriesOwnSpacing ? kept.join('') : kept.join(' ');
+  const text = joined.replace(/\s+/g, ' ').replace(/\s+([,.!?;:])/g, '$1').trim();
+  return { text, removed };
+}
+
 function mediaKeyForTranscription(record) {
   if (record.audioKey) return { key: record.audioKey };
   if (record.recordingMode === 'audio' && record.mediaKey) return { key: record.mediaKey };
@@ -173,4 +198,68 @@ test('a text submission has nothing to transcribe', () => {
   const r = mediaKeyForTranscription({ recordingMode: 'text' });
   assert.equal(r.key, null);
   assert.match(r.why, /no audio/);
+});
+
+// ── repetition guard ──────────────────────────────────────────────────────
+// Whisper looped on the first real recording we tested: a 25-word span came
+// back twice, both stamped 21.52s-23.82s. These lock in the timeline-based fix.
+
+const timed = (pairs) => pairs.map(([word, start]) => ({ word, start, end: start + 0.3 }));
+
+test('drops a span the model repeated at the same timestamps', () => {
+  const words = timed([
+    ['it', 1.0], ['held', 1.3], ['still', 1.6],
+    ['we', 2.0], ['were', 2.3], ['paralyzed', 2.6],
+    // the loop: same words, same timestamps, emitted again
+    ['we', 2.0], ['were', 2.3], ['paralyzed', 2.6],
+    ['then', 3.0], ['it', 3.3], ['moved', 3.6],
+  ]);
+  const { text, removed } = textFromWords(words);
+  assert.equal(removed, 3);
+  assert.equal(text, 'it held still we were paralyzed then it moved');
+});
+
+test('leaves a clean timeline completely alone', () => {
+  const words = timed([['the', 0.1], ['frogs', 0.4], ['stopped', 0.7]]);
+  const { text, removed } = textFromWords(words);
+  assert.equal(removed, 0);
+  assert.equal(text, 'the frogs stopped');
+});
+
+test('a word genuinely repeated later in the recording is kept', () => {
+  // Same word, different moment — that is speech, not a loop.
+  const words = timed([['silence', 1.0], ['then', 2.0], ['silence', 9.0]]);
+  const { text, removed } = textFromWords(words);
+  assert.equal(removed, 0);
+  assert.equal(text, 'silence then silence');
+});
+
+test('small timestamp jitter is not mistaken for a loop', () => {
+  const words = [
+    { word: 'a', start: 1.00, end: 1.2 },
+    { word: 'b', start: 0.95, end: 1.3 },
+    { word: 'c', start: 1.40, end: 1.6 },
+  ];
+  const { removed } = textFromWords(words);
+  assert.equal(removed, 0, '50ms of jitter should be tolerated');
+});
+
+test('joins bare tokens with spaces and keeps punctuation closed up', () => {
+  const { text } = textFromWords(timed([['the', 1], ['whole', 2], ['time.', 3]]));
+  assert.equal(text, 'the whole time.');
+});
+
+test('respects tokens that carry their own leading spaces', () => {
+  const words = [
+    { word: 'It', start: 1 }, { word: ' held', start: 2 }, { word: ' still.', start: 3 },
+  ];
+  const { text } = textFromWords(words);
+  assert.equal(text, 'It held still.');
+});
+
+test('words without timestamps are kept rather than risked', () => {
+  const words = [{ word: 'kept' }, { word: 'also', start: 1 }, { word: 'kept' }];
+  const { text, removed } = textFromWords(words);
+  assert.equal(removed, 0);
+  assert.match(text, /kept also kept/);
 });

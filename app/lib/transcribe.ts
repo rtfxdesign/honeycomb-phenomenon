@@ -29,8 +29,79 @@ export const DEFAULT_MODEL = "@cf/openai/whisper";
 export const MAX_BYTES = Number(process.env.TRANSCRIBE_MAX_BYTES || 25 * 1024 * 1024);
 
 export type TranscriptionResult =
-  | { ok: true; text: string; model: string; wordCount: number }
+  | { ok: true; text: string; model: string; wordCount: number; warnings: string[] }
   | { ok: false; reason: "not-configured" | "too-large" | "empty" | "failed"; detail?: string };
+
+type TimedWord = { word?: string; start?: number; end?: number };
+
+/**
+ * Rebuild the transcript from the word timeline, dropping repeated spans.
+ *
+ * Whisper sometimes loops: it emits the same passage twice, with *identical*
+ * timestamps, because its decoding windows overlap. Seen on the first real
+ * recording we tested — a 25-word span appeared twice, both stamped
+ * 21.52s-23.82s, so the audio said it once and the model said it twice.
+ *
+ * Text heuristics for this are guesswork; the timeline is not. Any word that
+ * starts earlier than where we have already reached is a step backwards in
+ * time, which no genuine speech does, so it is a repeat and gets dropped.
+ */
+export function textFromWords(words: TimedWord[]): { text: string; removed: number } {
+  const kept: string[] = [];
+  let furthest = -Infinity;
+  let removed = 0;
+  // Once a jump backwards proves we are inside a repeat, stay in it until the
+  // timeline moves past where we had already reached. Without this the last
+  // word of a repeated span survives, because its timestamp is exactly the
+  // boundary rather than behind it.
+  let insideRepeat = false;
+
+  // A tenth of a second of slack throughout: word boundaries are not exact and
+  // we only want to catch a real jump backwards, not ordinary jitter.
+  const SLACK = 0.1;
+
+  for (const w of words) {
+    const word = typeof w?.word === "string" ? w.word : "";
+    const start = Number(w?.start);
+
+    // No usable timestamp — keep it rather than risk dropping real speech.
+    if (!Number.isFinite(start)) {
+      if (word) kept.push(word);
+      continue;
+    }
+
+    if (start < furthest - SLACK) {
+      insideRepeat = true;
+      removed++;
+      continue;
+    }
+
+    if (insideRepeat) {
+      if (start <= furthest + SLACK) {
+        removed++;
+        continue;
+      }
+      insideRepeat = false;
+    }
+
+    furthest = Math.max(furthest, start);
+    if (word) kept.push(word);
+  }
+
+  // Some responses carry their own spacing on each token (" the"), others hand
+  // back bare words ("the"). Joining the second kind with "" produces one long
+  // run-on string, so decide from the data rather than assuming.
+  const carriesOwnSpacing = kept.some((w) => /^\s/.test(w));
+  const joined = carriesOwnSpacing ? kept.join("") : kept.join(" ");
+
+  const text = joined
+    .replace(/\s+/g, " ")
+    // Re-close punctuation that the join pushed away from its word.
+    .replace(/\s+([,.!?;:])/g, "$1")
+    .trim();
+
+  return { text, removed };
+}
 
 export const transcriptionConfigured = () =>
   Boolean(process.env.CF_ACCOUNT_ID && process.env.CF_AI_TOKEN);
@@ -74,20 +145,40 @@ export async function transcribeAudio(
     }
 
     const body = await res.json();
-    // Shapes seen across Workers AI revisions: { result: { text } } from the
-    // account REST API, and a bare { text } when proxied. Accept either rather
-    // than pinning to one and breaking on the next revision.
+    // Verified against the account REST API: the response is
+    // { errors, messages, success, result: { text, vtt, words, word_count } }.
+    // The bare { text } form is still accepted because it has been seen when
+    // the call is proxied, and pinning to one shape would break on the next
+    // revision for no gain.
     const text: unknown = body?.result?.text ?? body?.text;
     if (typeof text !== "string" || !text.trim()) {
       return { ok: false, reason: "failed", detail: "no text in response" };
     }
 
-    const clean = text.trim();
+    const warnings: string[] = [];
+    let clean = text.trim();
+
+    // Prefer the word timeline when it is there — it is the only reliable way
+    // to catch the model repeating itself.
+    const words: unknown = body?.result?.words ?? body?.words;
+    if (Array.isArray(words) && words.length) {
+      const rebuilt = textFromWords(words as TimedWord[]);
+      if (rebuilt.text) {
+        if (rebuilt.removed > 0) {
+          warnings.push(
+            `Removed ${rebuilt.removed} repeated word${rebuilt.removed === 1 ? "" : "s"} where the transcription looped. Worth checking this one against the recording.`
+          );
+        }
+        clean = rebuilt.text;
+      }
+    }
+
     return {
       ok: true,
       text: clean,
       model,
-      wordCount: Number(body?.result?.word_count ?? body?.word_count ?? clean.split(/\s+/).length),
+      wordCount: clean.split(/\s+/).filter(Boolean).length,
+      warnings,
     };
   } catch (err) {
     return { ok: false, reason: "failed", detail: err instanceof Error ? err.message : String(err) };
