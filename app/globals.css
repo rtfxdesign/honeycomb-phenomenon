@@ -142,6 +142,22 @@ button{font:inherit;color:inherit}
 .cell{--lit:0;--lx:0}
 .cell-dormant-wrap{position:relative;display:block}
 
+/* The colour of the light, in one place.
+   Held as bare channels so alpha can still be computed per layer with
+   rgb(... / calc(...)). Every warm surface in the comb — the pool on a cell,
+   the interior, the film over a face — draws from these three, so the light
+   has one temperature rather than a dozen hand-picked ones that drift apart
+   whenever anybody edits a gradient.
+
+   Golden rather than pale: the core keeps a little white so it still reads as
+   a light source, but the falloff runs through honey into amber instead of
+   fading toward cream. */
+.arch-field{
+  --light-core:255 206 118;   /* the middle of the pool */
+  --light-warm:255 168 56;    /* honey, most of what you see */
+  --light-deep:236 132 22;    /* amber at the edge, where it meets the dark */
+}
+
 /* Fractal noise, generated once by the browser from an inline SVG rather than
    shipped as an image. feColorMatrix maps the turbulence into alpha 0.45..1,
    so as a mask it mottles what it covers instead of cutting holes in it. */
@@ -158,9 +174,9 @@ button{font:inherit;color:inherit}
   transition:opacity var(--glow-fade,520ms) var(--ease-quiet);
   background:
     radial-gradient(circle at calc(50% + var(--lx) * 26%) 42%,
-      rgba(255,206,132,0.55) 0%,
-      rgba(247,182,86,0.30) 34%,
-      rgba(224,151,37,0.10) 62%,
+      rgb(var(--light-core) / 0.58) 0%,
+      rgb(var(--light-warm) / 0.34) 34%,
+      rgb(var(--light-deep) / 0.13) 62%,
       transparent 78%);
   /* the light lands on the comb, not on the square box around it */
   -webkit-mask-image:url('/assets/cell-bright.png');
@@ -181,9 +197,9 @@ button{font:inherit;color:inherit}
   /* Same reasoning as the glaze: uneven pools, not a band. */
   background:
     radial-gradient(ellipse 58% 44% at calc(40% + var(--lx) * 40%) 34%,
-      rgba(255,214,150,0.40) 0%, rgba(255,190,110,0.14) 44%, transparent 74%),
+      rgb(var(--light-core) / 0.42) 0%, rgb(var(--light-warm) / 0.17) 44%, transparent 74%),
     radial-gradient(ellipse 46% 60% at calc(64% + var(--lx) * 22%) 66%,
-      rgba(255,182,92,0.26) 0%, transparent 72%);
+      rgb(var(--light-warm) / 0.28) 0%, transparent 72%);
   /* two masks: the hex silhouette, then the mottling inside it */
   -webkit-mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
   mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
@@ -215,15 +231,15 @@ button{font:inherit;color:inherit}
      Colours are honey rather than white — this is warm material, lit warmly. */
   background:
     radial-gradient(ellipse 64% 46% at calc(34% + var(--lx) * 34%) 28%,
-      rgba(255,216,150,calc(0.05 + var(--lit) * 0.30)) 0%,
-      rgba(255,196,112,calc(0.02 + var(--lit) * 0.12)) 42%,
+      rgb(var(--light-core) / calc(0.05 + var(--lit) * 0.30)) 0%,
+      rgb(var(--light-warm) / calc(0.02 + var(--lit) * 0.13)) 42%,
       transparent 72%),
     radial-gradient(ellipse 44% 68% at calc(68% + var(--lx) * 16%) 58%,
-      rgba(255,188,96,calc(0.04 + var(--lit) * 0.20)) 0%,
-      rgba(252,166,66,calc(0.02 + var(--lit) * 0.09)) 46%,
+      rgb(var(--light-warm) / calc(0.04 + var(--lit) * 0.21)) 0%,
+      rgb(var(--light-deep) / calc(0.02 + var(--lit) * 0.10)) 46%,
       transparent 76%),
     radial-gradient(ellipse 78% 38% at calc(52% + var(--lx) * 48%) 82%,
-      rgba(255,172,74,calc(0.03 + var(--lit) * 0.16)) 0%,
+      rgb(var(--light-deep) / calc(0.03 + var(--lit) * 0.17)) 0%,
       transparent 70%);
   /* Fractal noise breaks the pools into mottling, the way light through wax is
      never even. Static data URI, so it costs one rasterisation and nothing per
