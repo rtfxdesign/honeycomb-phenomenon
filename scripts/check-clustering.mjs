@@ -8,6 +8,7 @@
  *
  *   node scripts/check-clustering.mjs
  */
+import { existsSync } from 'node:fs';
 import { STORIES, ALL_TAGS, TAG_VOCABULARY } from './seed-stories.mjs';
 
 // Same scoring as app/components/HoneycombApp.jsx.
@@ -134,6 +135,17 @@ console.log(`             mean ${Math.round(words.reduce((a, b) => a + b, 0) / w
 const shortOnes = STORIES.filter((s) => s.text.length < 500);
 if (shortOnes.length) fail(`${shortOnes.length} transcript(s) under 500 chars: ${shortOnes.map((s) => s.name).join(', ')}`);
 else pass('every transcript is a substantial account');
+
+// 8b. Every referenced recording exists. The seeder skips a missing file with
+//     a warning, which is right at seed time and wrong here: a renamed file
+//     would quietly drop a voice's audio and nobody would notice until the
+//     story panel had no player.
+const audioDir = new URL('../seed-audio/', import.meta.url);
+const withAudio = STORIES.filter((s) => s.audio);
+const missingAudio = withAudio.filter((s) => !existsSync(new URL(s.audio, audioDir)));
+console.log(`\nRecordings: ${withAudio.length} of ${STORIES.length} stories have audio`);
+if (missingAudio.length) fail(`referenced audio file(s) not found: ${missingAudio.map((s) => s.audio).join(', ')}`);
+else pass('every referenced recording is present');
 
 // 9. Paragraphs, since the panel now renders them.
 const flat = STORIES.filter((s) => !s.text.includes('\n\n'));

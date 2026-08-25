@@ -103,7 +103,24 @@ async function seed() {
       photoKey = `approved/image/${id}-portrait.svg`;
       await put(photoKey, portraitSvg(i), "image/svg+xml");
     }
-    const useVideo = videoKey && i === 0;
+
+    // Spoken accounts. audioKey is what transcription reads, and for an audio
+    // submission it is the recording itself — the same shape the recorder
+    // produces, so the seeded records exercise the real path rather than a
+    // convenient fiction.
+    let audioKey;
+    if (s.audio) {
+      try {
+        const audio = await readFile(new URL(`../seed-audio/${s.audio}`, import.meta.url));
+        audioKey = `approved/audio/${id}.mp3`;
+        await put(audioKey, audio, "audio/mpeg");
+      } catch {
+        console.log(`  missing seed-audio/${s.audio} — ${s.name} seeded without audio`);
+        audioKey = undefined;
+      }
+    }
+
+    const useVideo = videoKey && !audioKey && i === 0;
     const record = {
       id,
       title: s.title,
@@ -113,10 +130,17 @@ async function seed() {
       experienceType: s.type,
       transcript: s.text,
       privacy: s.privacy || "public",
-      recordingMode: useVideo ? "video" : "text",
+      recordingMode: audioKey ? "audio" : useVideo ? "video" : "text",
       hashtags: s.tags,
-      mediaKey: useVideo ? videoKey : undefined,
+      mediaKey: audioKey || (useVideo ? videoKey : undefined),
+      audioKey,
       photoKey,
+      // These carry a written account as well as the recording, so the
+      // transcript is confirmed rather than awaiting a machine. Clearing
+      // transcriptStatus on one of them is the way to test the transcribe
+      // button against a record that already has a known-good answer.
+      transcriptSource: "typed",
+      transcriptStatus: "confirmed",
       submittedAt: new Date(stamp + i * 1000).toISOString(),
       approvedAt: new Date(stamp + i * 1000 + 500).toISOString(),
       status: "approved",

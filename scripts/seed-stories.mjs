@@ -33,7 +33,7 @@ export const ALL_TAGS = Object.values(TAG_VOCABULARY).flat();
 export const STORIES = [
   {
     name: 'Marcy Ruiz', title: 'A silent light above the pines', location: 'Hudson Valley, NY', year: '1986', type: 'Light',
-    tags: ['orb', 'silent', 'forest', 'night', 'childhood', 'family', 'never-told'], portrait: true,
+    tags: ['orb', 'silent', 'forest', 'night', 'childhood', 'family', 'never-told'], audio: '00-marcy-ruiz.mp3', portrait: true,
     text: `It held perfectly still over the treeline for what must have been four or five minutes. Then it moved without crossing the space between — it was in one place, and then it was in another place, and there was no travel in between that my eye could follow.
 
 The silence is the part I have never been able to explain to anyone. We lived under a flight path. I knew what aircraft sounded like at that distance, and I knew what the woods sounded like at night, and this was neither. It was the absence of both. Even the frogs stopped.
@@ -42,7 +42,7 @@ My brother saw it too. He was nine and I was twelve. We went inside and got into
   },
   {
     name: 'Jonah Ellery', title: 'Three points over the water', location: 'Lake Erie, OH', year: '2004', type: 'Craft',
-    tags: ['triangle', 'formation', 'water', 'silent', 'multiple-witness'], portrait: true,
+    tags: ['triangle', 'formation', 'water', 'silent', 'multiple-witness'], audio: '01-jonah-ellery.mp3', portrait: true,
     text: `The lights formed a triangle, but the stars went out behind it. That is how I knew it was one solid object and not three separate craft flying in formation. I could trace the edge of it by which stars were missing.
 
 There were four of us on the breakwall that night. We had been fishing since before dark. Nobody said anything for the first minute — I think we were all waiting for someone else to say it first, so we would know we were not the only one seeing it.
@@ -53,7 +53,7 @@ My friend Dev started laughing, which I have thought about a great deal since. I
   },
   {
     name: 'Ana Whitfield', title: 'The morning after', location: 'Sedona, AZ', year: '2018', type: 'Dream',
-    tags: ['presence', 'desert', 'dreams-after', 'memory-gap', 'solitary', 'telepathy'],
+    tags: ['presence', 'desert', 'dreams-after', 'memory-gap', 'solitary', 'telepathy'], audio: '02-ana-whitfield.mp3',
     text: `I woke with a memory that behaved like a place I had visited rather than anything my mind had made. I know the difference. Dreams thin out when you reach for them. This did the opposite — it got more detailed the longer I sat with it.
 
 There was a room with no corners. Not round, exactly; the walls met, but the meeting did not produce a corner, and I remember being interested in that rather than frightened by it. And there was someone waiting, patiently, for me to understand something. Not speaking. Waiting the way a teacher waits when they have already given you everything you need.
@@ -62,7 +62,7 @@ I never did understand it. That is the part that has stayed with me — not the 
   },
   {
     name: 'Dell Emerson', title: 'No sound on the county road', location: 'Taos, NM', year: '1997', type: 'Craft',
-    tags: ['radio-failure', 'engine-stall', 'highway', 'desert', 'silent'], portrait: true,
+    tags: ['radio-failure', 'engine-stall', 'highway', 'desert', 'silent'], audio: '03-dell-emerson.mp3', portrait: true,
     text: `The radio cut out before I saw anything. That order matters to me. I have gone over it many times and I am certain of it: first the radio, then the glow coming up over the ridge.
 
 The truck kept running. That is the strange part — the engine was fine, I had headlights, but every electrical thing that made noise went dead quiet at once. The radio, the heater fan, the little chime that never stopped telling me the passenger belt was undone. All of it, together, like someone had put a hand over the whole system.
