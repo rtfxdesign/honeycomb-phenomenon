@@ -142,6 +142,13 @@ button{font:inherit;color:inherit}
 .cell{--lit:0;--lx:0}
 .cell-dormant-wrap{position:relative;display:block}
 
+/* Fractal noise, generated once by the browser from an inline SVG rather than
+   shipped as an image. feColorMatrix maps the turbulence into alpha 0.45..1,
+   so as a mask it mottles what it covers instead of cutting holes in it. */
+.arch-field{
+  --wax-noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.032' numOctaves='4' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.55 0 0 0 0.45'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
 /* The warm pool. Sits under the face deliberately — light on bare comb should
    read stronger than light on someone's portrait. */
 .hexcell::before,
@@ -171,17 +178,21 @@ button{font:inherit;color:inherit}
   content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
   opacity:calc(var(--lit) * var(--glow-strength,0.7) * 0.55);
   transition:opacity var(--glow-fade,520ms) var(--ease-quiet);
-  background:linear-gradient(
-    calc(104deg + var(--lx) * 42deg),
-    transparent 34%,
-    rgba(255,224,170,0.42) 47%,
-    rgba(255,236,200,0.14) 53%,
-    transparent 66%);
-  -webkit-mask-image:url('/assets/cell-bright.png');
-  mask-image:url('/assets/cell-bright.png');
-  -webkit-mask-size:100% 100%;
-  mask-size:100% 100%;
+  /* Same reasoning as the glaze: uneven pools, not a band. */
+  background:
+    radial-gradient(ellipse 58% 44% at calc(40% + var(--lx) * 40%) 34%,
+      rgba(255,214,150,0.40) 0%, rgba(255,190,110,0.14) 44%, transparent 74%),
+    radial-gradient(ellipse 46% 60% at calc(64% + var(--lx) * 22%) 66%,
+      rgba(255,182,92,0.26) 0%, transparent 72%);
+  /* two masks: the hex silhouette, then the mottling inside it */
+  -webkit-mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  -webkit-mask-size:100% 100%,170% 170%;
+  mask-size:100% 100%,170% 170%;
+  -webkit-mask-composite:source-in;
+  mask-composite:intersect;
   mix-blend-mode:screen;
+  animation:waxdrift 26s linear infinite reverse;
 }
 
 /* A thin film over the portrait, and the thing the light actually catches.
@@ -197,22 +208,42 @@ button{font:inherit;color:inherit}
   clip-path:polygon(25% 2%,75% 2%,98% 50%,75% 98%,25% 98%,2% 50%);
   pointer-events:none;z-index:3;
   opacity:var(--glaze,0.5);
+  /* Three uneven pools rather than a band. A straight-edged sheen reads as
+     glass; wax has no straight edges in it. Each ellipse is a different shape,
+     sits at a different place, and slides at a different rate as the light
+     moves, so they drift apart and overlap instead of travelling as one plate.
+     Colours are honey rather than white — this is warm material, lit warmly. */
   background:
-    /* the sheen: a narrow band that slides across as the light moves */
-    linear-gradient(
-      calc(96deg + var(--lx) * 54deg),
-      transparent 30%,
-      rgba(255,241,214,calc(0.05 + var(--lit) * 0.30)) 45%,
-      rgba(255,232,190,calc(0.02 + var(--lit) * 0.13)) 55%,
+    radial-gradient(ellipse 64% 46% at calc(34% + var(--lx) * 34%) 28%,
+      rgba(255,216,150,calc(0.05 + var(--lit) * 0.30)) 0%,
+      rgba(255,196,112,calc(0.02 + var(--lit) * 0.12)) 42%,
       transparent 72%),
-    /* the pool: warmth gathering on the surface nearest the light */
-    radial-gradient(circle at calc(50% + var(--lx) * 34%) 40%,
-      rgba(255,214,146,calc(0.04 + var(--lit) * 0.20)) 0%,
-      rgba(255,196,110,calc(0.02 + var(--lit) * 0.08)) 45%,
-      transparent 74%);
+    radial-gradient(ellipse 44% 68% at calc(68% + var(--lx) * 16%) 58%,
+      rgba(255,188,96,calc(0.04 + var(--lit) * 0.20)) 0%,
+      rgba(252,166,66,calc(0.02 + var(--lit) * 0.09)) 46%,
+      transparent 76%),
+    radial-gradient(ellipse 78% 38% at calc(52% + var(--lx) * 48%) 82%,
+      rgba(255,172,74,calc(0.03 + var(--lit) * 0.16)) 0%,
+      transparent 70%);
+  /* Fractal noise breaks the pools into mottling, the way light through wax is
+     never even. Static data URI, so it costs one rasterisation and nothing per
+     frame. Alpha is held between 0.45 and 1 so it thins the glaze rather than
+     punching holes in it. */
+  -webkit-mask-image:var(--wax-noise);
+  mask-image:var(--wax-noise);
+  -webkit-mask-size:150% 150%;
+  mask-size:150% 150%;
   mix-blend-mode:screen;
+  animation:waxdrift 19s linear infinite;
   transition:opacity var(--glow-fade,520ms) var(--ease-quiet),
              background var(--glow-fade,520ms) var(--ease-quiet);
+}
+
+/* The mottling drifts, slowly enough to be felt rather than watched. It is
+   what stops the film reading as a decal stuck to the cell. */
+@keyframes waxdrift{
+  from{-webkit-mask-position:0% 0%;mask-position:0% 0%}
+  to{-webkit-mask-position:100% 100%;mask-position:100% 100%}
 }
 
 /* The photograph itself now barely moves — the glaze carries the light, and
@@ -257,6 +288,8 @@ button{font:inherit;color:inherit}
 
 @media (prefers-reduced-motion:reduce){
   .hexcell::before,.hexcell::after,.hexcell .cell-face,.cell-dormant,.hexcell .cell-glaze{transition:none}
+  /* the mottling holds still — it still reads as wax, it just stops drifting */
+  .hexcell::after,.hexcell .cell-glaze{animation:none}
 }
 
 /* search: matches gather and stay lit, everything else recedes */
