@@ -44,7 +44,12 @@ export async function GET(request: NextRequest) {
           const response = await client.send(getCmd);
           const bodyStr = await response.Body?.transformToString();
           const data = bodyStr ? JSON.parse(bodyStr) : {};
-          
+
+          // "Strictly archived" means preserved but never shown. The client
+          // used to drop these, which still shipped the transcript to every
+          // visitor — they must not leave the server at all.
+          if (data.privacy === "archive") return null;
+
           let mediaUrl = null;
           let photoUrl = null;
 
