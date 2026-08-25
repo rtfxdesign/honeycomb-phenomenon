@@ -38,6 +38,7 @@ const TWEAK_DEFAULTS = {
   lightStrength: 70,    // %
   lightAfterglow: 520,  // ms for a cell to let go of the light
   cellCenter: 14,       // % of the middle given over to the ground behind
+  faceGlaze: 50,        // % — the film over a portrait for the light to catch
   cellOpacity: 92,
   dormantBright: 85,
   ground: '#1A1210',
@@ -906,6 +907,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                '--glow-fade': `${t.lightAfterglow ?? 520}ms`,
                '--glow-strength': (t.lightStrength ?? 70) / 100,
                '--cell-center': (t.cellCenter ?? 14) / 100,
+               '--glaze': (t.faceGlaze ?? 50) / 100,
              }}
              onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
           {vines.map((v) => (
@@ -937,6 +939,10 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                     {face && !face.src && face.initials && (
                       <span className="cell-initials" aria-hidden="true">{face.initials}</span>
                     )}
+                    {/* a thin film over the portrait for the light to catch —
+                        the face reads as sitting under the wax rather than
+                        printed on top of it */}
+                    {face && <span className="cell-glaze" aria-hidden="true" />}
                   </div>
                 )
                 : (
@@ -1113,6 +1119,7 @@ export default function HoneycombApp() {
         <TweakToggle label="Mouse light" value={t.mouseLight !== false} onChange={(v) => setTweak('mouseLight', v)} />
         <TweakSlider label="Light reach" value={t.lightReach ?? 260} min={100} max={600} step={10} unit="%" onChange={(v) => setTweak('lightReach', v)} />
         <TweakSlider label="Light strength" value={t.lightStrength ?? 70} min={0} max={100} unit="%" onChange={(v) => setTweak('lightStrength', v)} />
+        <TweakSlider label="Face glaze" value={t.faceGlaze ?? 50} min={0} max={100} unit="%" onChange={(v) => setTweak('faceGlaze', v)} />
         <TweakSlider label="Afterglow" value={t.lightAfterglow ?? 520} min={0} max={1600} step={20} unit="ms" onChange={(v) => setTweak('lightAfterglow', v)} />
         <TweakButton label="Reshuffle field" onClick={() => setTweak('seed', (t.seed || 1) + 1)} />
         <TweakSection label="Gravity" />

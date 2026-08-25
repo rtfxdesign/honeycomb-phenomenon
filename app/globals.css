@@ -184,10 +184,41 @@ button{font:inherit;color:inherit}
   mix-blend-mode:screen;
 }
 
-/* Faces take a lighter touch: the pool sits beneath them, and this is all the
-   light that reaches the portrait itself. */
+/* A thin film over the portrait, and the thing the light actually catches.
+   Brightening the photograph itself only ever looked like a photograph turned
+   up; a film sitting over it reads as a face under wax, which is what the cell
+   is meant to be. Sits above the face and takes the same hex as the photo.
+
+   Two layers in one element: a moving sheen that leans with the light, and a
+   soft pool that gathers where the light is. Both are nearly invisible at
+   rest — the glaze should be felt rather than seen until the light finds it. */
+.hexcell .cell-glaze{
+  position:absolute;left:11%;top:11%;width:78%;aspect-ratio:749/631;
+  clip-path:polygon(25% 2%,75% 2%,98% 50%,75% 98%,25% 98%,2% 50%);
+  pointer-events:none;z-index:3;
+  opacity:var(--glaze,0.5);
+  background:
+    /* the sheen: a narrow band that slides across as the light moves */
+    linear-gradient(
+      calc(96deg + var(--lx) * 54deg),
+      transparent 30%,
+      rgba(255,241,214,calc(0.05 + var(--lit) * 0.30)) 45%,
+      rgba(255,232,190,calc(0.02 + var(--lit) * 0.13)) 55%,
+      transparent 72%),
+    /* the pool: warmth gathering on the surface nearest the light */
+    radial-gradient(circle at calc(50% + var(--lx) * 34%) 40%,
+      rgba(255,214,146,calc(0.04 + var(--lit) * 0.20)) 0%,
+      rgba(255,196,110,calc(0.02 + var(--lit) * 0.08)) 45%,
+      transparent 74%);
+  mix-blend-mode:screen;
+  transition:opacity var(--glow-fade,520ms) var(--ease-quiet),
+             background var(--glow-fade,520ms) var(--ease-quiet);
+}
+
+/* The photograph itself now barely moves — the glaze carries the light, and
+   doubling the two made faces look blown out as the pointer went by. */
 .hexcell .cell-face{
-  filter:brightness(calc(1 + var(--lit) * 0.16)) saturate(calc(1 + var(--lit) * 0.10));
+  filter:brightness(calc(1 + var(--lit) * 0.05));
   transition:opacity var(--dur-grow) var(--ease-quiet),filter var(--glow-fade,520ms) var(--ease-quiet);
 }
 
@@ -219,10 +250,13 @@ button{font:inherit;color:inherit}
   .hexcell::before,.hexcell::after,.cell-dormant-wrap::before{display:none}
   .hexcell .cell-face{filter:none}
   .cell-dormant{filter:brightness(var(--dormant-brightness,0.72)) saturate(0.85)}
+  /* the film stays — it is what makes a face look set into wax, and it costs
+     nothing without a pointer. Only its response to light goes. */
+  .hexcell .cell-glaze{opacity:calc(var(--glaze,0.5) * 0.55)}
 }
 
 @media (prefers-reduced-motion:reduce){
-  .hexcell::before,.hexcell::after,.hexcell .cell-face,.cell-dormant{transition:none}
+  .hexcell::before,.hexcell::after,.hexcell .cell-face,.cell-dormant,.hexcell .cell-glaze{transition:none}
 }
 
 /* search: matches gather and stay lit, everything else recedes */
