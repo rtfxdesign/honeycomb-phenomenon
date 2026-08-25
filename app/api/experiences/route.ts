@@ -1,33 +1,22 @@
-import { NextRequest, NextResponse } from "next/server";
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
+import { NextResponse } from "next/server";
+import { ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 
-function getR2Client() {
-  return new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
-}
+export const dynamic = "force-dynamic";
 
-export async function GET(request: NextRequest) {
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
+export async function GET() {
+  if (!r2Configured()) {
     return NextResponse.json({ experiences: [] });
   }
 
   const client = getR2Client();
 
   try {
-    const listCommand = new ListObjectsV2Command({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Prefix: "approved/submissions/",
-    });
-
-    const listResponse = await client.send(listCommand);
+    const listResponse = await client.send(new ListObjectsV2Command({
+      Bucket: BUCKET,
+      Prefix: phys("approved/submissions/"),
+    }));
     const objects = listResponse.Contents || [];
 
     // Filter to only get .json metadata files
@@ -36,30 +25,30 @@ export async function GET(request: NextRequest) {
     const submissions = await Promise.all(
       jsonObjects.map(async (obj) => {
         const getCmd = new GetObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME,
+          Bucket: BUCKET,
           Key: obj.Key,
         });
-        
+
         try {
           const response = await client.send(getCmd);
           const bodyStr = await response.Body?.transformToString();
           const data = bodyStr ? JSON.parse(bodyStr) : {};
-          
+
           let mediaUrl = null;
           let photoUrl = null;
 
           if (data.mediaKey) {
             const mediaCmd = new GetObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME,
-              Key: data.mediaKey,
+              Bucket: BUCKET,
+              Key: phys(data.mediaKey),
             });
             mediaUrl = await getSignedUrl(client, mediaCmd, { expiresIn: 3600 });
           }
 
           if (data.photoKey) {
             const photoCmd = new GetObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME,
-              Key: data.photoKey,
+              Bucket: BUCKET,
+              Key: phys(data.photoKey),
             });
             photoUrl = await getSignedUrl(client, photoCmd, { expiresIn: 3600 });
           }

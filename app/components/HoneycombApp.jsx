@@ -25,17 +25,20 @@ const TWEAK_DEFAULTS = {
   gaps: 3,
   fieldWidth: 1600,
   fieldHeight: 1000,
-  clusterShare: 30,
-  pull: 70,
-  push: 255,
+  // middle-of-the-road gravity — the settings that read best in review
+  clusterShare: 50,
+  pull: 55,
+  push: 190,
   dormantRespond: false,
   showFaces: true,
-  cellOpacity: 90,
-  dormantBright: 72,
-  ground: '#0D0806',
+  cellOpacity: 92,
+  dormantBright: 85,
+  ground: '#1A1210',
   backdrop: 'Archive texture',
-  textureOpacity: 29,
+  textureOpacity: 34,
+  warmth: 38,
   vignette: true,
+  topbarAutohide: true,
   vines: true,
   vineSeed: 1,
   vineStyle: 'climb',
@@ -99,6 +102,72 @@ function genField(cols, rows, count, mode, brightShare, gaps, rng) {
 
 const GATE_CELLS = [[0, 2, 'd'], [1, 1, 'd'], [1, 5, 'd'], [2, 6, 'd'], [12, 1, 'd'], [12, 5, 'd'], [13, 2, 'b'], [13, 4, 'd'], [14, 3, 'd'], [0, 4, 'b']];
 
+// Everything a cell can be found by. Community faces search their name and
+// panel text; archive submissions search their whole record.
+function haystack(face) {
+  const p = face.person || {};
+  const e = p.experience;
+  const parts = [face.name, p.name];
+  if (e) {
+    parts.push(e.title, e.location, e.experienceYear, e.experienceType, e.transcript, e.displayName, ...(e.hashtags || []));
+  } else if (Array.isArray(p.about)) {
+    parts.push(...p.about);
+  }
+  return parts.filter(Boolean).join(' ').toLowerCase();
+}
+
+// Search rearranges the field itself: matches gather into the middle, everything
+// else gives way outward. Same lattice-snapping rule as the click gravity, so
+// cells stay aligned and never overlap.
+function gatherMatches(base, matchKeys, cols, rows, cx, cy, size, W, H, push) {
+  const centerX = (W - size) / 2, centerY = (H - size) / 2;
+  const distToCenter = (x, y) => Math.hypot(x - centerX, y - centerY);
+  const slots = [];
+  for (let c = 0; c < cols; c++) {
+    for (let r = c % 2; r < rows; r += 2) {
+      slots.push({ s: [c, r], x: c * cx, y: r * cy });
+    }
+  }
+  slots.sort((a, b) => distToCenter(a.x, a.y) - distToCenter(b.x, b.y));
+  const taken = new Set();
+  const result = new Map();
+
+  const matched = base.filter((b) => matchKeys.has(b.k))
+    .sort((a, b) => distToCenter(a.x, a.y) - distToCenter(b.x, b.y));
+  let si = 0;
+  for (const b of matched) {
+    while (si < slots.length && taken.has(key(slots[si].s))) si++;
+    if (si >= slots.length) break;
+    const slot = slots[si++];
+    taken.add(key(slot.s));
+    result.set(b.k, { x: slot.x, y: slot.y });
+  }
+
+  // the rest move outward, farthest first so they don't trap each other
+  const others = base.filter((b) => !matchKeys.has(b.k))
+    .sort((a, b) => distToCenter(b.x, b.y) - distToCenter(a.x, a.y));
+  for (const b of others) {
+    const dx = b.x - centerX, dy = b.y - centerY;
+    const d = Math.hypot(dx, dy) || 1;
+    const tx = centerX + (dx / d) * (d + push), ty = centerY + (dy / d) * (d + push);
+    let best = null, bestD = Infinity;
+    for (const slot of slots) {
+      if (taken.has(key(slot.s))) continue;
+      const dd = (slot.x - tx) ** 2 + (slot.y - ty) ** 2;
+      if (dd < bestD) { bestD = dd; best = slot; }
+    }
+    if (best) {
+      taken.add(key(best.s));
+      result.set(b.k, { x: best.x, y: best.y });
+    }
+  }
+  return base.map((b) => ({
+    ...b,
+    match: matchKeys.has(b.k),
+    ...(result.get(b.k) || {}),
+  }));
+}
+
 function Cells({ list, size }) {
   const cx = size * 0.751, cy = size * 0.428;
   return list.map(([c, r, t]) => (
@@ -110,8 +179,11 @@ function Cells({ list, size }) {
 
 // ── topbar (from the projecthoneycomb.site deploy) ──────────────────────────
 
-function TopBar({ onNav, onSubmit, activePage }) {
+function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autohide, keepVisible }) {
   const [navOpen, setNavOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [tucked, setTucked] = useState(false);
+  const searchRef = useRef(null);
   const go = (id) => { setNavOpen(false); onNav(id); };
   useEffect(() => {
     if (!navOpen) return;
@@ -119,12 +191,49 @@ function TopBar({ onNav, onSubmit, activePage }) {
     window.addEventListener('pointerdown', close);
     return () => window.removeEventListener('pointerdown', close);
   }, [navOpen]);
+  useEffect(() => {
+    const focus = () => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 60); };
+    window.addEventListener('hc-focus-search', focus);
+    return () => window.removeEventListener('hc-focus-search', focus);
+  }, []);
+  // desktop only: the bar tucks up out of the way and returns when the pointer
+  // comes near the top of the screen
+  useEffect(() => {
+    if (!autohide || window.innerWidth < 881) { setTucked(false); return; }
+    const settle = setTimeout(() => setTucked(true), 2600);
+    const onMove = (e) => setTucked(e.clientY > 130);
+    window.addEventListener('mousemove', onMove);
+    return () => { clearTimeout(settle); window.removeEventListener('mousemove', onMove); };
+  }, [autohide]);
+  const hidden = tucked && !navOpen && !keepVisible && !query;
   return (
-    <header className="site-header">
+    <>
+      {hidden && <div className="topbar-peek" aria-hidden="true" />}
+      <header className={`site-header${hidden ? ' site-header--tucked' : ''}`}>
       <button className="brand" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
         <img src="/hc-connected-field-watermark.svg" alt="" />
         <span>HONEYCOMB</span>
       </button>
+      <div className={`site-search${searchOpen || query ? ' is-open' : ''}`}>
+        <button
+          className="search-toggle" type="button" aria-label="Search the archive"
+          onClick={() => { setSearchOpen((o) => !o); setTimeout(() => searchRef.current?.focus(), 0); }}
+        >
+          <span aria-hidden="true">⌕</span>
+        </button>
+        <input
+          ref={searchRef} className="search-input" type="search" value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Search place, year, tag, or words"
+          aria-label="Search the archive"
+        />
+        {query && (
+          <>
+            <span className="search-count">{matchCount}</span>
+            <button className="search-clear" type="button" aria-label="Clear search" onClick={() => { onQuery(''); searchRef.current?.focus(); }}>×</button>
+          </>
+        )}
+      </div>
       <button
         className="menu-button" type="button"
         aria-expanded={navOpen} aria-controls="primary-navigation"
@@ -148,13 +257,14 @@ function TopBar({ onNav, onSubmit, activePage }) {
           SUBMIT
         </button>
       </nav>
-    </header>
+      </header>
+    </>
   );
 }
 
 // ── story panel slideout (from the projecthoneycomb.site deploy) ────────────
 
-function StoryPanel({ page, person, onClose, openRecorder }) {
+function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
   const open = Boolean(page || person);
   return (
     <aside
@@ -169,7 +279,7 @@ function StoryPanel({ page, person, onClose, openRecorder }) {
           <div className="story-content">
             <p className="record-label">{page.eyebrow}</p>
             <h1>{page.title}</h1>
-            <div className="panel-copy">{page.body({ openRecorder })}</div>
+            <div className="panel-copy">{page.body({ openRecorder, focusSearch })}</div>
           </div>
           <PanelFooter />
         </>
@@ -287,7 +397,7 @@ function Gate({ onEnter, size }) {
 
 // ── archive field (design project, + person panel wiring + touch panning) ───
 
-function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences, faces }) {
+function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences, faces, query, onMatchCount }) {
   const [vp, setVp] = useState(() => (typeof window === 'undefined' ? [1280, 800] : [window.innerWidth, window.innerHeight]));
   useEffect(() => {
     const onR = () => setVp([window.innerWidth, window.innerHeight]);
@@ -304,12 +414,20 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
   // panning skips re-renders)
   const maxPanX = Math.max(0, (W - (vp[0] - 30)) / 2);
   const maxPanY = Math.max(0, (H - (vp[1] - 30)) / 2);
+  // with the story panel open the field is allowed to slide further than usual,
+  // so the cell you clicked can clear the panel even on a small field
+  const panelWidth = Math.min(vp[0] * 0.44, 704);
+  const slack = panelOpen && vp[0] >= 881 ? panelWidth : 0;
   const fieldRef = useRef(null);
   const panRef = useRef({ x: 0, y: 0 });
   const apply = useCallback(() => {
     if (fieldRef.current) fieldRef.current.style.transform = `translate(calc(-50% + ${panRef.current.x}px), calc(-50% + ${panRef.current.y}px))`;
   }, []);
-  useEffect(() => { panRef.current.x = Math.max(-maxPanX, Math.min(maxPanX, panRef.current.x)); panRef.current.y = Math.max(-maxPanY, Math.min(maxPanY, panRef.current.y)); apply(); });
+  useEffect(() => {
+    panRef.current.x = Math.max(-maxPanX - slack, Math.min(maxPanX + slack, panRef.current.x));
+    panRef.current.y = Math.max(-maxPanY, Math.min(maxPanY, panRef.current.y));
+    apply();
+  });
   // desktop: mouse-edge auto panning
   useEffect(() => {
     const mouse = { x: -1, y: -1, on: false };
@@ -421,11 +539,52 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
       } else if (e < experiences.length) {
         const exp = experiences[e++];
         const name = exp.displayName || exp.title || 'Archive voice';
-        m.set(b.k, { src: exp.photoUrl || null, photo: true, name, person: { name, experience: exp } });
+        // a story with no photo still needs to be findable in the comb, so the
+        // cell carries its initials instead of a portrait
+        const initials = String(exp.displayName || exp.title || '?')
+          .split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+        m.set(b.k, { src: exp.photoUrl || null, photo: true, initials, name, person: { name, experience: exp } });
       }
     }
     return m;
   }, [base, experiences, faces]);
+  // ── search ────────────────────────────────────────────────────────────────
+  const q = (query || '').trim().toLowerCase();
+  const matchKeys = useMemo(() => {
+    if (!q) return null;
+    const set = new Set();
+    for (const [k, face] of faceOf) {
+      if (haystack(face).includes(q)) set.add(k);
+    }
+    return set;
+  }, [faceOf, q]);
+  useEffect(() => {
+    if (onMatchCount) onMatchCount(matchKeys ? matchKeys.size : 0);
+  }, [matchKeys, onMatchCount]);
+  // a live search takes over the field arrangement; otherwise the clicked-cell
+  // gravity does
+  const arranged = useMemo(() => {
+    if (matchKeys) return gatherMatches(base, matchKeys, cols, rows, cx, cy, size, W, H, t.push);
+    return placed;
+  }, [matchKeys, placed, base, cols, rows, cx, cy, size, W, H, t.push]);
+  // with the panel open, slide the field so the cell you clicked clears it
+  useEffect(() => {
+    if (!panelOpen || !focusKey || vp[0] < 881) return;
+    const b = arranged.find((x) => x.k === focusKey);
+    const el = fieldRef.current;
+    if (!b || !el) return;
+    const targetScreenX = panelWidth + (vp[0] - panelWidth) / 2;
+    const cellCenterX = b.x + size / 2;
+    const desiredX = targetScreenX - vp[0] / 2 - (cellCenterX - W / 2);
+    panRef.current = {
+      x: Math.max(-maxPanX - slack, Math.min(maxPanX + slack, desiredX)),
+      y: panRef.current.y,
+    };
+    el.classList.add('arch-field--ease');
+    apply();
+    const done = setTimeout(() => el.classList.remove('arch-field--ease'), 760);
+    return () => clearTimeout(done);
+  }, [panelOpen, focusKey, arranged, vp, panelWidth, size, W, maxPanX, slack, apply]);
   // vines render beneath the cells, never obscuring comb contents. Three growth
   // styles: "climb" hugs the left/right silhouette from the bottom up, "wrap"
   // traces the cluster's whole outer perimeter, "sprawl" rises as undergrowth
@@ -512,7 +671,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     }
   };
   return (
-    <div>
+    <div className={panelOpen ? 'arch arch--panel' : 'arch'}>
       <div className="arch-clip" style={panelOpen ? { filter: 'brightness(0.83)' } : undefined}>
         <div className="arch-field" ref={fieldRef} style={{ width: W, height: H, transform: 'translate(-50%,-50%)', marginTop: 12 }} onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
           {vines.map((v) => (
@@ -520,27 +679,34 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
               <img src="/uploads/vine-sprite.webp" alt="" style={{ height: v.L, width: v.L * VINE_ASPECT * ((t.vineSize ?? 100) / 100), transform: `translateX(-48%) rotate(${v.rot}deg)`, animationDelay: v.delay + 'ms' }} />
             </div>
           ))}
-          {placed.map((b) => (
-            <div key={b.k} className="cell" style={{ left: b.x, top: b.y, width: size, zIndex: b.k === focusKey ? 3 : b.kin ? 2 : 1 }}>
+          {arranged.map((b) => {
+            const face = faceOf.get(b.k);
+            const dimmed = matchKeys && !b.match;
+            return (
+            <div key={b.k} className={'cell' + (dimmed ? ' cell-unmatched' : '')} style={{ left: b.x, top: b.y, width: size, zIndex: b.k === focusKey ? 3 : b.match ? 2 : b.kin ? 2 : 1 }}>
               {b.t === 'b'
                 ? (
-                  <div className={'hexcell' + (b.k === focusKey ? ' cell-focus' : '')} tabIndex="0" role="button"
-                       aria-label={faceOf.get(b.k) ? faceOf.get(b.k).name : 'Bright cell'}
+                  <div className={'hexcell' + (b.k === focusKey ? ' cell-focus' : '') + (b.match ? ' cell-match' : '')} tabIndex="0" role="button"
+                       aria-label={face ? face.name : 'Bright cell'}
                        onClick={() => toggleCell(b)}
                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCell(b); } }}>
                     <img src="/assets/cell-bright.png" alt="" />
-                    {t.showFaces && faceOf.get(b.k) && faceOf.get(b.k).src && (
+                    {face && face.src && (
                       <img
-                        className={faceOf.get(b.k).photo ? 'cell-face cell-face-photo' : 'cell-face'}
-                        src={faceOf.get(b.k).src}
-                        alt={faceOf.get(b.k).name}
+                        className={face.photo ? 'cell-face cell-face-photo' : 'cell-face'}
+                        src={face.src}
+                        alt={face.name}
                       />
+                    )}
+                    {face && !face.src && face.initials && (
+                      <span className="cell-initials" aria-hidden="true">{face.initials}</span>
                     )}
                   </div>
                 )
                 : <img src="/assets/cell-bright.png" alt="" className="cell-dormant" style={{ width: '100%' }} />}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -558,6 +724,8 @@ export default function HoneycombApp() {
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [experiences, setExperiences] = useState([]);
   const [people, setPeople] = useState(PEOPLE);
+  const [query, setQuery] = useState('');
+  const [matchCount, setMatchCount] = useState(0);
 
   // approved archive submissions join the field as additional bright cells
   useEffect(() => {
@@ -607,11 +775,24 @@ export default function HoneycombApp() {
   }, [closePanel]);
 
   const onNav = (id) => {
-    if (id === 'home') { closePanel(); return; }
+    if (id === 'home') { closePanel(); setQuery(''); return; }
     setPerson(null);
     setFocusKey(null);
     setPageId(id);
   };
+
+  // searching and reading a story fight for the same field, so starting a
+  // search closes whatever panel is open
+  const onQuery = useCallback((value) => {
+    setQuery(value);
+    if (value) { setPageId(null); setPerson(null); setFocusKey(null); }
+  }, []);
+
+  // "Search the archive" inside the Explore panel hands focus to the topbar field
+  const focusSearch = useCallback(() => {
+    closePanel();
+    window.dispatchEvent(new CustomEvent('hc-focus-search'));
+  }, [closePanel]);
 
   const onPersonSelect = (p) => {
     setPageId(null);
@@ -623,9 +804,15 @@ export default function HoneycombApp() {
   const panelOpen = Boolean(page || person);
 
   return (
-    <div className="hc-page" style={{ background: t.ground, '--cell-opacity': (t.cellOpacity ?? 90) / 100, '--dormant-brightness': (t.dormantBright ?? 72) / 100 }}>
+    <div className="hc-page" style={{
+      background: t.ground,
+      '--cell-opacity': (t.cellOpacity ?? 90) / 100,
+      '--dormant-brightness': (t.dormantBright ?? 72) / 100,
+      '--face-opacity': t.showFaces ? 1 : 0,
+    }}>
       <img src={BACKDROPS[t.backdrop] || BACKDROPS['Archive texture']} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
       {t.vignette && <div className="hc-vignette"></div>}
+      {(t.warmth ?? 0) > 0 && <div className="hc-warm" style={{ opacity: (t.warmth ?? 0) / 100 }} aria-hidden="true"></div>}
       <div className="hc-view" style={{ opacity: view === 'gate' ? 1 : 0, pointerEvents: view === 'gate' ? 'auto' : 'none' }}>
         <Gate onEnter={enter} size={t.cellSize} />
       </div>
@@ -639,12 +826,18 @@ export default function HoneycombApp() {
             onPersonSelect={onPersonSelect}
             experiences={experiences}
             faces={faces}
+            query={query}
+            onMatchCount={setMatchCount}
           />
         )}
       </div>
       <div className="hc-frame"></div>
-      <TopBar onNav={onNav} onSubmit={openRecorder} activePage={pageId} />
-      <StoryPanel page={page} person={person} onClose={closePanel} openRecorder={openRecorder} />
+      <TopBar
+        onNav={onNav} onSubmit={openRecorder} activePage={pageId}
+        query={query} onQuery={onQuery} matchCount={matchCount}
+        autohide={t.topbarAutohide !== false} keepVisible={panelOpen || recorderOpen}
+      />
+      <StoryPanel page={page} person={person} onClose={closePanel} openRecorder={openRecorder} focusSearch={focusSearch} />
       {recorderOpen && <RecorderModal onClose={() => setRecorderOpen(false)} />}
       <TweaksPanel>
         <TweakSection label="Cells" />
@@ -654,8 +847,8 @@ export default function HoneycombApp() {
         <TweakSlider label="Field width" value={t.fieldWidth} min={800} max={2400} step={20} unit="px" onChange={(v) => setTweak('fieldWidth', v)} />
         <TweakSlider label="Field height" value={t.fieldHeight} min={400} max={1600} step={20} unit="px" onChange={(v) => setTweak('fieldHeight', v)} />
         <TweakSlider label="Bright share" value={t.brightShare} min={10} max={90} unit="%" onChange={(v) => setTweak('brightShare', v)} />
-        <TweakRadio label="Distribution" value={t.distribution} options={['even', 'clustered', 'scattered']} onChange={(v) => setTweak('distribution', v)} />
-        <TweakToggle label="Show faces" value={t.showFaces} onChange={(v) => setTweak('showFaces', v)} />
+        <TweakRadio label="Distribution" value={t.distribution === 'scattered' ? 'even' : t.distribution} options={['even', 'clustered']} onChange={(v) => setTweak('distribution', v)} />
+        <TweakToggle label="Faces always visible" value={t.showFaces} onChange={(v) => setTweak('showFaces', v)} />
         <TweakSlider label="Cell opacity" value={t.cellOpacity ?? 90} min={40} max={100} unit="%" onChange={(v) => setTweak('cellOpacity', v)} />
         <TweakSlider label="Dormant brightness" value={t.dormantBright ?? 72} min={30} max={100} unit="%" onChange={(v) => setTweak('dormantBright', v)} />
         <TweakButton label="Reshuffle field" onClick={() => setTweak('seed', (t.seed || 1) + 1)} />
@@ -665,10 +858,12 @@ export default function HoneycombApp() {
         <TweakSlider label="Push distance" value={t.push} min={40} max={340} unit="px" onChange={(v) => setTweak('push', v)} />
         <TweakToggle label="Dormant cells respond" value={t.dormantRespond} onChange={(v) => setTweak('dormantRespond', v)} />
         <TweakSection label="Background" />
-        <TweakColor label="Ground" value={t.ground} options={['#0D0806', '#120B07', '#1A1210', '#261711']} onChange={(v) => setTweak('ground', v)} />
+        <TweakColor label="Ground" value={t.ground} options={['#0D0806', '#1A1210', '#241711', '#2E1C12']} onChange={(v) => setTweak('ground', v)} />
         <TweakSelect label="Texture image" value={t.backdrop} options={Object.keys(BACKDROPS)} onChange={(v) => setTweak('backdrop', v)} />
         <TweakSlider label="Texture" value={t.textureOpacity} min={0} max={70} unit="%" onChange={(v) => setTweak('textureOpacity', v)} />
+        <TweakSlider label="Warmth" value={t.warmth ?? 0} min={0} max={100} unit="%" onChange={(v) => setTweak('warmth', v)} />
         <TweakToggle label="Vignette" value={t.vignette} onChange={(v) => setTweak('vignette', v)} />
+        <TweakToggle label="Topbar hides until hover" value={t.topbarAutohide !== false} onChange={(v) => setTweak('topbarAutohide', v)} />
         <TweakSection label="Vines" />
         <TweakToggle label="Vines" value={t.vines} onChange={(v) => setTweak('vines', v)} />
         <TweakRadio label="Growth style" value={t.vineStyle ?? 'climb'} options={['climb', 'wrap', 'sprawl']} onChange={(v) => setTweak('vineStyle', v)} />

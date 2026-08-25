@@ -1,37 +1,26 @@
 import { NextResponse } from "next/server";
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
+import { ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getR2Client, BUCKET, phys, toLogical, r2Configured } from "../../lib/r2";
 
 export const dynamic = "force-dynamic";
 
-function getR2Client() {
-  return new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
-}
-
 export async function GET() {
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
+  if (!r2Configured()) {
     return NextResponse.json({ images: [] });
   }
 
   try {
     const client = getR2Client();
-    
+
     // Only fetch images that have been moved to the approved/ folder
     const command = new ListObjectsV2Command({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Prefix: "approved/image/", 
+      Bucket: BUCKET,
+      Prefix: phys("approved/image/"),
     });
 
     const response = await client.send(command);
-    
+
     if (!response.Contents || response.Contents.length === 0) {
       return NextResponse.json({ images: [] });
     }
@@ -50,12 +39,12 @@ export async function GET() {
       recentImages.map(async (item) => {
         if (!item.Key) return null;
         const getCmd = new GetObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME,
+          Bucket: BUCKET,
           Key: item.Key,
         });
         // Generate a URL that expires in 1 hour
         const url = await getSignedUrl(client, getCmd, { expiresIn: 3600 });
-        return { key: item.Key, url };
+        return { key: toLogical(item.Key), url };
       })
     );
 

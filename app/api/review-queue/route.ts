@@ -1,23 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isAuthed } from "../../lib/auth";
-import { S3Client, ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
+import { ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getR2Client, BUCKET, phys, toLogical, r2Configured } from "../../lib/r2";
 
-function getR2Client() {
-  return new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
-}
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
   if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
+  if (!r2Configured()) {
     return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
   }
 
@@ -29,8 +20,8 @@ export async function GET(request: NextRequest) {
     const objects: { Key?: string; LastModified?: Date }[] = [];
     for (const prefix of prefixes) {
       const listResponse = await client.send(new ListObjectsV2Command({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Prefix: prefix,
+        Bucket: BUCKET,
+        Prefix: phys(prefix),
       }));
       objects.push(...(listResponse.Contents || []));
     }
@@ -42,15 +33,15 @@ export async function GET(request: NextRequest) {
       jsonObjects.map(async (obj) => {
         // Read the JSON content
         const getCmd = new GetObjectCommand({
-          Bucket: process.env.R2_BUCKET_NAME,
+          Bucket: BUCKET,
           Key: obj.Key,
         });
-        
+
         try {
           const response = await client.send(getCmd);
           const bodyStr = await response.Body?.transformToString();
           const data = bodyStr ? JSON.parse(bodyStr) : {};
-          
+
           let mediaUrl = null;
           let mediaType = null;
           let photoUrl = null;
@@ -58,8 +49,8 @@ export async function GET(request: NextRequest) {
           // Generate presigned URLs for the associated media keys
           if (data.mediaKey) {
             const mediaCmd = new GetObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME,
-              Key: data.mediaKey,
+              Bucket: BUCKET,
+              Key: phys(data.mediaKey),
             });
             mediaUrl = await getSignedUrl(client, mediaCmd, { expiresIn: 3600 });
             if (data.mediaKey.includes("image/") || data.mediaKey.match(/\.(jpg|jpeg|png|webp|gif)$/i)) {
@@ -75,14 +66,14 @@ export async function GET(request: NextRequest) {
 
           if (data.photoKey) {
             const photoCmd = new GetObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME,
-              Key: data.photoKey,
+              Bucket: BUCKET,
+              Key: phys(data.photoKey),
             });
             photoUrl = await getSignedUrl(client, photoCmd, { expiresIn: 3600 });
           }
 
           return {
-            submissionKey: obj.Key,
+            submissionKey: toLogical(obj.Key!),
             data,
             mediaUrl,
             mediaType,
