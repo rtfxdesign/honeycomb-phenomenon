@@ -8,6 +8,12 @@
  *      accounts run several hundred words with digressions and corrections in
  *      them. Two-sentence samples made the story panel look like a caption.
  *
+ *      The four stories with recordings go further: their transcripts are the
+ *      machine transcription of the audio, corrected the way a moderator would
+ *      correct it, so the words on the page match the words in the recording.
+ *      They read differently from the rest — more hesitation, more filler —
+ *      because that is what speech is.
+ *
  *   2. Tags come from a controlled vocabulary. Clustering can only draw two
  *      voices together when they share a tag, so a field of one-off tags
  *      produces no clustering at all — which is exactly what the first pass
@@ -34,42 +40,44 @@ export const STORIES = [
   {
     name: 'Marcy Ruiz', title: 'A silent light above the pines', location: 'Hudson Valley, NY', year: '1986', type: 'Light',
     tags: ['orb', 'silent', 'forest', 'night', 'childhood', 'family', 'never-told'], audio: '00-marcy-ruiz.mp3', portrait: true,
-    text: `It held perfectly still over the treeline for what must have been four or five minutes. Then it moved without crossing the space between — it was in one place, and then it was in another place, and there was no travel in between that my eye could follow.
+    text: `My name is Marcy, and this is the story of my encounter with some sort of flying orb. I was 12 years old, and my brother and I were in the backyard playing when we saw it. Sort of glittery and pulsing as it floated, and then it held perfectly still over the tree line for what must have been four or five minutes.
+
+I remember thinking it was watching us, and we were sort of paralyzed the whole time. Then all of a sudden it just moved without crossing the space between. It was in one place, and then it was in another place, and there was no travel in between that my eye could follow.
 
 The silence is the part I have never been able to explain to anyone. We lived under a flight path. I knew what aircraft sounded like at that distance, and I knew what the woods sounded like at night, and this was neither. It was the absence of both. Even the frogs stopped.
 
-My brother saw it too. He was nine and I was twelve. We went inside and got into our beds and did not say a word about it, and then we did not say a word about it for thirty years. When I finally brought it up at our mother's funeral he finished my sentence for me. He had been carrying the same picture the whole time.`,
+We went inside and got into our beds and didn't say a word about it, didn't mention it for 20 years to be honest. When I finally brought it up, my brother remembered the frogs, and then he described the orb just as I remembered it.`,
   },
   {
     name: 'Jonah Ellery', title: 'Three points over the water', location: 'Lake Erie, OH', year: '2004', type: 'Craft',
     tags: ['triangle', 'formation', 'water', 'silent', 'multiple-witness'], audio: '01-jonah-ellery.mp3', portrait: true,
-    text: `The lights formed a triangle, but the stars went out behind it. That is how I knew it was one solid object and not three separate craft flying in formation. I could trace the edge of it by which stars were missing.
+    text: `The lights formed this triangle, but the stars actually went out behind it. That's how I knew it was one solid object, you know, and not just three separate craft flying in formation. I could literally trace the edge of it by figuring out which stars were missing.
 
-There were four of us on the breakwall that night. We had been fishing since before dark. Nobody said anything for the first minute — I think we were all waiting for someone else to say it first, so we would know we were not the only one seeing it.
+Four of us out on the breakwall that night. We'd been fishing since before dark. Nobody said anything for the first minute or so. I think we were all just waiting for someone else to say it first, so we'd know we weren't the only one seeing it.
 
-It drifted west across the lake, slow, at maybe the speed of a boat. Four minutes, give or take. Then it was simply not there. Not gone over the horizon, not faded — the stars came back all at once, the way a light goes off.
+It drifted west across the lake, really slow, at maybe the speed of a boat. Four minutes, give or take. Then it was simply just not there, not going over the horizon, not faded out. The stars came back all at once, just the way a light goes off.
 
-My friend Dev started laughing, which I have thought about a great deal since. It was not a funny thing. I think laughing was just the only thing his body knew how to do with it.`,
+My friend Dev started laughing, which I've thought about a great deal since then. It wasn't a funny thing. I think laughing was just the only thing his body knew how to do with it.`,
   },
   {
     name: 'Ana Whitfield', title: 'The morning after', location: 'Sedona, AZ', year: '2018', type: 'Dream',
     tags: ['presence', 'desert', 'dreams-after', 'memory-gap', 'solitary', 'telepathy'], audio: '02-ana-whitfield.mp3',
-    text: `I woke with a memory that behaved like a place I had visited rather than anything my mind had made. I know the difference. Dreams thin out when you reach for them. This did the opposite — it got more detailed the longer I sat with it.
+    text: `I woke up with this memory, but it...it behaved more like a place I had actually visited, rather than, you know, anything my mind had just made up. I know the difference. Dreams usually thin out when you try to reach for them. This did the exact opposite. It got more detailed the longer I sat with it.
 
-There was a room with no corners. Not round, exactly; the walls met, but the meeting did not produce a corner, and I remember being interested in that rather than frightened by it. And there was someone waiting, patiently, for me to understand something. Not speaking. Waiting the way a teacher waits when they have already given you everything you need.
+There was this room with no corners. Not round exactly. The walls met, but the meeting didn't really produce a corner. And I remember being interested in that rather than frightened by it. And there was someone waiting patiently for me to understand something. Not speaking. Waiting sort of the way a teacher waits when they've already given you everything you need.
 
-I never did understand it. That is the part that has stayed with me — not the strangeness, but the sense of having been shown something carefully and having failed to take it in. I have had ordinary dreams about the room since, and I can tell those apart from the first one immediately.`,
+I never did understand it. That's the part that has really stayed with me, not the strangeness of it, but the sense of having been shown something carefully, and just failing to take it in. I've had ordinary dreams about the room since then, and I can tell those apart from the first one immediately.`,
   },
   {
     name: 'Dell Emerson', title: 'No sound on the county road', location: 'Taos, NM', year: '1997', type: 'Craft',
     tags: ['radio-failure', 'engine-stall', 'highway', 'desert', 'silent'], audio: '03-dell-emerson.mp3', portrait: true,
-    text: `The radio cut out before I saw anything. That order matters to me. I have gone over it many times and I am certain of it: first the radio, then the glow coming up over the ridge.
+    text: `The radio cut out before I saw anything. In that, that order matters to me. I've gone over it a lot of times and I am absolutely certain of it. First the radio went. Then the glow came up over the ridge.
 
-The truck kept running. That is the strange part — the engine was fine, I had headlights, but every electrical thing that made noise went dead quiet at once. The radio, the heater fan, the little chime that never stopped telling me the passenger belt was undone. All of it, together, like someone had put a hand over the whole system.
+The truck kept running though. That's a strange part. The engine was fine. I still had headlights, but every electrical thing that made noise just went dead quiet all at once. The radio, the heater fan, the little chime that never stops telling me the passenger belt is undone. All of it, together, like someone had just put a hand over the whole system.
 
-I pulled onto the shoulder because I did not trust myself to drive. The glow passed north of me. I would not call it a craft because I could not see a shape, only that the light had an edge to it, and the edge was hard rather than soft the way a cloud of light would be.
+I pulled onto the shoulder because I didn't trust myself to drive. The glow passed north of me. I wouldn't call it a craft because I couldn't see a shape, only that the light had an edge to it, and the edge was hard, rather than soft, the way a, you know, a cloud of light would be.
 
-When it was gone the radio came back mid-song. Not from the start of a song — mid-song, at the point it would have reached if it had been playing the whole time. I sat there until the song ended.`,
+When it was gone, the radio came back mid-song. Not from the start of a song, mid-song. Exactly at the point it would have reached if it had been playing the whole time. I just sat there until the song ended.`,
   },
   {
     name: 'Kit Sorenson', title: 'A shape inside the cloud', location: 'Portland, OR', year: '2021', type: 'Other',
