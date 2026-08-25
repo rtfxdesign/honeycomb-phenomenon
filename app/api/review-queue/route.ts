@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthed } from "../../lib/auth";
+import { isModerator } from "../../lib/auth";
 import { ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getR2Client, BUCKET, phys, toLogical, r2Configured } from "../../lib/r2";
@@ -7,7 +7,7 @@ import { getR2Client, BUCKET, phys, toLogical, r2Configured } from "../../lib/r2
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
-  if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!r2Configured()) {
     return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
   }

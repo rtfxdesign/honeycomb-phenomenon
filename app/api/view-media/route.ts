@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthed } from "../../lib/auth";
+import { isModerator } from "../../lib/auth";
 import { GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 
 export async function GET(request: NextRequest) {
-  if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   const searchParams = request.nextUrl.searchParams;
   const key = searchParams.get("key");
 

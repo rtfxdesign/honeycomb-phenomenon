@@ -1,14 +1,18 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
+import { getSession, canSeeCommunity } from "../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (!r2Configured()) {
     return NextResponse.json({ experiences: [] });
   }
+  // "Community only" stories reach members and moderators; visitors never see
+  // them, and nothing marked strictly archived leaves the server at all.
+  const community = canSeeCommunity(getSession(request));
 
   const client = getR2Client();
 
@@ -38,6 +42,7 @@ export async function GET() {
           // used to drop these, which still shipped the transcript to every
           // visitor — they must not leave the server at all.
           if (data.privacy === "archive") return null;
+          if (data.privacy === "community" && !community) return null;
 
           let mediaUrl = null;
           let photoUrl = null;

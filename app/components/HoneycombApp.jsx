@@ -179,7 +179,7 @@ function Cells({ list, size }) {
 
 // ── topbar (from the projecthoneycomb.site deploy) ──────────────────────────
 
-function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autohide, keepVisible }) {
+function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autohide, keepVisible, session, onSignOut }) {
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [tucked, setTucked] = useState(false);
@@ -252,6 +252,16 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
             {p.id.toUpperCase()}
           </button>
         ))}
+        {session && session.role && session.role !== 'visitor' && (
+          <button
+            className="member-chip" type="button"
+            title={session.role === 'moderator' ? 'Signed in as moderator — click to sign out' : 'Signed in — click to sign out'}
+            onClick={() => { if (confirm('Sign out of the archive on this device?')) onSignOut(); }}
+          >
+            <i aria-hidden="true" />
+            {session.role === 'moderator' ? 'MODERATOR' : (session.name || 'MEMBER').toUpperCase()}
+          </button>
+        )}
         <button className="share-button" type="button" aria-label="Share your experience"
                 onClick={() => { setNavOpen(false); onSubmit(); }}>
           SUBMIT
@@ -289,6 +299,7 @@ function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
           <div className="story-content">
             <p className="record-label">
               FROM THE ARCHIVE{person.experience.displayName ? ` · ${String(person.experience.displayName).toUpperCase()}` : ''}
+              {person.experience.privacy === 'community' && <span className="community-badge">COMMUNITY ONLY</span>}
             </p>
             <h1>{person.experience.title}</h1>
             <div className="panel-copy">
@@ -367,8 +378,10 @@ function Gate({ onEnter, size }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw }),
       });
-      if (res.ok) onEnter();
-      else setWrong(true);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        onEnter(data);
+      } else setWrong(true);
     } catch {
       setWrong(true);
     } finally {
@@ -383,10 +396,10 @@ function Gate({ onEnter, size }) {
       <div className="gate-center">
         <p className="gate-eyebrow">Private archive</p>
         <h1 className="gate-title">Enter the <em>Honeycomb.</em></h1>
-        <p className="gate-body">This living archive is shared by invitation. Enter the password to continue.</p>
+        <p className="gate-body">This living archive is shared by invitation. Enter the password, or your member access code, to continue.</p>
         <form className="gate-form" onSubmit={submit}>
-          <Input label="Password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
-                 hint={wrong ? 'That password was not recognized.' : undefined} invalid={wrong} autoFocus />
+          <Input label="Password or access code" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
+                 hint={wrong ? 'That password or code was not recognized.' : undefined} invalid={wrong} autoFocus />
           <Button type="submit" disabled={checking}>{checking ? 'Checking…' : 'Enter'}</Button>
         </form>
         <p className="gate-note"><span>✦</span> The session stays unlocked for 30 days on this device.</p>
@@ -731,6 +744,20 @@ export default function HoneycombApp() {
   const [people, setPeople] = useState(PEOPLE);
   const [query, setQuery] = useState('');
   const [matchCount, setMatchCount] = useState(0);
+  const [session, setSession] = useState({ role: null, name: null });
+
+  useEffect(() => {
+    fetch('/api/session')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setSession({ role: d.role, name: d.name }); })
+      .catch(() => undefined);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await fetch('/api/session', { method: 'DELETE' }).catch(() => undefined);
+    try { localStorage.removeItem('hc-unlocked-until'); } catch { /* private mode */ }
+    window.location.reload();
+  }, []);
 
   // approved archive submissions join the field as additional bright cells
   useEffect(() => {
@@ -762,8 +789,9 @@ export default function HoneycombApp() {
     } catch { /* private mode */ }
   }, []);
 
-  const enter = () => {
+  const enter = (data) => {
     setView('archive');
+    if (data && data.role) setSession({ role: data.role, name: data.name ?? null });
     try { localStorage.setItem('hc-unlocked-until', String(Date.now() + 30 * 24 * 3600 * 1000)); } catch { /* private mode */ }
   };
 
@@ -841,6 +869,7 @@ export default function HoneycombApp() {
         onNav={onNav} onSubmit={openRecorder} activePage={pageId}
         query={query} onQuery={onQuery} matchCount={matchCount}
         autohide={t.topbarAutohide !== false} keepVisible={panelOpen || recorderOpen}
+        session={session} onSignOut={signOut}
       />
       <StoryPanel page={page} person={person} onClose={closePanel} openRecorder={openRecorder} focusSearch={focusSearch} />
       {recorderOpen && <RecorderModal onClose={() => setRecorderOpen(false)} />}
