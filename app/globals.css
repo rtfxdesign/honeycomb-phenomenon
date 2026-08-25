@@ -149,13 +149,14 @@ button{font:inherit;color:inherit}
    has one temperature rather than a dozen hand-picked ones that drift apart
    whenever anybody edits a gradient.
 
-   Golden rather than pale: the core keeps a little white so it still reads as
-   a light source, but the falloff runs through honey into amber instead of
-   fading toward cream. */
+   Molten: no white anywhere in it. A white core reads as a lamp shining onto
+   the comb from somewhere else; without it the light reads as the wax itself
+   glowing, which is the thing this archive is actually about. The falloff runs
+   amber into a deep ember rather than fading toward cream. */
 .arch-field{
-  --light-core:255 206 118;   /* the middle of the pool */
-  --light-warm:255 168 56;    /* honey, most of what you see */
-  --light-deep:236 132 22;    /* amber at the edge, where it meets the dark */
+  --light-core:255 188 92;    /* the middle of the pool — already amber */
+  --light-warm:252 146 38;    /* molten, most of what you see */
+  --light-deep:214 96 12;     /* ember at the edge, where it meets the dark */
 }
 
 /* Fractal noise, generated once by the browser from an inline SVG rather than
@@ -219,9 +220,13 @@ button{font:inherit;color:inherit}
    Two layers in one element: a moving sheen that leans with the light, and a
    soft pool that gathers where the light is. Both are nearly invisible at
    rest — the glaze should be felt rather than seen until the light finds it. */
-.hexcell .cell-glaze{
-  position:absolute;left:11%;top:11%;width:78%;aspect-ratio:749/631;
-  clip-path:polygon(25% 2%,75% 2%,98% 50%,75% 98%,25% 98%,2% 50%);
+.hexcell .cell-glaze,
+.cell-dormant-wrap::after{
+  content:"";
+  /* the whole cell, not just the portrait — the wax frame is the same material
+     as the middle of it and should catch the light the same way. Masked to the
+     comb silhouette so the film stops where the cell does. */
+  position:absolute;inset:0;
   pointer-events:none;z-index:3;
   opacity:var(--glaze,0.5);
   /* Three uneven pools rather than a band. A straight-edged sheen reads as
@@ -245,10 +250,12 @@ button{font:inherit;color:inherit}
      never even. Static data URI, so it costs one rasterisation and nothing per
      frame. Alpha is held between 0.45 and 1 so it thins the glaze rather than
      punching holes in it. */
-  -webkit-mask-image:var(--wax-noise);
-  mask-image:var(--wax-noise);
-  -webkit-mask-size:150% 150%;
-  mask-size:150% 150%;
+  -webkit-mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  -webkit-mask-size:100% 100%,150% 150%;
+  mask-size:100% 100%,150% 150%;
+  -webkit-mask-composite:source-in;
+  mask-composite:intersect;
   mix-blend-mode:screen;
   animation:waxdrift 19s linear infinite;
   transition:opacity var(--glow-fade,520ms) var(--ease-quiet),
@@ -299,13 +306,13 @@ button{font:inherit;color:inherit}
   .cell-dormant{filter:brightness(var(--dormant-brightness,0.72)) saturate(0.85)}
   /* the film stays — it is what makes a face look set into wax, and it costs
      nothing without a pointer. Only its response to light goes. */
-  .hexcell .cell-glaze{opacity:calc(var(--glaze,0.5) * 0.55)}
+  .hexcell .cell-glaze,.cell-dormant-wrap::after{opacity:calc(var(--glaze,0.5) * 0.55)}
 }
 
 @media (prefers-reduced-motion:reduce){
   .hexcell::before,.hexcell::after,.hexcell .cell-face,.cell-dormant,.hexcell .cell-glaze{transition:none}
   /* the mottling holds still — it still reads as wax, it just stops drifting */
-  .hexcell::after,.hexcell .cell-glaze{animation:none}
+  .hexcell::after,.hexcell .cell-glaze,.cell-dormant-wrap::after{animation:none}
 }
 
 /* search: matches gather and stay lit, everything else recedes */

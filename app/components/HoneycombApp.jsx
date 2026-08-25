@@ -939,10 +939,10 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                     {face && !face.src && face.initials && (
                       <span className="cell-initials" aria-hidden="true">{face.initials}</span>
                     )}
-                    {/* a thin film over the portrait for the light to catch —
-                        the face reads as sitting under the wax rather than
-                        printed on top of it */}
-                    {face && <span className="cell-glaze" aria-hidden="true" />}
+                    {/* a thin film over the whole cell for the light to catch —
+                        wax frame and portrait alike, so a face reads as sitting
+                        under the comb rather than printed on top of it */}
+                    <span className="cell-glaze" aria-hidden="true" />
                   </div>
                 )
                 : (
