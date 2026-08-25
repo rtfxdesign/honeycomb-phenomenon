@@ -479,9 +479,13 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     window.addEventListener('pointerup', up);
     return () => { el.removeEventListener('pointerdown', down); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
   }, [maxPanX, maxPanY, apply]);
+  // the comb grows to hold every voice: enough cells that each community face
+  // and each approved story gets its own, whatever the cell-count slider says
+  const voices = faces.length + experiences.length;
+  const cellCount = Math.max(t.cellCount, Math.ceil(voices / Math.max(0.1, t.brightShare / 100)));
   const field = useMemo(
-    () => genField(cols, rows, t.cellCount, t.distribution, t.brightShare, t.gaps, mulberry32(t.seed * 7919 + 13)),
-    [cols, rows, t.cellCount, t.distribution, t.brightShare, t.gaps, t.seed]
+    () => genField(cols, rows, cellCount, t.distribution, t.brightShare, t.gaps, mulberry32(t.seed * 7919 + 13)),
+    [cols, rows, cellCount, t.distribution, t.brightShare, t.gaps, t.seed]
   );
   const base = useMemo(() => field.map(([c, r, ty]) => ({ k: c + ',' + r, t: ty, x: c * cx, y: r * cy })), [field, cx, cy]);
   useEffect(() => { setFocusKey(null); }, [field, setFocusKey]);
