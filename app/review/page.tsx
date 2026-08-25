@@ -14,6 +14,16 @@ interface SubmissionData {
   privacy?: string;
   hashtags?: string[];
   status?: string;
+  // machine transcription
+  audioKey?: string;
+  recordingMode?: string;
+  machineTranscript?: string;
+  transcriptStatus?: "none" | "awaiting" | "ready" | "confirmed" | "failed";
+  transcriptSource?: string;
+  transcriptModel?: string;
+  transcriptWarnings?: string[];
+  transcriptError?: string;
+  transcribedAt?: string;
 }
 
 interface Submission {
@@ -74,6 +84,9 @@ export default function ReviewDashboard() {
   const [authError, setAuthError] = useState("");
   const [members, setMembers] = useState<MemberRecord[]>([]);
   const [newMember, setNewMember] = useState({ name: "", email: "", note: "" });
+  // which submission is being transcribed right now, and anything it came back with
+  const [transcribingKey, setTranscribingKey] = useState<string | null>(null);
+  const [transcribeNote, setTranscribeNote] = useState<Record<string, string>>({});
   const [issuedCode, setIssuedCode] = useState<{ name: string; code: string } | null>(null);
   const [memberBusy, setMemberBusy] = useState(false);
 
@@ -277,6 +290,80 @@ export default function ReviewDashboard() {
     }
   };
 
+  /**
+   * Ask the archive to transcribe this submission's recording.
+   *
+   * The result is a draft, not a transcript. It lands in machineTranscript and
+   * the moderator decides whether it becomes the record — see acceptDraft.
+   */
+  const transcribe = async (submissionKey: string) => {
+    setTranscribingKey(submissionKey);
+    setTranscribeNote(n => ({ ...n, [submissionKey]: "" }));
+    try {
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionKey }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        // The route explains its own failures; show what it said rather than
+        // a generic message the moderator can do nothing with.
+        setTranscribeNote(n => ({ ...n, [submissionKey]: result.error || `Failed (${res.status})` }));
+        return;
+      }
+      setSubmissions(current => current.map(sub =>
+        sub.submissionKey === submissionKey
+          ? { ...sub, data: {
+              ...sub.data,
+              machineTranscript: result.machineTranscript,
+              transcriptStatus: "ready",
+              transcriptSource: "machine",
+              transcriptModel: result.model,
+              transcriptWarnings: result.warnings,
+              transcriptError: undefined,
+            } }
+          : sub
+      ));
+      const warned = (result.warnings || []).length;
+      setTranscribeNote(n => ({
+        ...n,
+        [submissionKey]: `${result.wordCount} words${warned ? " — see the note below" : ""}`,
+      }));
+    } catch (err) {
+      console.error(err);
+      setTranscribeNote(n => ({ ...n, [submissionKey]: "Could not reach the transcription service." }));
+    } finally {
+      setTranscribingKey(null);
+    }
+  };
+
+  /** Move the machine draft into the transcript and mark it confirmed. */
+  const acceptDraft = async (submissionKey: string, text: string) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/update-experience", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          submissionKey,
+          updates: { transcript: text, transcriptStatus: "confirmed", transcriptSource: "machine" },
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      const result = await res.json();
+      setSubmissions(current => current.map(sub =>
+        sub.submissionKey === submissionKey ? { ...sub, data: result.data } : sub
+      ));
+      setTranscribeNote(n => ({ ...n, [submissionKey]: "" }));
+    } catch (err) {
+      console.error(err);
+      alert("Could not save the transcript. Check console.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const savePerson = async (key: string) => {
     if (!personEdit) return;
     setSaving(true);
@@ -465,9 +552,78 @@ export default function ReviewDashboard() {
             </div>
           ) : (
             <>
-              <p style={{ margin: "0 0 1rem 0", lineHeight: 1.6, whiteSpace: "pre-wrap", fontSize: "0.95rem" }}>
-                &ldquo;{transcript}&rdquo;
-              </p>
+              {transcript ? (
+                <p style={{ margin: "0 0 1rem 0", lineHeight: 1.6, whiteSpace: "pre-wrap", fontSize: "0.95rem" }}>
+                  &ldquo;{transcript}&rdquo;
+                </p>
+              ) : (
+                <p style={{ margin: "0 0 1rem 0", fontSize: "0.9rem", opacity: 0.55, fontStyle: "italic" }}>
+                  No transcript yet — this account is only a recording so far.
+                </p>
+              )}
+
+              {/* ── machine transcription ───────────────────────────────── */}
+              {(() => {
+                const d = submission.data;
+                const canTranscribe = Boolean(d.audioKey || d.recordingMode === "audio");
+                const busy = transcribingKey === submission.submissionKey;
+                const note = transcribeNote[submission.submissionKey];
+                if (!canTranscribe && !d.machineTranscript) return null;
+                return (
+                  <div style={{ margin: "0 0 1rem 0", padding: "0.9rem", border: "1px solid var(--line)", borderRadius: "8px", background: "rgba(255,255,255,0.03)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", flexWrap: "wrap" }}>
+                      <span style={{ ...labelStyle, margin: 0 }}>Machine transcript</span>
+                      {canTranscribe && (
+                        <button
+                          onClick={() => transcribe(submission.submissionKey)}
+                          disabled={busy || saving}
+                          style={{ background: "rgba(242,191,73,0.14)", color: "var(--gold)", border: "1px solid var(--line)", padding: "0.3rem 0.75rem", borderRadius: "100px", cursor: busy ? "wait" : "pointer", fontSize: "0.78rem" }}
+                        >
+                          {busy ? "Transcribing…" : d.machineTranscript ? "Transcribe again" : "Transcribe recording"}
+                        </button>
+                      )}
+                      {d.transcriptStatus === "confirmed" && d.transcriptSource === "machine" && (
+                        <span style={{ fontSize: "0.72rem", opacity: 0.6 }}>confirmed</span>
+                      )}
+                      {note && <span style={{ fontSize: "0.75rem", opacity: 0.75 }}>{note}</span>}
+                    </div>
+
+                    {d.transcriptWarnings && d.transcriptWarnings.length > 0 && (
+                      <div style={{ marginTop: "0.6rem", fontSize: "0.78rem", color: "#f0b95c", lineHeight: 1.5 }}>
+                        {d.transcriptWarnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+                      </div>
+                    )}
+
+                    {d.machineTranscript && (
+                      <>
+                        <p style={{ margin: "0.7rem 0 0.6rem", lineHeight: 1.6, fontSize: "0.9rem", opacity: 0.9, whiteSpace: "pre-wrap" }}>
+                          {d.machineTranscript}
+                        </p>
+                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => acceptDraft(submission.submissionKey, d.machineTranscript as string)}
+                            disabled={saving}
+                            style={{ background: "var(--gold)", color: "#1A0F06", border: "none", padding: "0.35rem 0.8rem", borderRadius: "100px", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600 }}
+                          >
+                            Use as transcript
+                          </button>
+                          <button
+                            onClick={() => startEdit(submission)}
+                            disabled={saving}
+                            style={{ background: "transparent", color: "var(--gold)", border: "1px solid var(--line)", padding: "0.35rem 0.8rem", borderRadius: "100px", cursor: "pointer", fontSize: "0.78rem" }}
+                          >
+                            Edit before using
+                          </button>
+                        </div>
+                        <p style={{ margin: "0.6rem 0 0", fontSize: "0.72rem", opacity: 0.5, lineHeight: 1.5 }}>
+                          A draft, not a record. Nothing here is published until you use it.
+                          {d.transcriptModel ? ` (${d.transcriptModel})` : ""}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
               {hashtags && hashtags.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
                   {hashtags.map(tag => (
