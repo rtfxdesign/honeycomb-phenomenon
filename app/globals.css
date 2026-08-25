@@ -132,6 +132,99 @@ button{font:inherit;color:inherit}
   background:radial-gradient(circle at 50% 38%,rgba(242,191,73,0.30),rgba(38,23,9,0.92) 74%);
   color:var(--gold);font-family:Montserrat,sans-serif;font-size:20cqw;font-weight:600;letter-spacing:0.06em;
   text-shadow:0 2px 12px rgba(0,0,0,0.65);pointer-events:none}
+/* ── the pointer as a light source ──────────────────────────────────────────
+   --lit (0..1) and --lx (-1..1) are written per cell by useFieldLight. Nothing
+   here reads the pointer directly, so the whole effect costs two custom
+   property writes per cell per frame and no layout.
+
+   The afterglow is this transition and nothing else: when the pointer moves
+   on, --lit drops to 0 and the glow takes --glow-fade to follow it. */
+.cell{--lit:0;--lx:0}
+.cell-dormant-wrap{position:relative;display:block}
+
+/* The warm pool. Sits under the face deliberately — light on bare comb should
+   read stronger than light on someone's portrait. */
+.hexcell::before,
+.cell-dormant-wrap::before{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  opacity:calc(var(--lit) * var(--glow-strength,0.7));
+  transition:opacity var(--glow-fade,520ms) var(--ease-quiet);
+  background:
+    radial-gradient(circle at calc(50% + var(--lx) * 26%) 42%,
+      rgba(255,206,132,0.55) 0%,
+      rgba(247,182,86,0.30) 34%,
+      rgba(224,151,37,0.10) 62%,
+      transparent 78%);
+  /* the light lands on the comb, not on the square box around it */
+  -webkit-mask-image:url('/assets/cell-bright.png');
+  mask-image:url('/assets/cell-bright.png');
+  -webkit-mask-size:100% 100%;
+  mask-size:100% 100%;
+  mix-blend-mode:screen;
+}
+
+/* The interior reflection: a narrow specular streak that leans away from the
+   light. While cells are travelling to new positions their real location lags
+   the one the light is computed from, so this sweeps across their interiors as
+   they settle — which is the point of it. */
+.hexcell::after{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  opacity:calc(var(--lit) * var(--glow-strength,0.7) * 0.55);
+  transition:opacity var(--glow-fade,520ms) var(--ease-quiet);
+  background:linear-gradient(
+    calc(104deg + var(--lx) * 42deg),
+    transparent 34%,
+    rgba(255,224,170,0.42) 47%,
+    rgba(255,236,200,0.14) 53%,
+    transparent 66%);
+  -webkit-mask-image:url('/assets/cell-bright.png');
+  mask-image:url('/assets/cell-bright.png');
+  -webkit-mask-size:100% 100%;
+  mask-size:100% 100%;
+  mix-blend-mode:screen;
+}
+
+/* Faces take a lighter touch: the pool sits beneath them, and this is all the
+   light that reaches the portrait itself. */
+.hexcell .cell-face{
+  filter:brightness(calc(1 + var(--lit) * 0.16)) saturate(calc(1 + var(--lit) * 0.10));
+  transition:opacity var(--dur-grow) var(--ease-quiet),filter var(--glow-fade,520ms) var(--ease-quiet);
+}
+
+/* Dormant cells are bare wax and take the light full on. */
+.cell-dormant{
+  filter:brightness(calc(var(--dormant-brightness,0.72) + var(--lit) * 0.30)) saturate(0.85);
+  transition:filter var(--glow-fade,520ms) var(--ease-quiet);
+}
+
+/* A hint of the ground through the middle of each cell, so the comb reads as
+   wax with depth rather than as stickers laid on the background. Kept low by
+   default: past about 30% the faces start to look like they are dissolving. */
+.hexcell > img:not(.cell-face),
+.cell-dormant{
+  -webkit-mask-image:radial-gradient(circle at 50% 46%,
+    rgba(0,0,0,calc(1 - var(--cell-center,0.14))) 0%,
+    rgba(0,0,0,calc(1 - var(--cell-center,0.14) * 0.72)) 34%,
+    #000 62%);
+  mask-image:radial-gradient(circle at 50% 46%,
+    rgba(0,0,0,calc(1 - var(--cell-center,0.14))) 0%,
+    rgba(0,0,0,calc(1 - var(--cell-center,0.14) * 0.72)) 34%,
+    #000 62%);
+}
+
+/* Coarse pointers get no light — there is nothing hovering to emit it, and a
+   pool stranded wherever the last tap landed reads as a bug. The centre
+   transparency stays, since it costs nothing. */
+@media (hover:none),(pointer:coarse){
+  .hexcell::before,.hexcell::after,.cell-dormant-wrap::before{display:none}
+  .hexcell .cell-face{filter:none}
+  .cell-dormant{filter:brightness(var(--dormant-brightness,0.72)) saturate(0.85)}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .hexcell::before,.hexcell::after,.hexcell .cell-face,.cell-dormant{transition:none}
+}
+
 /* search: matches gather and stay lit, everything else recedes */
 .cell-unmatched{opacity:0.3;filter:saturate(0.55) brightness(0.7)}
 .cell,.cell-unmatched{transition:left 640ms var(--ease-quiet),top 640ms var(--ease-quiet),opacity 420ms var(--ease-quiet),filter 420ms var(--ease-quiet)}

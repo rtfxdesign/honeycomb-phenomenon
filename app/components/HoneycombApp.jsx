@@ -32,6 +32,12 @@ const TWEAK_DEFAULTS = {
   push: 190,
   dormantRespond: false,
   showFaces: true,
+  // the pointer as a lamp over the comb
+  mouseLight: true,
+  lightReach: 260,      // % of a cell's width — how far the pool carries
+  lightStrength: 70,    // %
+  lightAfterglow: 520,  // ms for a cell to let go of the light
+  cellCenter: 14,       // % of the middle given over to the ground behind
   cellOpacity: 92,
   dormantBright: 85,
   ground: '#1A1210',
@@ -48,6 +54,105 @@ const TWEAK_DEFAULTS = {
 };
 
 const VINE_ASPECT = 571 / 1100; // natural width/height of the vine sprite
+
+/**
+ * The pointer as a light source over the comb.
+ *
+ * Each cell gets two custom properties and nothing else:
+ *   --lit  0..1, how much of the light is falling on it
+ *   --lx   -1..1, which side the light is coming from
+ *
+ * React is deliberately not involved. Re-rendering fifty cells on every
+ * pointermove would be absurd for what is a lighting change, so this walks the
+ * DOM nodes once per layout and then only writes two variables per cell per
+ * frame. The afterglow is a CSS transition on opacity rather than anything
+ * animated here — the light stops moving, the glow fades on its own.
+ *
+ * Positions come from the layout the field was given, not from
+ * getBoundingClientRect, which would force layout every frame. While cells are
+ * travelling to new places their real position lags the value used here, and
+ * the light sweeps across their interiors as they settle. That is the intended
+ * behaviour rather than an artefact of the shortcut.
+ */
+function useFieldLight(fieldRef, { enabled, reach, cells }) {
+  useEffect(() => {
+    const field = fieldRef.current;
+    if (!field || !enabled) return undefined;
+
+    // No pointer, no light. Touch devices would otherwise get a light stuck
+    // wherever the last tap landed.
+    const fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+    if (!fine.matches) return undefined;
+
+    let nodes = [];
+    const collect = () => {
+      nodes = Array.from(field.querySelectorAll('.cell[data-cx]')).map((el) => ({
+        el,
+        cx: Number(el.dataset.cx),
+        cy: Number(el.dataset.cy),
+        half: Number(el.dataset.half) || 0,
+      }));
+    };
+    collect();
+
+    let raf = 0;
+    let px = -1e6;
+    let py = -1e6;
+    let dirty = false;
+
+    const paint = () => {
+      raf = 0;
+      dirty = false;
+      for (const n of nodes) {
+        const dx = px - (n.cx + n.half);
+        const dy = py - (n.cy + n.half);
+        const d = Math.hypot(dx, dy);
+        // Smooth falloff rather than a hard edge: squared so the centre of the
+        // pool is clearly brighter than its rim, the way a lamp behaves.
+        const t = Math.max(0, 1 - d / reach);
+        const lit = t * t;
+        n.el.style.setProperty('--lit', lit.toFixed(3));
+        // Which way the highlight leans. Only meaningful while lit, so it is
+        // clamped to the cell's own width.
+        n.el.style.setProperty('--lx', Math.max(-1, Math.min(1, dx / (n.half * 2 || 1))).toFixed(3));
+      }
+    };
+
+    const schedule = () => {
+      if (dirty) return;
+      dirty = true;
+      raf = requestAnimationFrame(paint);
+    };
+
+    const onMove = (e) => {
+      const box = field.getBoundingClientRect();
+      px = e.clientX - box.left;
+      py = e.clientY - box.top;
+      schedule();
+    };
+
+    const onLeave = () => {
+      px = -1e6;
+      py = -1e6;
+      schedule();
+    };
+
+    field.addEventListener('pointermove', onMove, { passive: true });
+    field.addEventListener('pointerleave', onLeave, { passive: true });
+
+    return () => {
+      field.removeEventListener('pointermove', onMove);
+      field.removeEventListener('pointerleave', onLeave);
+      if (raf) cancelAnimationFrame(raf);
+      for (const n of nodes) {
+        n.el.style.removeProperty('--lit');
+        n.el.style.removeProperty('--lx');
+      }
+    };
+    // `cells` changes whenever the field is rebuilt or rearranged, which is
+    // exactly when the node list and their positions need collecting again.
+  }, [fieldRef, enabled, reach, cells]);
+}
 
 const BACKDROPS = {
   'Archive texture': '/assets/archive-background.webp',
@@ -680,6 +785,14 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     if (matchKeys) return gatherMatches(base, matchKeys, cols, rows, cx, cy, size, W, H, t.push);
     return placed;
   }, [matchKeys, placed, base, cols, rows, cx, cy, size, W, H, t.push]);
+  // the pointer as a lamp over the comb
+  useFieldLight(fieldRef, {
+    enabled: t.mouseLight !== false,
+    // Reach scales with the cells, so the pool covers a similar number of them
+    // whatever size they are set to.
+    reach: size * ((t.lightReach ?? 260) / 100),
+    cells: arranged,
+  });
   // with the panel open, slide the field so the cell you clicked clears it
   useEffect(() => {
     if (!panelOpen || !focusKey || vp[0] < 881) return;
@@ -787,7 +900,14 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
   return (
     <div className={panelOpen ? 'arch arch--panel' : 'arch'}>
       <div className="arch-clip" style={panelOpen ? { filter: 'brightness(0.83)' } : undefined}>
-        <div className="arch-field" ref={fieldRef} style={{ width: W, height: H, transform: 'translate(-50%,-50%)', marginTop: 12 }} onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
+        <div className="arch-field" ref={fieldRef}
+             style={{
+               width: W, height: H, transform: 'translate(-50%,-50%)', marginTop: 12,
+               '--glow-fade': `${t.lightAfterglow ?? 520}ms`,
+               '--glow-strength': (t.lightStrength ?? 70) / 100,
+               '--cell-center': (t.cellCenter ?? 14) / 100,
+             }}
+             onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
           {vines.map((v) => (
             <div key={v.id} className="vine-sprite" aria-hidden="true" style={{ left: v.x, top: v.y }}>
               <img src="/uploads/vine-sprite.webp" alt="" style={{ height: v.L, width: v.L * VINE_ASPECT * ((t.vineSize ?? 100) / 100), transform: `translateX(-48%) rotate(${v.rot}deg)`, animationDelay: v.delay + 'ms' }} />
@@ -797,7 +917,9 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
             const face = faceOf.get(b.k);
             const dimmed = matchKeys && !b.match;
             return (
-            <div key={b.k} className={'cell' + (dimmed ? ' cell-unmatched' : '')} style={{ left: b.x, top: b.y, width: size, zIndex: b.k === focusKey ? 3 : b.match ? 2 : b.kin ? 2 : 1 }}>
+            <div key={b.k} className={'cell' + (dimmed ? ' cell-unmatched' : '')}
+                 data-cx={b.x} data-cy={b.y} data-half={size / 2}
+                 style={{ left: b.x, top: b.y, width: size, zIndex: b.k === focusKey ? 3 : b.match ? 2 : b.kin ? 2 : 1 }}>
               {b.t === 'b'
                 ? (
                   <div className={'hexcell' + (b.k === focusKey ? ' cell-focus' : '') + (b.match ? ' cell-match' : '')} tabIndex="0" role="button"
@@ -817,7 +939,13 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                     )}
                   </div>
                 )
-                : <img src="/assets/cell-bright.png" alt="" className="cell-dormant" style={{ width: '100%' }} />}
+                : (
+                  // wrapped so a dormant cell has somewhere to hang the light
+                  // pool; bare wax takes the light more fully than a portrait
+                  <div className="cell-dormant-wrap" aria-hidden="true">
+                    <img src="/assets/cell-bright.png" alt="" className="cell-dormant" style={{ width: '100%' }} />
+                  </div>
+                )}
             </div>
             );
           })}
@@ -981,6 +1109,11 @@ export default function HoneycombApp() {
         <TweakToggle label="Faces always visible" value={t.showFaces} onChange={(v) => setTweak('showFaces', v)} />
         <TweakSlider label="Cell opacity" value={t.cellOpacity ?? 90} min={40} max={100} unit="%" onChange={(v) => setTweak('cellOpacity', v)} />
         <TweakSlider label="Dormant brightness" value={t.dormantBright ?? 72} min={30} max={100} unit="%" onChange={(v) => setTweak('dormantBright', v)} />
+        <TweakSlider label="Cell centre" value={t.cellCenter ?? 14} min={0} max={45} unit="%" onChange={(v) => setTweak('cellCenter', v)} />
+        <TweakToggle label="Mouse light" value={t.mouseLight !== false} onChange={(v) => setTweak('mouseLight', v)} />
+        <TweakSlider label="Light reach" value={t.lightReach ?? 260} min={100} max={600} step={10} unit="%" onChange={(v) => setTweak('lightReach', v)} />
+        <TweakSlider label="Light strength" value={t.lightStrength ?? 70} min={0} max={100} unit="%" onChange={(v) => setTweak('lightStrength', v)} />
+        <TweakSlider label="Afterglow" value={t.lightAfterglow ?? 520} min={0} max={1600} step={20} unit="ms" onChange={(v) => setTweak('lightAfterglow', v)} />
         <TweakButton label="Reshuffle field" onClick={() => setTweak('seed', (t.seed || 1) + 1)} />
         <TweakSection label="Gravity" />
         <TweakRadio label="Kinship" value={t.clusterBy} options={[{ value: 'tags', label: 'Shared tags' }, { value: 'random', label: 'Random' }]} onChange={(v) => setTweak('clusterBy', v)} />
