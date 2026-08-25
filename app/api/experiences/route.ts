@@ -63,8 +63,18 @@ export async function GET(request: NextRequest) {
             photoUrl = await getSignedUrl(client, photoCmd, { expiresIn: 3600 });
           }
 
+          // An unconfirmed machine transcript is a draft for the moderator,
+          // not a record of what anybody said. It must not reach a browser and
+          // must not stand in for the transcript — same rule as the archived
+          // records above: if it should not be shown, it should not be sent.
+          const {
+            machineTranscript: _machineTranscript,
+            transcriptError: _transcriptError,
+            ...safe
+          } = data;
+
           return {
-            ...data,
+            ...safe,
             mediaUrl,
             photoUrl,
             lastModified: obj.LastModified

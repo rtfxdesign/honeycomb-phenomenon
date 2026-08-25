@@ -15,6 +15,13 @@ const EDITABLE_FIELDS = [
   "privacy",
   "recordingMode",
   "hashtags",
+  // Confirming a machine draft is an edit like any other: the moderator moves
+  // the text into `transcript` and marks it confirmed. `machineTranscript`
+  // itself stays read-only — it is the record of what the machine actually
+  // heard, and overwriting it would destroy the only way to check a disputed
+  // transcript later.
+  "transcriptStatus",
+  "transcriptSource",
 ] as const;
 
 export async function POST(request: NextRequest) {

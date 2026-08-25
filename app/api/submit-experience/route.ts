@@ -10,8 +10,18 @@ export async function POST(request: NextRequest) {
   try {
     const data = await request.json();
 
-    if (!data.title || !data.transcript) {
-      return NextResponse.json({ error: "Title and transcript are required" }, { status: 400 });
+    // A recording is itself an account. Requiring typed text alongside it made
+    // people transcribe themselves before they could submit, which is exactly
+    // the work machine transcription exists to remove — so a submission needs
+    // a title and then either words or a recording.
+    const hasWords = typeof data.transcript === "string" && data.transcript.trim().length > 0;
+    const hasRecording = Boolean(data.mediaKey || data.audioKey);
+
+    if (!data.title || (!hasWords && !hasRecording)) {
+      return NextResponse.json(
+        { error: "A title and either a transcript or a recording are required" },
+        { status: 400 }
+      );
     }
 
     const timestamp = Date.now();
@@ -23,7 +33,12 @@ export async function POST(request: NextRequest) {
       ...data,
       id: submissionId,
       submittedAt: new Date().toISOString(),
-      status: "pending"
+      status: "pending",
+      // Where the words came from, and whether a machine still owes us any.
+      // The review queue uses this to show which submissions are waiting on a
+      // transcript rather than on a decision.
+      transcriptSource: hasWords ? (data.transcriptSource || "typed") : undefined,
+      transcriptStatus: hasWords ? "confirmed" : hasRecording ? "awaiting" : "none",
     };
 
     const client = getR2Client();

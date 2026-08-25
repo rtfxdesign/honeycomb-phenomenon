@@ -23,6 +23,8 @@ export default function RecorderModal({ onClose }) {
   const [year, setYear] = useState(new Date().getFullYear().toString());
   const [storyText, setStoryText] = useState('');
   const [mediaFile, setMediaFile] = useState(null);
+  // Audio-only copy of a video recording, so it can be machine-transcribed.
+  const [audioFile, setAudioFile] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
   const [recording, setRecording] = useState(false);
   const [dictating, setDictating] = useState(false);
@@ -34,10 +36,13 @@ export default function RecorderModal({ onClose }) {
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
+  const audioChunksRef = useRef([]);
+  const audioRecorderRef = useRef(null);
   const speechRef = useRef(null);
 
   useEffect(() => () => {
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+    if (audioRecorderRef.current?.state === 'recording') audioRecorderRef.current.stop();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     speechRef.current?.stop();
   }, []);
@@ -47,16 +52,41 @@ export default function RecorderModal({ onClose }) {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: mode === 'video' });
       streamRef.current = stream;
       chunksRef.current = [];
+      audioChunksRef.current = [];
       const recorder = new MediaRecorder(stream);
       recorderRef.current = recorder;
       recorder.ondataavailable = (event) => { if (event.data.size) chunksRef.current.push(event.data); };
+
+      // For video we also record the audio track on its own. Transcription
+      // takes audio, not a video container, and extracting a track server-side
+      // would mean running ffmpeg somewhere — this gets the same result for
+      // the cost of a second MediaRecorder over the microphone track we
+      // already have.
+      let audioRecorder = null;
+      if (mode === 'video') {
+        try {
+          const audioOnly = new MediaStream(stream.getAudioTracks());
+          audioRecorder = new MediaRecorder(audioOnly);
+          audioRecorder.ondataavailable = (event) => { if (event.data.size) audioChunksRef.current.push(event.data); };
+          audioRecorderRef.current = audioRecorder;
+        } catch {
+          // Not fatal: the video still records, it just cannot be
+          // auto-transcribed, and the dashboard says so.
+          audioRecorderRef.current = null;
+        }
+      }
+
       recorder.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: recorder.mimeType || (mode === 'video' ? 'video/webm' : 'audio/webm') });
         setMediaFile(blob);
+        if (audioChunksRef.current.length) {
+          setAudioFile(new Blob(audioChunksRef.current, { type: audioRecorderRef.current?.mimeType || 'audio/webm' }));
+        }
         stream.getTracks().forEach((track) => track.stop());
         setStatus('Recording ready. You can add notes or continue.');
       };
       recorder.start();
+      audioRecorder?.start();
       setRecording(true);
       setStatus('Recording now — take your time.');
     } catch {
@@ -66,6 +96,7 @@ export default function RecorderModal({ onClose }) {
 
   const stopRecording = () => {
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
+    if (audioRecorderRef.current?.state === 'recording') audioRecorderRef.current.stop();
     streamRef.current?.getTracks().forEach((track) => track.stop());
     setRecording(false);
   };
@@ -113,8 +144,10 @@ export default function RecorderModal({ onClose }) {
 
   const submitExperience = async (event) => {
     event.preventDefault();
-    if (!title.trim() || !storyText.trim()) {
-      setStatus('Please add a title and a few words about what happened.');
+    // A recording is an account in itself. Asking someone to also type it out
+    // before they may submit is the work machine transcription removes.
+    if (!title.trim() || (!storyText.trim() && !mediaFile)) {
+      setStatus('Please add a title, and either a few words or a recording.');
       return;
     }
     setSubmitting(true);
@@ -140,6 +173,20 @@ export default function RecorderModal({ onClose }) {
       setStatus('Preserving your experience securely…');
     }
 
+    // The audio-only copy of a video, uploaded so the record can be
+    // transcribed later. Never worth failing a submission over: if it does not
+    // upload, the video is still safely stored and the moderator can type the
+    // transcript as before.
+    let audioKey = '';
+    if (audioFile) {
+      try {
+        setStatus('Storing the audio track…');
+        audioKey = (await uploadToR2(audioFile, `experience-audio-${Date.now()}.webm`, () => {})).key;
+      } catch (error) {
+        console.warn('Audio track upload failed', error);
+      }
+    }
+
     let photoKey = '';
     if (photoFile) {
       try {
@@ -158,6 +205,8 @@ export default function RecorderModal({ onClose }) {
       privacy,
       recordingMode: mode,
       mediaKey: mediaKey || undefined,
+      // For an audio submission the recording is already the audio track.
+      audioKey: audioKey || (mode === 'audio' ? mediaKey : '') || undefined,
       photoKey: photoKey || undefined,
       hashtags: tags,
     };
