@@ -27,6 +27,7 @@ const TWEAK_DEFAULTS = {
   fieldHeight: 1000,
   // middle-of-the-road gravity — the settings that read best in review
   clusterShare: 50,
+  clusterBy: 'tags',
   pull: 55,
   push: 190,
   dormantRespond: false,
@@ -114,6 +115,62 @@ function haystack(face) {
     parts.push(...p.about);
   }
   return parts.filter(Boolean).join(' ').toLowerCase();
+}
+
+// ── relatedness ───────────────────────────────────────────────────────────
+// What the comb means by "kin". Two voices are related when they share tags,
+// and a tag shared by only two stories says far more than one carried by
+// twenty — so each tag is weighted by how rare it is across the whole archive
+// (the usual inverse-document-frequency idea), and the pair is scored by
+// cosine similarity over those weights. The result is 0..1: 0 for nothing in
+// common, 1 for an identical tag set.
+function tagsOf(face) {
+  const e = face && face.person && face.person.experience;
+  if (!e || !Array.isArray(e.hashtags)) return [];
+  const seen = new Set();
+  for (const raw of e.hashtags) {
+    const t = String(raw).trim().toLowerCase().replace(/^#/, '');
+    if (t) seen.add(t);
+  }
+  return [...seen];
+}
+
+// Weight every tag once per field, not once per comparison.
+function buildTagWeights(faceOf) {
+  const df = new Map();
+  let docs = 0;
+  for (const face of faceOf.values()) {
+    const tags = tagsOf(face);
+    if (!tags.length) continue;
+    docs++;
+    for (const t of tags) df.set(t, (df.get(t) || 0) + 1);
+  }
+  const weight = new Map();
+  for (const [t, n] of df) weight.set(t, Math.log(1 + docs / n));
+  // Pre-compute each cell's tag vector and its magnitude, so scoring a pair is
+  // one pass over the smaller tag list.
+  const vec = new Map();
+  for (const [k, face] of faceOf) {
+    const tags = tagsOf(face);
+    if (!tags.length) continue;
+    let mag = 0;
+    for (const t of tags) { const w = weight.get(t) || 0; mag += w * w; }
+    if (mag > 0) vec.set(k, { tags: new Set(tags), mag: Math.sqrt(mag) });
+  }
+  return { weight, vec };
+}
+
+function relatedness(aKey, bKey, { weight, vec }) {
+  const a = vec.get(aKey), b = vec.get(bKey);
+  if (!a || !b) return 0;
+  const [small, large] = a.tags.size <= b.tags.size ? [a, b] : [b, a];
+  let dot = 0;
+  for (const t of small.tags) {
+    if (!large.tags.has(t)) continue;
+    const w = weight.get(t) || 0;
+    dot += w * w;
+  }
+  return dot > 0 ? dot / (a.mag * b.mag) : 0;
 }
 
 // Search rearranges the field itself: matches gather into the middle, everything
@@ -502,47 +559,6 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
   );
   const base = useMemo(() => field.map(([c, r, ty]) => ({ k: c + ',' + r, t: ty, x: c * cx, y: r * cy })), [field, cx, cy]);
   useEffect(() => { setFocusKey(null); }, [field, setFocusKey]);
-  // clicked cell becomes a center of gravity: kin cells draw close, the rest give way.
-  // every moved cell snaps to the nearest FREE lattice slot, so cells always align and never overlap
-  const placed = useMemo(() => {
-    if (!focusKey) return base;
-    const f = base.find((b) => b.k === focusKey);
-    if (!f) return base;
-    const slots = [];
-    for (let c = 0; c < cols; c++) for (let r = c % 2; r < rows; r += 2) slots.push([c, r]);
-    const movers = base.filter((b) => b.k !== focusKey && (b.t === 'b' || t.dormantRespond));
-    const rng = mulberry32(((f.x * 31 + f.y * 7) | 0) + t.seed * 101);
-    const order = shuffle(movers.map((m) => m.k), rng);
-    const kinSet = new Set(order.slice(0, Math.round(movers.length * t.clusterShare / 100)));
-    const occupied = new Set([focusKey]);
-    base.forEach((b) => { if (b.k !== focusKey && !(b.t === 'b' || t.dormantRespond)) occupied.add(b.k); });
-    const taken = new Set();
-    const result = new Map();
-    const assign = (b, px, py) => {
-      let bestS = null, bestD = Infinity;
-      for (const s of slots) {
-        const kk = key(s);
-        if (occupied.has(kk) || taken.has(kk)) continue;
-        const d = (s[0] * cx - px) ** 2 + (s[1] * cy - py) ** 2;
-        if (d < bestD) { bestD = d; bestS = s; }
-      }
-      if (!bestS) return;
-      taken.add(key(bestS));
-      result.set(b.k, { x: bestS[0] * cx, y: bestS[1] * cy });
-    };
-    const byDist = (arr) => arr.slice().sort((a, b2) => Math.hypot(a.x - f.x, a.y - f.y) - Math.hypot(b2.x - f.x, b2.y - f.y));
-    for (const b of byDist(movers.filter((m) => kinSet.has(m.k)))) {
-      const dx = b.x - f.x, dy = b.y - f.y, d = Math.hypot(dx, dy) || 1;
-      const nd = Math.max(d * (1 - t.pull / 100), size * 0.87);
-      assign(b, f.x + dx / d * nd, f.y + dy / d * nd);
-    }
-    for (const b of byDist(movers.filter((m) => !kinSet.has(m.k)))) {
-      const dx = b.x - f.x, dy = b.y - f.y, d = Math.hypot(dx, dy) || 1;
-      const nd = d + t.push;
-      assign(b, Math.min(Math.max(f.x + dx / d * nd, 0), W - size), Math.min(Math.max(f.y + dy / d * nd, 0), H - size));
-    }
-    return base.map((b) => result.has(b.k) ? { ...b, kin: kinSet.has(b.k), ...result.get(b.k) } : b);
-  }, [base, focusKey, cols, rows, cx, cy, t.clusterShare, t.pull, t.push, t.dormantRespond, t.seed, size, W, H]);
   // bright cells hold the community faces first; approved archive submissions
   // (from /api/experiences) claim the remaining bright cells, their attached
   // photo becoming the cell face
@@ -565,6 +581,77 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     }
     return m;
   }, [base, experiences, faces]);
+  // tag weights for the whole field, recomputed only when the voices change
+  const tagIndex = useMemo(() => buildTagWeights(faceOf), [faceOf]);
+  // clicked cell becomes a center of gravity: kin cells draw close, the rest give way.
+  // every moved cell snaps to the nearest FREE lattice slot, so cells always align and never overlap
+  const placed = useMemo(() => {
+    if (!focusKey) return base;
+    const f = base.find((b) => b.k === focusKey);
+    if (!f) return base;
+    const slots = [];
+    for (let c = 0; c < cols; c++) for (let r = c % 2; r < rows; r += 2) slots.push([c, r]);
+    const movers = base.filter((b) => b.k !== focusKey && (b.t === 'b' || t.dormantRespond));
+    const rng = mulberry32(((f.x * 31 + f.y * 7) | 0) + t.seed * 101);
+    const shuffled = shuffle(movers.map((m) => m.k), rng);
+    const kinCount = Math.round(movers.length * t.clusterShare / 100);
+    // Kin by shared tags: rank every other voice by how much it has in common
+    // with this one. Ties — and they are common, since most pairs share
+    // nothing — fall back to the shuffled order, so a field with no tags yet
+    // behaves exactly as it did before and never looks broken.
+    const tie = new Map(shuffled.map((k, i) => [k, i]));
+    const score = new Map();
+    if (t.clusterBy === 'tags') {
+      for (const m of movers) score.set(m.k, relatedness(focusKey, m.k, tagIndex));
+    }
+    const ranked = movers.map((m) => m.k).sort((a, b2) => {
+      const d = (score.get(b2) || 0) - (score.get(a) || 0);
+      return d !== 0 ? d : tie.get(a) - tie.get(b2);
+    });
+    const kinSet = new Set(ranked.slice(0, kinCount));
+    const occupied = new Set([focusKey]);
+    base.forEach((b) => { if (b.k !== focusKey && !(b.t === 'b' || t.dormantRespond)) occupied.add(b.k); });
+    const taken = new Set();
+    const result = new Map();
+    const assign = (b, px, py) => {
+      let bestS = null, bestD = Infinity;
+      for (const s of slots) {
+        const kk = key(s);
+        if (occupied.has(kk) || taken.has(kk)) continue;
+        const d = (s[0] * cx - px) ** 2 + (s[1] * cy - py) ** 2;
+        if (d < bestD) { bestD = d; bestS = s; }
+      }
+      if (!bestS) return;
+      taken.add(key(bestS));
+      result.set(b.k, { x: bestS[0] * cx, y: bestS[1] * cy });
+    };
+    const byDist = (arr) => arr.slice().sort((a, b2) => Math.hypot(a.x - f.x, a.y - f.y) - Math.hypot(b2.x - f.x, b2.y - f.y));
+    // How strong the strongest relation is, so pull can be read relative to it
+    // rather than against an absolute the archive may never reach.
+    const maxScore = ranked.length ? (score.get(ranked[0]) || 0) : 0;
+    const scoring = t.clusterBy === 'tags' && maxScore > 0;
+    // A cell that shares a rare tag comes all the way in; a weak relation only
+    // drifts closer. With no tag signal every kin cell pulls the full amount,
+    // which is the behaviour that shipped.
+    const pullFactor = (k) => scoring ? 0.55 + 0.45 * ((score.get(k) || 0) / maxScore) : 1;
+    // Strongest relation gets first claim on the nearest free slot; without
+    // scoring, nearest-first as before.
+    const kin = movers.filter((m) => kinSet.has(m.k));
+    const kinOrder = scoring
+      ? kin.slice().sort((a, b2) => (score.get(b2.k) || 0) - (score.get(a.k) || 0))
+      : byDist(kin);
+    for (const b of kinOrder) {
+      const dx = b.x - f.x, dy = b.y - f.y, d = Math.hypot(dx, dy) || 1;
+      const nd = Math.max(d * (1 - (t.pull / 100) * pullFactor(b.k)), size * 0.87);
+      assign(b, f.x + dx / d * nd, f.y + dy / d * nd);
+    }
+    for (const b of byDist(movers.filter((m) => !kinSet.has(m.k)))) {
+      const dx = b.x - f.x, dy = b.y - f.y, d = Math.hypot(dx, dy) || 1;
+      const nd = d + t.push;
+      assign(b, Math.min(Math.max(f.x + dx / d * nd, 0), W - size), Math.min(Math.max(f.y + dy / d * nd, 0), H - size));
+    }
+    return base.map((b) => result.has(b.k) ? { ...b, kin: kinSet.has(b.k), ...result.get(b.k) } : b);
+  }, [base, focusKey, cols, rows, cx, cy, t.clusterShare, t.clusterBy, t.pull, t.push, t.dormantRespond, t.seed, size, W, H, tagIndex]);
   // ── search ────────────────────────────────────────────────────────────────
   const q = (query || '').trim().toLowerCase();
   const matchKeys = useMemo(() => {
@@ -887,6 +974,7 @@ export default function HoneycombApp() {
         <TweakSlider label="Dormant brightness" value={t.dormantBright ?? 72} min={30} max={100} unit="%" onChange={(v) => setTweak('dormantBright', v)} />
         <TweakButton label="Reshuffle field" onClick={() => setTweak('seed', (t.seed || 1) + 1)} />
         <TweakSection label="Gravity" />
+        <TweakRadio label="Kinship" value={t.clusterBy} options={[{ value: 'tags', label: 'Shared tags' }, { value: 'random', label: 'Random' }]} onChange={(v) => setTweak('clusterBy', v)} />
         <TweakSlider label="Cluster share" value={t.clusterShare} min={0} max={100} unit="%" onChange={(v) => setTweak('clusterShare', v)} />
         <TweakSlider label="Pull strength" value={t.pull} min={20} max={90} unit="%" onChange={(v) => setTweak('pull', v)} />
         <TweakSlider label="Push distance" value={t.push} min={40} max={340} unit="px" onChange={(v) => setTweak('push', v)} />
