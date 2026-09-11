@@ -721,9 +721,14 @@ export default function ReviewDashboard() {
           <h1 style={{ fontSize: "2rem", fontWeight: "600", margin: "0 0 0.5rem 0" }}>Unified Review Dashboard</h1>
           <p style={{ margin: 0, opacity: 0.7 }}>Secure archive of uploaded anomalous experiences (Text + Media).</p>
         </div>
-        <Link href="/" style={{ padding: "0.5rem 1rem", border: "1px solid var(--line)", borderRadius: "4px", textDecoration: "none", color: "inherit" }}>
-          &larr; Back to Site
-        </Link>
+        <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
+          <Link href="/review/todo" style={{ padding: "0.5rem 1rem", border: "1px solid var(--line)", borderRadius: "4px", textDecoration: "none", color: "inherit" }}>
+            To Do
+          </Link>
+          <Link href="/" style={{ padding: "0.5rem 1rem", border: "1px solid var(--line)", borderRadius: "4px", textDecoration: "none", color: "inherit" }}>
+            &larr; Back to Site
+          </Link>
+        </div>
       </header>
 
       {loading && <div style={{ opacity: 0.5 }}>Loading securely...</div>}
