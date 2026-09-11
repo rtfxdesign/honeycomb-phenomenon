@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 
 /**
  * Generates a presigned URL for direct-to-R2 video uploads.
@@ -8,27 +9,11 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
  * The frontend uploads large media files directly to Cloudflare R2,
  * bypassing Netlify's 8 MB form payload limit entirely.
  *
- * Required env vars: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET_NAME, ARCJET_KEY
+ * Required env vars: R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_ENDPOINT, R2_BUCKET_NAME
  */
-
-
-
-function getR2Client() {
-  return new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
-}
-
 export async function POST(request: NextRequest) {
-
   // Guard: if R2 isn't configured, return a clear error
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
+  if (!r2Configured()) {
     return NextResponse.json(
       { error: "Media uploads are not yet configured. Submissions without media still work via the standard form." },
       { status: 503 }
@@ -58,14 +43,15 @@ export async function POST(request: NextRequest) {
 
     const client = getR2Client();
     const command = new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: key,
+      Bucket: BUCKET,
+      Key: phys(key),
       ContentType: contentType,
     });
 
     // Generate a URL that expires in 30 minutes (plenty for large uploads)
     const uploadUrl = await getSignedUrl(client, command, { expiresIn: 1800 });
 
+    // The caller stores the logical key; the prefix stays server-side.
     return NextResponse.json({ uploadUrl, key });
   } catch (error) {
     console.error("Failed to generate upload URL:", error);

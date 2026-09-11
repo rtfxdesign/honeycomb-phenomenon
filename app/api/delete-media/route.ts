@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthed } from "../../lib/auth";
-import { S3Client, DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
-
-function getR2Client() {
-  return new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
-}
+import { isModerator } from "../../lib/auth";
+import { DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 
 export async function POST(request: NextRequest) {
-  if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!r2Configured()) {
+    return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
+  }
   try {
     const { submissionKey } = await request.json();
 
@@ -27,27 +19,27 @@ export async function POST(request: NextRequest) {
 
     // 1. Fetch the JSON submission to find its media keys
     const getCmd = new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: submissionKey,
+      Bucket: BUCKET,
+      Key: phys(submissionKey),
     });
-    
+
     try {
       const response = await client.send(getCmd);
       const bodyStr = await response.Body?.transformToString();
       if (bodyStr) {
         const data = JSON.parse(bodyStr);
-        
+
         // 2. Delete associated media files
         if (data.mediaKey) {
           await client.send(new DeleteObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME,
-            Key: data.mediaKey,
+            Bucket: BUCKET,
+            Key: phys(data.mediaKey),
           }));
         }
         if (data.photoKey) {
           await client.send(new DeleteObjectCommand({
-            Bucket: process.env.R2_BUCKET_NAME,
-            Key: data.photoKey,
+            Bucket: BUCKET,
+            Key: phys(data.photoKey),
           }));
         }
       }
@@ -57,8 +49,8 @@ export async function POST(request: NextRequest) {
 
     // 3. Delete the JSON submission itself
     await client.send(new DeleteObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: submissionKey,
+      Bucket: BUCKET,
+      Key: phys(submissionKey),
     }));
 
     return NextResponse.json({ success: true });

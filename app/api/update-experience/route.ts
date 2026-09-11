@@ -1,18 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthed } from "../../lib/auth";
-import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-
-function getR2Client() {
-  return new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
-}
+import { isModerator } from "../../lib/auth";
+import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 
 // Fields the review dashboard may edit; everything else in the stored JSON
 // (media keys, ids, timestamps, status) is preserved as-is.
@@ -26,11 +15,18 @@ const EDITABLE_FIELDS = [
   "privacy",
   "recordingMode",
   "hashtags",
+  // Confirming a machine draft is an edit like any other: the moderator moves
+  // the text into `transcript` and marks it confirmed. `machineTranscript`
+  // itself stays read-only — it is the record of what the machine actually
+  // heard, and overwriting it would destroy the only way to check a disputed
+  // transcript later.
+  "transcriptStatus",
+  "transcriptSource",
 ] as const;
 
 export async function POST(request: NextRequest) {
-  if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
+  if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!r2Configured()) {
     return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
   }
 
@@ -47,8 +43,8 @@ export async function POST(request: NextRequest) {
     const client = getR2Client();
 
     const response = await client.send(new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: submissionKey,
+      Bucket: BUCKET,
+      Key: phys(submissionKey),
     }));
     const bodyStr = await response.Body?.transformToString();
     if (!bodyStr) throw new Error("Empty submission file");
@@ -68,8 +64,8 @@ export async function POST(request: NextRequest) {
     data.editedAt = new Date().toISOString();
 
     await client.send(new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: submissionKey,
+      Bucket: BUCKET,
+      Key: phys(submissionKey),
       Body: JSON.stringify(data, null, 2),
       ContentType: "application/json",
     }));

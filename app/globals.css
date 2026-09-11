@@ -85,6 +85,9 @@ button{font:inherit;color:inherit}
 .hc-frame{position:absolute;inset:var(--frame-inset);border:var(--frame-border) solid var(--border-frame);border-radius:var(--radius-xl);pointer-events:none;z-index:50}
 .hc-texture{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.14;pointer-events:none}
 .hc-vignette{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 40%,transparent 40%,rgba(13,8,6,0.85) 100%);pointer-events:none}
+/* warmth: a golden wash over the ground, so the comb reads warm rather than cool-brown */
+.hc-warm{position:absolute;inset:0;pointer-events:none;mix-blend-mode:soft-light;
+  background:radial-gradient(115% 85% at 50% 32%,rgba(255,196,96,0.95),rgba(255,158,46,0.42) 45%,rgba(255,140,30,0.12) 70%,transparent 88%)}
 .hc-view{position:absolute;inset:0;transition:opacity 480ms var(--ease-quiet)}
 .gate-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;text-align:center;z-index:5;padding:0 24px}
 .gate-eyebrow{font-family:var(--font-ui);font-weight:var(--weight-label);font-size:var(--type-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--text-gold);margin:36px 0 20px}
@@ -113,9 +116,210 @@ button{font:inherit;color:inherit}
 .hexcell{position:relative;cursor:pointer;outline:none;transition:transform var(--dur-grow) var(--ease-quiet),filter var(--dur-grow) var(--ease-quiet);filter:drop-shadow(0 0 14px rgba(240,168,60,0.28))}
 .hexcell:hover,.hexcell:focus-visible{transform:scale(var(--scale-grow));filter:drop-shadow(0 0 22px rgba(240,168,60,0.5))}
 .hexcell.cell-focus{transform:scale(1.12);filter:drop-shadow(0 0 30px rgba(240,168,60,0.6))}
+/* with the story panel open the clicked cell is also panned clear of it, so it
+   can afford to grow — you read the story beside the face, not behind it */
+.arch--panel .hexcell.cell-focus{transform:scale(1.42);filter:drop-shadow(0 0 40px rgba(240,168,60,0.72))}
 .hexcell img{width:100%;display:block}
 .hexcell > img:not(.cell-face){opacity:var(--cell-opacity,0.9)}
-.hexcell .cell-face{position:absolute;left:11%;top:11%;width:78%;pointer-events:none}
+.hexcell{container-type:inline-size}
+.hexcell .cell-face{position:absolute;left:11%;top:11%;width:78%;pointer-events:none;
+  opacity:var(--face-opacity,1);transition:opacity var(--dur-grow) var(--ease-quiet)}
+/* "Faces always visible" off = faces reveal on hover/focus instead of vanishing */
+.hexcell:hover .cell-face,.hexcell:focus-visible .cell-face,.hexcell.cell-focus .cell-face{opacity:1}
+/* a story with no photo still gets a visible, clickable cell */
+.cell-initials{position:absolute;left:11%;top:11%;width:78%;height:78%;display:grid;place-items:center;
+  clip-path:polygon(25% 2%,75% 2%,98% 50%,75% 98%,25% 98%,2% 50%);
+  background:radial-gradient(circle at 50% 38%,rgba(242,191,73,0.30),rgba(38,23,9,0.92) 74%);
+  color:var(--gold);font-family:Montserrat,sans-serif;font-size:20cqw;font-weight:600;letter-spacing:0.06em;
+  text-shadow:0 2px 12px rgba(0,0,0,0.65);pointer-events:none}
+/* ── the pointer as a light source ──────────────────────────────────────────
+   --lit (0..1) and --lx (-1..1) are written per cell by useFieldLight. Nothing
+   here reads the pointer directly, so the whole effect costs two custom
+   property writes per cell per frame and no layout.
+
+   The afterglow is this transition and nothing else: when the pointer moves
+   on, --lit drops to 0 and the glow takes --glow-fade to follow it. */
+.cell{--lit:0;--lx:0}
+.cell-dormant-wrap{position:relative;display:block}
+
+/* The colour of the light, in one place.
+   Held as bare channels so alpha can still be computed per layer with
+   rgb(... / calc(...)). Every warm surface in the comb — the pool on a cell,
+   the interior, the film over a face — draws from these three, so the light
+   has one temperature rather than a dozen hand-picked ones that drift apart
+   whenever anybody edits a gradient.
+
+   Molten: no white anywhere in it. A white core reads as a lamp shining onto
+   the comb from somewhere else; without it the light reads as the wax itself
+   glowing, which is the thing this archive is actually about. The falloff runs
+   amber into a deep ember rather than fading toward cream. */
+.arch-field{
+  --light-core:255 188 92;    /* the middle of the pool — already amber */
+  --light-warm:252 146 38;    /* molten, most of what you see */
+  --light-deep:214 96 12;     /* ember at the edge, where it meets the dark */
+}
+
+/* Fractal noise, generated once by the browser from an inline SVG rather than
+   shipped as an image. feColorMatrix maps the turbulence into alpha 0.45..1,
+   so as a mask it mottles what it covers instead of cutting holes in it. */
+.arch-field{
+  --wax-noise:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.032' numOctaves='4' seed='7'/%3E%3CfeColorMatrix type='matrix' values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0.55 0 0 0 0.45'/%3E%3C/filter%3E%3Crect width='180' height='180' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* The warm pool. Sits under the face deliberately — light on bare comb should
+   read stronger than light on someone's portrait. */
+.hexcell::before,
+.cell-dormant-wrap::before{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  opacity:calc(var(--lit) * var(--glow-strength,0.7));
+  transition:opacity var(--glow-fade,520ms) var(--ease-quiet);
+  background:
+    radial-gradient(circle at calc(50% + var(--lx) * 26%) 42%,
+      rgb(var(--light-core) / 0.58) 0%,
+      rgb(var(--light-warm) / 0.34) 34%,
+      rgb(var(--light-deep) / 0.13) 62%,
+      transparent 78%);
+  /* the light lands on the comb, not on the square box around it */
+  -webkit-mask-image:url('/assets/cell-bright.png');
+  mask-image:url('/assets/cell-bright.png');
+  -webkit-mask-size:100% 100%;
+  mask-size:100% 100%;
+  mix-blend-mode:screen;
+}
+
+/* The interior reflection: a narrow specular streak that leans away from the
+   light. While cells are travelling to new positions their real location lags
+   the one the light is computed from, so this sweeps across their interiors as
+   they settle — which is the point of it. */
+.hexcell::after{
+  content:"";position:absolute;inset:0;z-index:1;pointer-events:none;
+  opacity:calc(var(--lit) * var(--glow-strength,0.7) * 0.55);
+  transition:opacity var(--glow-fade,520ms) var(--ease-quiet);
+  /* Same reasoning as the glaze: uneven pools, not a band. */
+  background:
+    radial-gradient(ellipse 58% 44% at calc(40% + var(--lx) * 40%) 34%,
+      rgb(var(--light-core) / 0.42) 0%, rgb(var(--light-warm) / 0.17) 44%, transparent 74%),
+    radial-gradient(ellipse 46% 60% at calc(64% + var(--lx) * 22%) 66%,
+      rgb(var(--light-warm) / 0.28) 0%, transparent 72%);
+  /* two masks: the hex silhouette, then the mottling inside it */
+  -webkit-mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  -webkit-mask-size:100% 100%,170% 170%;
+  mask-size:100% 100%,170% 170%;
+  -webkit-mask-composite:source-in;
+  mask-composite:intersect;
+  mix-blend-mode:screen;
+  animation:waxdrift 26s linear infinite reverse;
+}
+
+/* A thin film over the portrait, and the thing the light actually catches.
+   Brightening the photograph itself only ever looked like a photograph turned
+   up; a film sitting over it reads as a face under wax, which is what the cell
+   is meant to be. Sits above the face and takes the same hex as the photo.
+
+   Two layers in one element: a moving sheen that leans with the light, and a
+   soft pool that gathers where the light is. Both are nearly invisible at
+   rest — the glaze should be felt rather than seen until the light finds it. */
+.hexcell .cell-glaze,
+.cell-dormant-wrap::after{
+  content:"";
+  /* the whole cell, not just the portrait — the wax frame is the same material
+     as the middle of it and should catch the light the same way. Masked to the
+     comb silhouette so the film stops where the cell does. */
+  position:absolute;inset:0;
+  pointer-events:none;z-index:3;
+  opacity:var(--glaze,0.5);
+  /* Three uneven pools rather than a band. A straight-edged sheen reads as
+     glass; wax has no straight edges in it. Each ellipse is a different shape,
+     sits at a different place, and slides at a different rate as the light
+     moves, so they drift apart and overlap instead of travelling as one plate.
+     Colours are honey rather than white — this is warm material, lit warmly. */
+  background:
+    radial-gradient(ellipse 64% 46% at calc(34% + var(--lx) * 34%) 28%,
+      rgb(var(--light-core) / calc(0.05 + var(--lit) * 0.30)) 0%,
+      rgb(var(--light-warm) / calc(0.02 + var(--lit) * 0.13)) 42%,
+      transparent 72%),
+    radial-gradient(ellipse 44% 68% at calc(68% + var(--lx) * 16%) 58%,
+      rgb(var(--light-warm) / calc(0.04 + var(--lit) * 0.21)) 0%,
+      rgb(var(--light-deep) / calc(0.02 + var(--lit) * 0.10)) 46%,
+      transparent 76%),
+    radial-gradient(ellipse 78% 38% at calc(52% + var(--lx) * 48%) 82%,
+      rgb(var(--light-deep) / calc(0.03 + var(--lit) * 0.17)) 0%,
+      transparent 70%);
+  /* Fractal noise breaks the pools into mottling, the way light through wax is
+     never even. Static data URI, so it costs one rasterisation and nothing per
+     frame. Alpha is held between 0.45 and 1 so it thins the glaze rather than
+     punching holes in it. */
+  -webkit-mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  -webkit-mask-size:100% 100%,150% 150%;
+  mask-size:100% 100%,150% 150%;
+  -webkit-mask-composite:source-in;
+  mask-composite:intersect;
+  mix-blend-mode:screen;
+  animation:waxdrift 19s linear infinite;
+  transition:opacity var(--glow-fade,520ms) var(--ease-quiet),
+             background var(--glow-fade,520ms) var(--ease-quiet);
+}
+
+/* The mottling drifts, slowly enough to be felt rather than watched. It is
+   what stops the film reading as a decal stuck to the cell. */
+@keyframes waxdrift{
+  from{-webkit-mask-position:0% 0%;mask-position:0% 0%}
+  to{-webkit-mask-position:100% 100%;mask-position:100% 100%}
+}
+
+/* The photograph itself now barely moves — the glaze carries the light, and
+   doubling the two made faces look blown out as the pointer went by. */
+.hexcell .cell-face{
+  filter:brightness(calc(1 + var(--lit) * 0.05));
+  transition:opacity var(--dur-grow) var(--ease-quiet),filter var(--glow-fade,520ms) var(--ease-quiet);
+}
+
+/* Dormant cells are bare wax and take the light full on. */
+.cell-dormant{
+  filter:brightness(calc(var(--dormant-brightness,0.72) + var(--lit) * 0.30)) saturate(0.85);
+  transition:filter var(--glow-fade,520ms) var(--ease-quiet);
+}
+
+/* A hint of the ground through the middle of each cell, so the comb reads as
+   wax with depth rather than as stickers laid on the background. Kept low by
+   default: past about 30% the faces start to look like they are dissolving. */
+.hexcell > img:not(.cell-face),
+.cell-dormant{
+  -webkit-mask-image:radial-gradient(circle at 50% 46%,
+    rgba(0,0,0,calc(1 - var(--cell-center,0.14))) 0%,
+    rgba(0,0,0,calc(1 - var(--cell-center,0.14) * 0.72)) 34%,
+    #000 62%);
+  mask-image:radial-gradient(circle at 50% 46%,
+    rgba(0,0,0,calc(1 - var(--cell-center,0.14))) 0%,
+    rgba(0,0,0,calc(1 - var(--cell-center,0.14) * 0.72)) 34%,
+    #000 62%);
+}
+
+/* Coarse pointers get no light — there is nothing hovering to emit it, and a
+   pool stranded wherever the last tap landed reads as a bug. The centre
+   transparency stays, since it costs nothing. */
+@media (hover:none),(pointer:coarse){
+  .hexcell::before,.hexcell::after,.cell-dormant-wrap::before{display:none}
+  .hexcell .cell-face{filter:none}
+  .cell-dormant{filter:brightness(var(--dormant-brightness,0.72)) saturate(0.85)}
+  /* the film stays — it is what makes a face look set into wax, and it costs
+     nothing without a pointer. Only its response to light goes. */
+  .hexcell .cell-glaze,.cell-dormant-wrap::after{opacity:calc(var(--glaze,0.5) * 0.55)}
+}
+
+@media (prefers-reduced-motion:reduce){
+  .hexcell::before,.hexcell::after,.hexcell .cell-face,.cell-dormant,.hexcell .cell-glaze{transition:none}
+  /* the mottling holds still — it still reads as wax, it just stops drifting */
+  .hexcell::after,.hexcell .cell-glaze,.cell-dormant-wrap::after{animation:none}
+}
+
+/* search: matches gather and stay lit, everything else recedes */
+.cell-unmatched{opacity:0.3;filter:saturate(0.55) brightness(0.7)}
+.cell,.cell-unmatched{transition:left 640ms var(--ease-quiet),top 640ms var(--ease-quiet),opacity 420ms var(--ease-quiet),filter 420ms var(--ease-quiet)}
+.hexcell.cell-match{filter:drop-shadow(0 0 24px rgba(240,168,60,0.62))}
+.arch-field--ease{transition:transform 720ms var(--ease-quiet)}
 /* raw photos (approved submissions) get the hex mask via CSS since they lack baked-in alpha */
 .hexcell .cell-face-photo{aspect-ratio:749/631;object-fit:cover;clip-path:polygon(25% 2%,75% 2%,98% 50%,75% 98%,25% 98%,2% 50%)}
 @media (max-height:760px){.gate-title{font-size:44px}.gate-eyebrow{margin-top:20px}}
@@ -123,7 +327,51 @@ button{font:inherit;color:inherit}
 
 /* ─────────────── topbar (projecthoneycomb.site deploy) ─────────────── */
 
-.site-header{position:fixed;z-index:30;top:clamp(8px,2.4vh,22px);left:clamp(28px,6.4vw,105px);right:clamp(28px,5.2vw,86px);height:74px;padding:0 22px;background:rgba(18,9,5,.94);border:1.5px solid rgba(190,123,27,.92);border-radius:12px;backdrop-filter:blur(18px);box-shadow:inset 0 0 0 1px rgba(255,207,98,.08),0 16px 44px rgba(54,25,3,.18)}
+.site-header{position:fixed;z-index:30;top:clamp(8px,2.4vh,22px);left:clamp(28px,6.4vw,105px);right:clamp(28px,5.2vw,86px);height:74px;padding:0 22px;background:rgba(18,9,5,.94);border:1.5px solid rgba(190,123,27,.92);border-radius:12px;box-shadow:inset 0 0 0 1px rgba(255,207,98,.08),0 16px 44px rgba(54,25,3,.18);
+  /* own compositing layer: without it iOS Safari can leave the bar unpainted
+     until some other repaint happens (it showed up only after a cell tap) */
+  transform:translateZ(0);will-change:transform;
+  transition:transform .38s var(--ease-quiet),opacity .3s var(--ease-quiet)}
+/* the blur is added only where it is safe: on iOS a backdrop-filter here went
+   unpainted until an unrelated repaint, and a minifier will happily drop an
+   unprefixed "none" override, so desktop opts in rather than mobile opting out */
+@media (min-width:881px){
+.site-header{backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+}
+.site-header--tucked{transform:translate3d(0,calc(-100% - 28px),0);opacity:0;pointer-events:none}
+/* a sliver of light stays behind so the tucked bar is discoverable */
+.topbar-peek{position:fixed;z-index:29;top:0;left:50%;transform:translateX(-50%);width:min(340px,42vw);height:3px;
+  background:linear-gradient(90deg,transparent,rgba(242,191,73,.75),transparent);pointer-events:none}
+
+/* search */
+.site-search{position:relative;display:flex;align-items:center;gap:6px;margin-left:clamp(14px,3vw,40px)}
+.site-search::before{content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);
+  color:rgba(242,191,73,.8);font-size:16px;line-height:1;pointer-events:none}
+.search-toggle{display:none}
+.search-input{width:clamp(150px,19vw,290px);height:38px;padding:0 54px 0 30px;border:1px solid rgba(242,191,73,.35);
+  border-radius:3px;background:rgba(255,255,255,.05);color:var(--cream);font-family:Montserrat,sans-serif;
+  font-size:11px;letter-spacing:.06em;outline:none;-webkit-appearance:none;appearance:none;
+  transition:border-color .2s ease,background .2s ease}
+.search-input::placeholder{color:rgba(244,232,210,.42)}
+.search-input:focus{border-color:rgba(242,191,73,.85);background:rgba(255,255,255,.09)}
+.search-input::-webkit-search-cancel-button{display:none}
+.search-count{position:absolute;right:32px;top:50%;transform:translateY(-50%);color:var(--gold);
+  font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.1em;pointer-events:none;font-variant-numeric:tabular-nums}
+.search-clear{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:20px;height:20px;display:grid;
+  place-items:center;border:0;border-radius:50%;background:transparent;color:rgba(244,232,210,.6);font-size:16px;
+  line-height:1;cursor:pointer}
+.search-clear:hover{color:var(--cream);background:rgba(255,255,255,.08)}
+
+/* who you are signed in as */
+.member-chip{display:inline-flex;align-items:center;gap:8px;padding:9px 13px;border:1px solid rgba(242,191,73,.4);
+  border-radius:3px;background:rgba(242,191,73,.08);color:var(--gold);font-family:Montserrat,sans-serif;
+  font-size:9px;font-weight:600;letter-spacing:.12em;cursor:pointer;white-space:nowrap;
+  transition:background .2s ease,border-color .2s ease}
+.member-chip:hover{background:rgba(242,191,73,.16);border-color:rgba(242,191,73,.7)}
+.member-chip i{width:6px;height:6px;border-radius:50%;background:var(--gold);box-shadow:0 0 8px var(--gold);flex:none}
+/* a story only members can see, marked so members know it is not public */
+.community-badge{display:inline-block;margin-left:10px;padding:3px 7px;border:1px solid rgba(242,191,73,.45);
+  border-radius:2px;color:var(--gold);font-size:8px;letter-spacing:.14em;vertical-align:middle}
 .brand,.site-header{display:flex;align-items:center}
 .brand{gap:15px;padding:0;border:0;background:transparent;color:var(--gold);text-decoration:none;font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em;cursor:pointer}
 .brand img{width:76px;height:42px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(242,191,73,.2))}
@@ -176,6 +424,7 @@ button{font:inherit;color:inherit}
 .story-meta dt{color:var(--amber);font-family:Montserrat;font-size:8px;letter-spacing:.18em}
 .story-meta dd{margin:7px 0 0;color:var(--cream);font-size:13px;line-height:1.35}
 .story-summary{margin:25px 0 0;color:#ddc9ab;font-size:16px;line-height:1.67}
+.story-summary p+p{margin-top:1.1em}
 .story-tags{display:flex;flex-wrap:wrap;gap:8px;margin:24px 0 30px}
 .story-tags span{padding:7px 9px;border:1px solid rgba(198,169,130,.28);border-radius:2px;color:var(--muted);font-size:8px}
 .story-action,.story-tags span{font-family:Montserrat;letter-spacing:.1em}
@@ -248,7 +497,24 @@ audio.story-media{max-height:none}
 /* ───────────────────────── responsive ───────────────────────── */
 
 @media (max-width:880px){
-.site-header{top:12px;left:12px;right:12px;height:62px;padding:0 14px;border-radius:9px}
+/* opaque background instead of a blur: backdrop-filter is the piece iOS was
+   failing to paint, and at 97% opacity nothing is lost */
+.site-header{top:12px;left:12px;right:12px;height:62px;padding:0 14px;border-radius:9px;
+  background:rgba(18,9,5,.97)}
+/* the bar never hides on touch — there is no hover to bring it back */
+.site-header--tucked{transform:translateZ(0);opacity:1;pointer-events:auto}
+.topbar-peek{display:none}
+.site-search{margin-left:auto}
+.site-search::before{display:none}
+.search-toggle{display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid rgba(242,191,73,.4);
+  border-radius:3px;background:transparent;color:var(--gold);font-size:18px;line-height:1;cursor:pointer}
+.search-input{position:absolute;top:calc(100% + 8px);left:0;right:0;width:auto;display:none;height:44px;
+  background:rgba(10,6,3,.97);border-color:var(--line);padding:0 54px 0 14px}
+.site-search.is-open .search-input{display:block}
+.site-search.is-open{position:static}
+.site-search.is-open .search-input{left:12px;right:12px;top:66px;position:fixed;z-index:31}
+.site-search.is-open .search-count{position:fixed;top:88px;right:26px;transform:none;z-index:32}
+.site-search.is-open .search-clear{position:fixed;top:78px;right:20px;transform:none;z-index:32}
 .brand{gap:9px;font-size:clamp(9px,1.5vw,12px);letter-spacing:.11em}
 .brand img{width:54px;height:30px}
 .site-header nav{gap:clamp(9px,2vw,18px)}
@@ -271,7 +537,7 @@ audio.story-media{max-height:none}
 }
 @media (max-width:600px){
 .brand{font-size:10px}
-.menu-button{margin-left:auto;display:flex;align-items:center;gap:8px;border:1px solid rgba(244,232,210,.38);border-radius:3px;background:transparent;padding:10px 11px;font-family:Montserrat;font-size:8px;letter-spacing:.12em;cursor:pointer}
+.menu-button{margin-left:10px;display:flex;align-items:center;gap:8px;border:1px solid rgba(244,232,210,.38);border-radius:3px;background:transparent;padding:10px 11px;font-family:Montserrat;font-size:8px;letter-spacing:.12em;cursor:pointer}
 .menu-button>span,.menu-button>span:after,.menu-button>span:before{display:block;width:13px;height:1px;background:currentColor;content:""}
 .menu-button>span{position:relative}
 .menu-button>span:before{position:absolute;top:-4px}

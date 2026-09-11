@@ -1,48 +1,52 @@
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
-
-function getR2Client() {
-  return new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
-}
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 
 export async function POST(request: NextRequest) {
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
+  if (!r2Configured()) {
     return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
   }
 
   try {
     const data = await request.json();
 
-    if (!data.title || !data.transcript) {
-      return NextResponse.json({ error: "Title and transcript are required" }, { status: 400 });
+    // A recording is itself an account. Requiring typed text alongside it made
+    // people transcribe themselves before they could submit, which is exactly
+    // the work machine transcription exists to remove — so a submission needs
+    // a title and then either words or a recording.
+    const hasWords = typeof data.transcript === "string" && data.transcript.trim().length > 0;
+    const hasRecording = Boolean(data.mediaKey || data.audioKey);
+
+    if (!data.title || (!hasWords && !hasRecording)) {
+      return NextResponse.json(
+        { error: "A title and either a transcript or a recording are required" },
+        { status: 400 }
+      );
     }
 
     const timestamp = Date.now();
     const submissionId = `sub_${timestamp}`;
     const key = `submissions/${submissionId}.json`;
-    
+
     // Add server-side metadata
     const payload = {
       ...data,
       id: submissionId,
       submittedAt: new Date().toISOString(),
-      status: "pending"
+      status: "pending",
+      // Where the words came from, and whether a machine still owes us any.
+      // The review queue uses this to show which submissions are waiting on a
+      // transcript rather than on a decision.
+      transcriptSource: hasWords ? (data.transcriptSource || "typed") : undefined,
+      transcriptStatus: hasWords ? "confirmed" : hasRecording ? "awaiting" : "none",
     };
 
     const client = getR2Client();
 
     await client.send(
       new PutObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: key,
+        Bucket: BUCKET,
+        Key: phys(key),
         Body: JSON.stringify(payload, null, 2),
         ContentType: "application/json",
       })

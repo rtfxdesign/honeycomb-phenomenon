@@ -14,6 +14,16 @@ interface SubmissionData {
   privacy?: string;
   hashtags?: string[];
   status?: string;
+  // machine transcription
+  audioKey?: string;
+  recordingMode?: string;
+  machineTranscript?: string;
+  transcriptStatus?: "none" | "awaiting" | "ready" | "confirmed" | "failed";
+  transcriptSource?: string;
+  transcriptModel?: string;
+  transcriptWarnings?: string[];
+  transcriptError?: string;
+  transcribedAt?: string;
 }
 
 interface Submission {
@@ -42,6 +52,16 @@ interface Person {
   video: string | null;
 }
 
+interface MemberRecord {
+  id: string;
+  name: string;
+  email?: string;
+  note?: string;
+  createdAt: string;
+  disabledAt?: string | null;
+  lastSeenAt?: string | null;
+}
+
 interface PersonEditState {
   name: string;
   about: string;
@@ -62,6 +82,13 @@ export default function ReviewDashboard() {
   const [authRequired, setAuthRequired] = useState(false);
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
+  const [members, setMembers] = useState<MemberRecord[]>([]);
+  const [newMember, setNewMember] = useState({ name: "", email: "", note: "" });
+  // which submission is being transcribed right now, and anything it came back with
+  const [transcribingKey, setTranscribingKey] = useState<string | null>(null);
+  const [transcribeNote, setTranscribeNote] = useState<Record<string, string>>({});
+  const [issuedCode, setIssuedCode] = useState<{ name: string; code: string } | null>(null);
+  const [memberBusy, setMemberBusy] = useState(false);
 
   const loadAll = () => {
     setLoading(true);
@@ -91,6 +118,72 @@ export default function ReviewDashboard() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => { if (data?.people) setPeople(data.people); })
       .catch((err) => console.error(err));
+    loadMembers();
+  };
+
+  const loadMembers = () => {
+    fetch("/api/members")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data?.members) setMembers(data.members); })
+      .catch((err) => console.error(err));
+  };
+
+  const addMember = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!newMember.name.trim()) return;
+    setMemberBusy(true);
+    try {
+      const res = await fetch("/api/members", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(newMember),
+      });
+      if (!res.ok) throw new Error("Failed to add member");
+      const data = await res.json();
+      setIssuedCode({ name: data.member.name, code: data.code });
+      setNewMember({ name: "", email: "", note: "" });
+      loadMembers();
+    } catch (err) {
+      console.error(err);
+      alert("Could not add that member. Check console.");
+    } finally {
+      setMemberBusy(false);
+    }
+  };
+
+  const patchMember = async (id: string, body: Record<string, unknown>) => {
+    setMemberBusy(true);
+    try {
+      const res = await fetch("/api/members", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...body }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      if (data.code) setIssuedCode({ name: data.member.name, code: data.code });
+      loadMembers();
+    } catch (err) {
+      console.error(err);
+      alert("That did not work. Check console.");
+    } finally {
+      setMemberBusy(false);
+    }
+  };
+
+  const removeMember = async (id: string, name: string) => {
+    if (!confirm(`Remove ${name}? Their access code stops working immediately.`)) return;
+    setMemberBusy(true);
+    try {
+      await fetch("/api/members", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      });
+      loadMembers();
+    } finally {
+      setMemberBusy(false);
+    }
   };
 
   useEffect(loadAll, []);
@@ -192,6 +285,80 @@ export default function ReviewDashboard() {
     } catch (err) {
       console.error(err);
       alert("Failed to save changes. Check console.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * Ask the archive to transcribe this submission's recording.
+   *
+   * The result is a draft, not a transcript. It lands in machineTranscript and
+   * the moderator decides whether it becomes the record — see acceptDraft.
+   */
+  const transcribe = async (submissionKey: string) => {
+    setTranscribingKey(submissionKey);
+    setTranscribeNote(n => ({ ...n, [submissionKey]: "" }));
+    try {
+      const res = await fetch("/api/transcribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionKey }),
+      });
+      const result = await res.json();
+      if (!res.ok) {
+        // The route explains its own failures; show what it said rather than
+        // a generic message the moderator can do nothing with.
+        setTranscribeNote(n => ({ ...n, [submissionKey]: result.error || `Failed (${res.status})` }));
+        return;
+      }
+      setSubmissions(current => current.map(sub =>
+        sub.submissionKey === submissionKey
+          ? { ...sub, data: {
+              ...sub.data,
+              machineTranscript: result.machineTranscript,
+              transcriptStatus: "ready",
+              transcriptSource: "machine",
+              transcriptModel: result.model,
+              transcriptWarnings: result.warnings,
+              transcriptError: undefined,
+            } }
+          : sub
+      ));
+      const warned = (result.warnings || []).length;
+      setTranscribeNote(n => ({
+        ...n,
+        [submissionKey]: `${result.wordCount} words${warned ? " — see the note below" : ""}`,
+      }));
+    } catch (err) {
+      console.error(err);
+      setTranscribeNote(n => ({ ...n, [submissionKey]: "Could not reach the transcription service." }));
+    } finally {
+      setTranscribingKey(null);
+    }
+  };
+
+  /** Move the machine draft into the transcript and mark it confirmed. */
+  const acceptDraft = async (submissionKey: string, text: string) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/update-experience", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          submissionKey,
+          updates: { transcript: text, transcriptStatus: "confirmed", transcriptSource: "machine" },
+        }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      const result = await res.json();
+      setSubmissions(current => current.map(sub =>
+        sub.submissionKey === submissionKey ? { ...sub, data: result.data } : sub
+      ));
+      setTranscribeNote(n => ({ ...n, [submissionKey]: "" }));
+    } catch (err) {
+      console.error(err);
+      alert("Could not save the transcript. Check console.");
     } finally {
       setSaving(false);
     }
@@ -385,9 +552,78 @@ export default function ReviewDashboard() {
             </div>
           ) : (
             <>
-              <p style={{ margin: "0 0 1rem 0", lineHeight: 1.6, whiteSpace: "pre-wrap", fontSize: "0.95rem" }}>
-                &ldquo;{transcript}&rdquo;
-              </p>
+              {transcript ? (
+                <p style={{ margin: "0 0 1rem 0", lineHeight: 1.6, whiteSpace: "pre-wrap", fontSize: "0.95rem" }}>
+                  &ldquo;{transcript}&rdquo;
+                </p>
+              ) : (
+                <p style={{ margin: "0 0 1rem 0", fontSize: "0.9rem", opacity: 0.55, fontStyle: "italic" }}>
+                  No transcript yet — this account is only a recording so far.
+                </p>
+              )}
+
+              {/* ── machine transcription ───────────────────────────────── */}
+              {(() => {
+                const d = submission.data;
+                const canTranscribe = Boolean(d.audioKey || d.recordingMode === "audio");
+                const busy = transcribingKey === submission.submissionKey;
+                const note = transcribeNote[submission.submissionKey];
+                if (!canTranscribe && !d.machineTranscript) return null;
+                return (
+                  <div style={{ margin: "0 0 1rem 0", padding: "0.9rem", border: "1px solid var(--line)", borderRadius: "8px", background: "rgba(255,255,255,0.03)" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", flexWrap: "wrap" }}>
+                      <span style={{ ...labelStyle, margin: 0 }}>Machine transcript</span>
+                      {canTranscribe && (
+                        <button
+                          onClick={() => transcribe(submission.submissionKey)}
+                          disabled={busy || saving}
+                          style={{ background: "rgba(242,191,73,0.14)", color: "var(--gold)", border: "1px solid var(--line)", padding: "0.3rem 0.75rem", borderRadius: "100px", cursor: busy ? "wait" : "pointer", fontSize: "0.78rem" }}
+                        >
+                          {busy ? "Transcribing…" : d.machineTranscript ? "Transcribe again" : "Transcribe recording"}
+                        </button>
+                      )}
+                      {d.transcriptStatus === "confirmed" && d.transcriptSource === "machine" && (
+                        <span style={{ fontSize: "0.72rem", opacity: 0.6 }}>confirmed</span>
+                      )}
+                      {note && <span style={{ fontSize: "0.75rem", opacity: 0.75 }}>{note}</span>}
+                    </div>
+
+                    {d.transcriptWarnings && d.transcriptWarnings.length > 0 && (
+                      <div style={{ marginTop: "0.6rem", fontSize: "0.78rem", color: "#f0b95c", lineHeight: 1.5 }}>
+                        {d.transcriptWarnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
+                      </div>
+                    )}
+
+                    {d.machineTranscript && (
+                      <>
+                        <p style={{ margin: "0.7rem 0 0.6rem", lineHeight: 1.6, fontSize: "0.9rem", opacity: 0.9, whiteSpace: "pre-wrap" }}>
+                          {d.machineTranscript}
+                        </p>
+                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
+                          <button
+                            onClick={() => acceptDraft(submission.submissionKey, d.machineTranscript as string)}
+                            disabled={saving}
+                            style={{ background: "var(--gold)", color: "#1A0F06", border: "none", padding: "0.35rem 0.8rem", borderRadius: "100px", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600 }}
+                          >
+                            Use as transcript
+                          </button>
+                          <button
+                            onClick={() => startEdit(submission)}
+                            disabled={saving}
+                            style={{ background: "transparent", color: "var(--gold)", border: "1px solid var(--line)", padding: "0.35rem 0.8rem", borderRadius: "100px", cursor: "pointer", fontSize: "0.78rem" }}
+                          >
+                            Edit before using
+                          </button>
+                        </div>
+                        <p style={{ margin: "0.6rem 0 0", fontSize: "0.72rem", opacity: 0.5, lineHeight: 1.5 }}>
+                          A draft, not a record. Nothing here is published until you use it.
+                          {d.transcriptModel ? ` (${d.transcriptModel})` : ""}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                );
+              })()}
               {hashtags && hashtags.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
                   {hashtags.map(tag => (
@@ -485,9 +721,14 @@ export default function ReviewDashboard() {
           <h1 style={{ fontSize: "2rem", fontWeight: "600", margin: "0 0 0.5rem 0" }}>Unified Review Dashboard</h1>
           <p style={{ margin: 0, opacity: 0.7 }}>Secure archive of uploaded anomalous experiences (Text + Media).</p>
         </div>
-        <Link href="/" style={{ padding: "0.5rem 1rem", border: "1px solid var(--line)", borderRadius: "4px", textDecoration: "none", color: "inherit" }}>
-          &larr; Back to Site
-        </Link>
+        <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
+          <Link href="/review/todo" style={{ padding: "0.5rem 1rem", border: "1px solid var(--line)", borderRadius: "4px", textDecoration: "none", color: "inherit" }}>
+            To Do
+          </Link>
+          <Link href="/" style={{ padding: "0.5rem 1rem", border: "1px solid var(--line)", borderRadius: "4px", textDecoration: "none", color: "inherit" }}>
+            &larr; Back to Site
+          </Link>
+        </div>
       </header>
 
       {loading && <div style={{ opacity: 0.5 }}>Loading securely...</div>}
@@ -540,12 +781,96 @@ export default function ReviewDashboard() {
             The named cells in the honeycomb. Edit the name, the panel text, or point one at a video — changes go live immediately.
           </p>
           {people.length === 0 ? (
-            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7 }}>
+            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7, marginBottom: "2.5rem" }}>
               Could not load the community faces.
             </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: "2rem" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: "2rem", marginBottom: "2.5rem" }}>
               {people.map(renderPersonCard)}
+            </div>
+          )}
+
+          <h2 style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0 0 0.4rem" }}>Members ({members.length})</h2>
+          <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", opacity: 0.6 }}>
+            Approved members sign in at the gate with their own access code and can see stories marked &ldquo;Community only&rdquo;.
+            A code is shown once, here, when you create it &mdash; pass it on however you like. Lost codes are replaced, not looked up.
+          </p>
+
+          {issuedCode && (
+            <div style={{ marginBottom: "1.5rem", padding: "1.2rem 1.5rem", border: "1px solid #007067", borderRadius: "8px", backgroundColor: "rgba(0,112,103,0.12)" }}>
+              <div style={{ fontSize: "0.85rem", opacity: 0.8, marginBottom: "0.5rem" }}>
+                Access code for <strong>{issuedCode.name}</strong> — copy it now, it will not be shown again:
+              </div>
+              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
+                <code style={{ fontSize: "1.5rem", letterSpacing: "0.12em", fontWeight: 600 }}>{issuedCode.code}</code>
+                <button
+                  onClick={() => navigator.clipboard?.writeText(issuedCode.code)}
+                  style={{ padding: "0.45rem 0.9rem", border: "1px solid var(--line)", borderRadius: "4px", background: "transparent", color: "inherit", cursor: "pointer" }}
+                >Copy</button>
+                <button
+                  onClick={() => setIssuedCode(null)}
+                  style={{ padding: "0.45rem 0.9rem", border: "0", borderRadius: "4px", background: "#007067", color: "#fff", cursor: "pointer" }}
+                >Done</button>
+              </div>
+            </div>
+          )}
+
+          <form onSubmit={addMember} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end", marginBottom: "1.5rem" }}>
+            <div style={{ flex: "1 1 200px" }}>
+              <span style={labelStyle}>Name</span>
+              <input style={inputStyle} value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} placeholder="Jane Okafor" required />
+            </div>
+            <div style={{ flex: "1 1 200px" }}>
+              <span style={labelStyle}>Email (optional)</span>
+              <input style={inputStyle} value={newMember.email} onChange={e => setNewMember({ ...newMember, email: e.target.value })} placeholder="jane@example.com" />
+            </div>
+            <div style={{ flex: "1 1 200px" }}>
+              <span style={labelStyle}>Note (optional)</span>
+              <input style={inputStyle} value={newMember.note} onChange={e => setNewMember({ ...newMember, note: e.target.value })} placeholder="Met at the Denver meetup" />
+            </div>
+            <button type="submit" disabled={memberBusy}
+                    style={{ padding: "0.6rem 1.2rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: 500, opacity: memberBusy ? 0.6 : 1 }}>
+              Add member
+            </button>
+          </form>
+
+          {members.length === 0 ? (
+            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7 }}>
+              No members yet.
+            </div>
+          ) : (
+            <div style={{ border: "1px solid var(--line)", borderRadius: "8px", overflow: "hidden" }}>
+              {members.map((m, i) => (
+                <div key={m.id} style={{
+                  display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap",
+                  padding: "0.9rem 1.2rem", borderTop: i ? "1px solid var(--line)" : "none",
+                  opacity: m.disabledAt ? 0.55 : 1,
+                }}>
+                  <div style={{ flex: "1 1 220px", minWidth: 0 }}>
+                    <div style={{ fontWeight: 600 }}>
+                      {m.name}
+                      {m.disabledAt && <span style={{ marginLeft: "0.6rem", fontSize: "0.7rem", padding: "0.15rem 0.45rem", borderRadius: "100px", background: "#5b3535", color: "#ffd9d9" }}>disabled</span>}
+                    </div>
+                    <div style={{ fontSize: "0.78rem", opacity: 0.6 }}>
+                      {m.email || "no email"} · added {new Date(m.createdAt).toLocaleDateString()}
+                      {m.lastSeenAt ? ` · last signed in ${new Date(m.lastSeenAt).toLocaleDateString()}` : " · never signed in"}
+                    </div>
+                    {m.note && <div style={{ fontSize: "0.78rem", opacity: 0.5, marginTop: "0.2rem" }}>{m.note}</div>}
+                  </div>
+                  <button onClick={() => patchMember(m.id, { action: "regenerate" })} disabled={memberBusy}
+                          style={{ padding: "0.45rem 0.8rem", border: "1px solid var(--line)", borderRadius: "4px", background: "transparent", color: "inherit", cursor: "pointer", fontSize: "0.8rem" }}>
+                    New code
+                  </button>
+                  <button onClick={() => patchMember(m.id, { disabled: !m.disabledAt })} disabled={memberBusy}
+                          style={{ padding: "0.45rem 0.8rem", border: "1px solid var(--line)", borderRadius: "4px", background: "transparent", color: "inherit", cursor: "pointer", fontSize: "0.8rem" }}>
+                    {m.disabledAt ? "Re-enable" : "Disable"}
+                  </button>
+                  <button onClick={() => removeMember(m.id, m.name)} disabled={memberBusy}
+                          style={{ padding: "0.45rem 0.8rem", border: "none", borderRadius: "4px", background: "#d9534f", color: "#fff", cursor: "pointer", fontSize: "0.8rem" }}>
+                    Remove
+                  </button>
+                </div>
+              ))}
             </div>
           )}
         </>

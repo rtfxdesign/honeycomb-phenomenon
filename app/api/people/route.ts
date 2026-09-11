@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { isAuthed } from "../../lib/auth";
+import { ListObjectsV2Command, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { isModerator } from "../../lib/auth";
+import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 import { PEOPLE } from "../../data/people";
 
-function getR2Client() {
-  return new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
-}
+export const dynamic = "force-dynamic";
 
 interface PersonRecord {
   key: string;
@@ -35,15 +26,15 @@ const validKeys = new Set(staticPeople.map((p) => p.key));
 // review dashboard are stored as overrides at people/{key}.json in R2 and win
 // over the defaults field-by-field.
 export async function GET() {
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
+  if (!r2Configured()) {
     return NextResponse.json({ people: staticPeople });
   }
 
   const client = getR2Client();
   try {
     const listResponse = await client.send(new ListObjectsV2Command({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Prefix: "people/",
+      Bucket: BUCKET,
+      Prefix: phys("people/"),
     }));
     const overrides = new Map<string, Partial<PersonRecord>>();
     await Promise.all(
@@ -52,7 +43,7 @@ export async function GET() {
         .map(async (obj) => {
           try {
             const response = await client.send(new GetObjectCommand({
-              Bucket: process.env.R2_BUCKET_NAME,
+              Bucket: BUCKET,
               Key: obj.Key,
             }));
             const bodyStr = await response.Body?.transformToString();
@@ -82,8 +73,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  if (!process.env.R2_ENDPOINT || !process.env.R2_ACCESS_KEY_ID) {
+  if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!r2Configured()) {
     return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
   }
 
@@ -104,8 +95,8 @@ export async function POST(request: NextRequest) {
 
     const client = getR2Client();
     await client.send(new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: `people/${key}.json`,
+      Bucket: BUCKET,
+      Key: phys(`people/${key}.json`),
       Body: JSON.stringify(record, null, 2),
       ContentType: "application/json",
     }));

@@ -25,17 +25,28 @@ const TWEAK_DEFAULTS = {
   gaps: 3,
   fieldWidth: 1600,
   fieldHeight: 1000,
-  clusterShare: 30,
-  pull: 70,
-  push: 255,
+  // middle-of-the-road gravity — the settings that read best in review
+  clusterShare: 50,
+  clusterBy: 'tags',
+  pull: 55,
+  push: 190,
   dormantRespond: false,
   showFaces: true,
-  cellOpacity: 90,
-  dormantBright: 72,
-  ground: '#0D0806',
+  // the pointer as a lamp over the comb
+  mouseLight: true,
+  lightReach: 260,      // % of a cell's width — how far the pool carries
+  lightStrength: 70,    // %
+  lightAfterglow: 520,  // ms for a cell to let go of the light
+  cellCenter: 14,       // % of the middle given over to the ground behind
+  faceGlaze: 50,        // % — the film over a portrait for the light to catch
+  cellOpacity: 92,
+  dormantBright: 85,
+  ground: '#1A1210',
   backdrop: 'Archive texture',
-  textureOpacity: 29,
+  textureOpacity: 34,
+  warmth: 38,
   vignette: true,
+  topbarAutohide: true,
   vines: true,
   vineSeed: 1,
   vineStyle: 'climb',
@@ -44,6 +55,105 @@ const TWEAK_DEFAULTS = {
 };
 
 const VINE_ASPECT = 571 / 1100; // natural width/height of the vine sprite
+
+/**
+ * The pointer as a light source over the comb.
+ *
+ * Each cell gets two custom properties and nothing else:
+ *   --lit  0..1, how much of the light is falling on it
+ *   --lx   -1..1, which side the light is coming from
+ *
+ * React is deliberately not involved. Re-rendering fifty cells on every
+ * pointermove would be absurd for what is a lighting change, so this walks the
+ * DOM nodes once per layout and then only writes two variables per cell per
+ * frame. The afterglow is a CSS transition on opacity rather than anything
+ * animated here — the light stops moving, the glow fades on its own.
+ *
+ * Positions come from the layout the field was given, not from
+ * getBoundingClientRect, which would force layout every frame. While cells are
+ * travelling to new places their real position lags the value used here, and
+ * the light sweeps across their interiors as they settle. That is the intended
+ * behaviour rather than an artefact of the shortcut.
+ */
+function useFieldLight(fieldRef, { enabled, reach, cells }) {
+  useEffect(() => {
+    const field = fieldRef.current;
+    if (!field || !enabled) return undefined;
+
+    // No pointer, no light. Touch devices would otherwise get a light stuck
+    // wherever the last tap landed.
+    const fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+    if (!fine.matches) return undefined;
+
+    let nodes = [];
+    const collect = () => {
+      nodes = Array.from(field.querySelectorAll('.cell[data-cx]')).map((el) => ({
+        el,
+        cx: Number(el.dataset.cx),
+        cy: Number(el.dataset.cy),
+        half: Number(el.dataset.half) || 0,
+      }));
+    };
+    collect();
+
+    let raf = 0;
+    let px = -1e6;
+    let py = -1e6;
+    let dirty = false;
+
+    const paint = () => {
+      raf = 0;
+      dirty = false;
+      for (const n of nodes) {
+        const dx = px - (n.cx + n.half);
+        const dy = py - (n.cy + n.half);
+        const d = Math.hypot(dx, dy);
+        // Smooth falloff rather than a hard edge: squared so the centre of the
+        // pool is clearly brighter than its rim, the way a lamp behaves.
+        const t = Math.max(0, 1 - d / reach);
+        const lit = t * t;
+        n.el.style.setProperty('--lit', lit.toFixed(3));
+        // Which way the highlight leans. Only meaningful while lit, so it is
+        // clamped to the cell's own width.
+        n.el.style.setProperty('--lx', Math.max(-1, Math.min(1, dx / (n.half * 2 || 1))).toFixed(3));
+      }
+    };
+
+    const schedule = () => {
+      if (dirty) return;
+      dirty = true;
+      raf = requestAnimationFrame(paint);
+    };
+
+    const onMove = (e) => {
+      const box = field.getBoundingClientRect();
+      px = e.clientX - box.left;
+      py = e.clientY - box.top;
+      schedule();
+    };
+
+    const onLeave = () => {
+      px = -1e6;
+      py = -1e6;
+      schedule();
+    };
+
+    field.addEventListener('pointermove', onMove, { passive: true });
+    field.addEventListener('pointerleave', onLeave, { passive: true });
+
+    return () => {
+      field.removeEventListener('pointermove', onMove);
+      field.removeEventListener('pointerleave', onLeave);
+      if (raf) cancelAnimationFrame(raf);
+      for (const n of nodes) {
+        n.el.style.removeProperty('--lit');
+        n.el.style.removeProperty('--lx');
+      }
+    };
+    // `cells` changes whenever the field is rebuilt or rearranged, which is
+    // exactly when the node list and their positions need collecting again.
+  }, [fieldRef, enabled, reach, cells]);
+}
 
 const BACKDROPS = {
   'Archive texture': '/assets/archive-background.webp',
@@ -99,6 +209,128 @@ function genField(cols, rows, count, mode, brightShare, gaps, rng) {
 
 const GATE_CELLS = [[0, 2, 'd'], [1, 1, 'd'], [1, 5, 'd'], [2, 6, 'd'], [12, 1, 'd'], [12, 5, 'd'], [13, 2, 'b'], [13, 4, 'd'], [14, 3, 'd'], [0, 4, 'b']];
 
+// Everything a cell can be found by. Community faces search their name and
+// panel text; archive submissions search their whole record.
+function haystack(face) {
+  const p = face.person || {};
+  const e = p.experience;
+  const parts = [face.name, p.name];
+  if (e) {
+    parts.push(e.title, e.location, e.experienceYear, e.experienceType, e.transcript, e.displayName, ...(e.hashtags || []));
+  } else if (Array.isArray(p.about)) {
+    parts.push(...p.about);
+  }
+  return parts.filter(Boolean).join(' ').toLowerCase();
+}
+
+// ── relatedness ───────────────────────────────────────────────────────────
+// What the comb means by "kin". Two voices are related when they share tags,
+// and a tag shared by only two stories says far more than one carried by
+// twenty — so each tag is weighted by how rare it is across the whole archive
+// (the usual inverse-document-frequency idea), and the pair is scored by
+// cosine similarity over those weights. The result is 0..1: 0 for nothing in
+// common, 1 for an identical tag set.
+function tagsOf(face) {
+  const e = face && face.person && face.person.experience;
+  if (!e || !Array.isArray(e.hashtags)) return [];
+  const seen = new Set();
+  for (const raw of e.hashtags) {
+    const t = String(raw).trim().toLowerCase().replace(/^#/, '');
+    if (t) seen.add(t);
+  }
+  return [...seen];
+}
+
+// Weight every tag once per field, not once per comparison.
+function buildTagWeights(faceOf) {
+  const df = new Map();
+  let docs = 0;
+  for (const face of faceOf.values()) {
+    const tags = tagsOf(face);
+    if (!tags.length) continue;
+    docs++;
+    for (const t of tags) df.set(t, (df.get(t) || 0) + 1);
+  }
+  const weight = new Map();
+  for (const [t, n] of df) weight.set(t, Math.log(1 + docs / n));
+  // Pre-compute each cell's tag vector and its magnitude, so scoring a pair is
+  // one pass over the smaller tag list.
+  const vec = new Map();
+  for (const [k, face] of faceOf) {
+    const tags = tagsOf(face);
+    if (!tags.length) continue;
+    let mag = 0;
+    for (const t of tags) { const w = weight.get(t) || 0; mag += w * w; }
+    if (mag > 0) vec.set(k, { tags: new Set(tags), mag: Math.sqrt(mag) });
+  }
+  return { weight, vec };
+}
+
+function relatedness(aKey, bKey, { weight, vec }) {
+  const a = vec.get(aKey), b = vec.get(bKey);
+  if (!a || !b) return 0;
+  const [small, large] = a.tags.size <= b.tags.size ? [a, b] : [b, a];
+  let dot = 0;
+  for (const t of small.tags) {
+    if (!large.tags.has(t)) continue;
+    const w = weight.get(t) || 0;
+    dot += w * w;
+  }
+  return dot > 0 ? dot / (a.mag * b.mag) : 0;
+}
+
+// Search rearranges the field itself: matches gather into the middle, everything
+// else gives way outward. Same lattice-snapping rule as the click gravity, so
+// cells stay aligned and never overlap.
+function gatherMatches(base, matchKeys, cols, rows, cx, cy, size, W, H, push) {
+  const centerX = (W - size) / 2, centerY = (H - size) / 2;
+  const distToCenter = (x, y) => Math.hypot(x - centerX, y - centerY);
+  const slots = [];
+  for (let c = 0; c < cols; c++) {
+    for (let r = c % 2; r < rows; r += 2) {
+      slots.push({ s: [c, r], x: c * cx, y: r * cy });
+    }
+  }
+  slots.sort((a, b) => distToCenter(a.x, a.y) - distToCenter(b.x, b.y));
+  const taken = new Set();
+  const result = new Map();
+
+  const matched = base.filter((b) => matchKeys.has(b.k))
+    .sort((a, b) => distToCenter(a.x, a.y) - distToCenter(b.x, b.y));
+  let si = 0;
+  for (const b of matched) {
+    while (si < slots.length && taken.has(key(slots[si].s))) si++;
+    if (si >= slots.length) break;
+    const slot = slots[si++];
+    taken.add(key(slot.s));
+    result.set(b.k, { x: slot.x, y: slot.y });
+  }
+
+  // the rest move outward, farthest first so they don't trap each other
+  const others = base.filter((b) => !matchKeys.has(b.k))
+    .sort((a, b) => distToCenter(b.x, b.y) - distToCenter(a.x, a.y));
+  for (const b of others) {
+    const dx = b.x - centerX, dy = b.y - centerY;
+    const d = Math.hypot(dx, dy) || 1;
+    const tx = centerX + (dx / d) * (d + push), ty = centerY + (dy / d) * (d + push);
+    let best = null, bestD = Infinity;
+    for (const slot of slots) {
+      if (taken.has(key(slot.s))) continue;
+      const dd = (slot.x - tx) ** 2 + (slot.y - ty) ** 2;
+      if (dd < bestD) { bestD = dd; best = slot; }
+    }
+    if (best) {
+      taken.add(key(best.s));
+      result.set(b.k, { x: best.x, y: best.y });
+    }
+  }
+  return base.map((b) => ({
+    ...b,
+    match: matchKeys.has(b.k),
+    ...(result.get(b.k) || {}),
+  }));
+}
+
 function Cells({ list, size }) {
   const cx = size * 0.751, cy = size * 0.428;
   return list.map(([c, r, t]) => (
@@ -110,8 +342,11 @@ function Cells({ list, size }) {
 
 // ── topbar (from the projecthoneycomb.site deploy) ──────────────────────────
 
-function TopBar({ onNav, onSubmit, activePage }) {
+function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autohide, keepVisible, session, onSignOut }) {
   const [navOpen, setNavOpen] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [tucked, setTucked] = useState(false);
+  const searchRef = useRef(null);
   const go = (id) => { setNavOpen(false); onNav(id); };
   useEffect(() => {
     if (!navOpen) return;
@@ -119,12 +354,49 @@ function TopBar({ onNav, onSubmit, activePage }) {
     window.addEventListener('pointerdown', close);
     return () => window.removeEventListener('pointerdown', close);
   }, [navOpen]);
+  useEffect(() => {
+    const focus = () => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 60); };
+    window.addEventListener('hc-focus-search', focus);
+    return () => window.removeEventListener('hc-focus-search', focus);
+  }, []);
+  // desktop only: the bar tucks up out of the way and returns when the pointer
+  // comes near the top of the screen
+  useEffect(() => {
+    if (!autohide || window.innerWidth < 881) { setTucked(false); return; }
+    const settle = setTimeout(() => setTucked(true), 2600);
+    const onMove = (e) => setTucked(e.clientY > 130);
+    window.addEventListener('mousemove', onMove);
+    return () => { clearTimeout(settle); window.removeEventListener('mousemove', onMove); };
+  }, [autohide]);
+  const hidden = tucked && !navOpen && !keepVisible && !query;
   return (
-    <header className="site-header">
+    <>
+      {hidden && <div className="topbar-peek" aria-hidden="true" />}
+      <header className={`site-header${hidden ? ' site-header--tucked' : ''}`}>
       <button className="brand" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
         <img src="/hc-connected-field-watermark.svg" alt="" />
         <span>HONEYCOMB</span>
       </button>
+      <div className={`site-search${searchOpen || query ? ' is-open' : ''}`}>
+        <button
+          className="search-toggle" type="button" aria-label="Search the archive"
+          onClick={() => { setSearchOpen((o) => !o); setTimeout(() => searchRef.current?.focus(), 0); }}
+        >
+          <span aria-hidden="true">⌕</span>
+        </button>
+        <input
+          ref={searchRef} className="search-input" type="search" value={query}
+          onChange={(e) => onQuery(e.target.value)}
+          placeholder="Search place, year, tag, or words"
+          aria-label="Search the archive"
+        />
+        {query && (
+          <>
+            <span className="search-count">{matchCount}</span>
+            <button className="search-clear" type="button" aria-label="Clear search" onClick={() => { onQuery(''); searchRef.current?.focus(); }}>×</button>
+          </>
+        )}
+      </div>
       <button
         className="menu-button" type="button"
         aria-expanded={navOpen} aria-controls="primary-navigation"
@@ -143,18 +415,29 @@ function TopBar({ onNav, onSubmit, activePage }) {
             {p.id.toUpperCase()}
           </button>
         ))}
+        {session && session.role && session.role !== 'visitor' && (
+          <button
+            className="member-chip" type="button"
+            title={session.role === 'moderator' ? 'Signed in as moderator — click to sign out' : 'Signed in — click to sign out'}
+            onClick={() => { if (confirm('Sign out of the archive on this device?')) onSignOut(); }}
+          >
+            <i aria-hidden="true" />
+            {session.role === 'moderator' ? 'MODERATOR' : (session.name || 'MEMBER').toUpperCase()}
+          </button>
+        )}
         <button className="share-button" type="button" aria-label="Share your experience"
                 onClick={() => { setNavOpen(false); onSubmit(); }}>
           SUBMIT
         </button>
       </nav>
-    </header>
+      </header>
+    </>
   );
 }
 
 // ── story panel slideout (from the projecthoneycomb.site deploy) ────────────
 
-function StoryPanel({ page, person, onClose, openRecorder }) {
+function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
   const open = Boolean(page || person);
   return (
     <aside
@@ -169,7 +452,7 @@ function StoryPanel({ page, person, onClose, openRecorder }) {
           <div className="story-content">
             <p className="record-label">{page.eyebrow}</p>
             <h1>{page.title}</h1>
-            <div className="panel-copy">{page.body({ openRecorder })}</div>
+            <div className="panel-copy">{page.body({ openRecorder, focusSearch })}</div>
           </div>
           <PanelFooter />
         </>
@@ -179,6 +462,7 @@ function StoryPanel({ page, person, onClose, openRecorder }) {
           <div className="story-content">
             <p className="record-label">
               FROM THE ARCHIVE{person.experience.displayName ? ` · ${String(person.experience.displayName).toUpperCase()}` : ''}
+              {person.experience.privacy === 'community' && <span className="community-badge">COMMUNITY ONLY</span>}
             </p>
             <h1>{person.experience.title}</h1>
             <div className="panel-copy">
@@ -192,7 +476,16 @@ function StoryPanel({ page, person, onClose, openRecorder }) {
               {person.experience.mediaUrl && person.experience.recordingMode === 'audio' && (
                 <audio className="story-media" src={person.experience.mediaUrl} controls preload="metadata" />
               )}
-              {person.experience.transcript && <p className="story-summary">{person.experience.transcript}</p>}
+              {person.experience.transcript && (
+                <div className="story-summary">
+                  {/* Dictated accounts run long and arrive with paragraph
+                      breaks in them. Rendering the whole transcript as one
+                      block turned a five-minute testimony into a wall. */}
+                  {String(person.experience.transcript).split(/\n\s*\n/).map((para, i) => (
+                    <p key={i}>{para.trim()}</p>
+                  ))}
+                </div>
+              )}
               {(person.experience.hashtags || []).length > 0 && (
                 <div className="story-tags">
                   {person.experience.hashtags.map((tag) => <span key={tag}>#{String(tag).toUpperCase()}</span>)}
@@ -257,8 +550,10 @@ function Gate({ onEnter, size }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ password: pw }),
       });
-      if (res.ok) onEnter();
-      else setWrong(true);
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}));
+        onEnter(data);
+      } else setWrong(true);
     } catch {
       setWrong(true);
     } finally {
@@ -273,10 +568,10 @@ function Gate({ onEnter, size }) {
       <div className="gate-center">
         <p className="gate-eyebrow">Private archive</p>
         <h1 className="gate-title">Enter the <em>Honeycomb.</em></h1>
-        <p className="gate-body">This living archive is shared by invitation. Enter the password to continue.</p>
+        <p className="gate-body">This living archive is shared by invitation. Enter the password, or your member access code, to continue.</p>
         <form className="gate-form" onSubmit={submit}>
-          <Input label="Password" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
-                 hint={wrong ? 'That password was not recognized.' : undefined} invalid={wrong} autoFocus />
+          <Input label="Password or access code" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
+                 hint={wrong ? 'That password or code was not recognized.' : undefined} invalid={wrong} autoFocus />
           <Button type="submit" disabled={checking}>{checking ? 'Checking…' : 'Enter'}</Button>
         </form>
         <p className="gate-note"><span>✦</span> The session stays unlocked for 30 days on this device.</p>
@@ -287,7 +582,7 @@ function Gate({ onEnter, size }) {
 
 // ── archive field (design project, + person panel wiring + touch panning) ───
 
-function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences, faces }) {
+function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences, faces, query, onMatchCount }) {
   const [vp, setVp] = useState(() => (typeof window === 'undefined' ? [1280, 800] : [window.innerWidth, window.innerHeight]));
   useEffect(() => {
     const onR = () => setVp([window.innerWidth, window.innerHeight]);
@@ -304,12 +599,20 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
   // panning skips re-renders)
   const maxPanX = Math.max(0, (W - (vp[0] - 30)) / 2);
   const maxPanY = Math.max(0, (H - (vp[1] - 30)) / 2);
+  // with the story panel open the field is allowed to slide further than usual,
+  // so the cell you clicked can clear the panel even on a small field
+  const panelWidth = Math.min(vp[0] * 0.44, 704);
+  const slack = panelOpen && vp[0] >= 881 ? panelWidth : 0;
   const fieldRef = useRef(null);
   const panRef = useRef({ x: 0, y: 0 });
   const apply = useCallback(() => {
     if (fieldRef.current) fieldRef.current.style.transform = `translate(calc(-50% + ${panRef.current.x}px), calc(-50% + ${panRef.current.y}px))`;
   }, []);
-  useEffect(() => { panRef.current.x = Math.max(-maxPanX, Math.min(maxPanX, panRef.current.x)); panRef.current.y = Math.max(-maxPanY, Math.min(maxPanY, panRef.current.y)); apply(); });
+  useEffect(() => {
+    panRef.current.x = Math.max(-maxPanX - slack, Math.min(maxPanX + slack, panRef.current.x));
+    panRef.current.y = Math.max(-maxPanY, Math.min(maxPanY, panRef.current.y));
+    apply();
+  });
   // desktop: mouse-edge auto panning
   useEffect(() => {
     const mouse = { x: -1, y: -1, on: false };
@@ -361,12 +664,40 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     window.addEventListener('pointerup', up);
     return () => { el.removeEventListener('pointerdown', down); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
   }, [maxPanX, maxPanY, apply]);
+  // the comb grows to hold every voice: enough cells that each community face
+  // and each approved story gets its own, whatever the cell-count slider says
+  const voices = faces.length + experiences.length;
+  const cellCount = Math.max(t.cellCount, Math.ceil(voices / Math.max(0.1, t.brightShare / 100)));
   const field = useMemo(
-    () => genField(cols, rows, t.cellCount, t.distribution, t.brightShare, t.gaps, mulberry32(t.seed * 7919 + 13)),
-    [cols, rows, t.cellCount, t.distribution, t.brightShare, t.gaps, t.seed]
+    () => genField(cols, rows, cellCount, t.distribution, t.brightShare, t.gaps, mulberry32(t.seed * 7919 + 13)),
+    [cols, rows, cellCount, t.distribution, t.brightShare, t.gaps, t.seed]
   );
   const base = useMemo(() => field.map(([c, r, ty]) => ({ k: c + ',' + r, t: ty, x: c * cx, y: r * cy })), [field, cx, cy]);
   useEffect(() => { setFocusKey(null); }, [field, setFocusKey]);
+  // bright cells hold the community faces first; approved archive submissions
+  // (from /api/experiences) claim the remaining bright cells, their attached
+  // photo becoming the cell face
+  const faceOf = useMemo(() => {
+    const m = new Map();
+    let i = 0, e = 0;
+    for (const b of base) {
+      if (b.t !== 'b') continue;
+      if (i < faces.length) {
+        m.set(b.k, faces[i++]);
+      } else if (e < experiences.length) {
+        const exp = experiences[e++];
+        const name = exp.displayName || exp.title || 'Archive voice';
+        // a story with no photo still needs to be findable in the comb, so the
+        // cell carries its initials instead of a portrait
+        const initials = String(exp.displayName || exp.title || '?')
+          .split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+        m.set(b.k, { src: exp.photoUrl || null, photo: true, initials, name, person: { name, experience: exp } });
+      }
+    }
+    return m;
+  }, [base, experiences, faces]);
+  // tag weights for the whole field, recomputed only when the voices change
+  const tagIndex = useMemo(() => buildTagWeights(faceOf), [faceOf]);
   // clicked cell becomes a center of gravity: kin cells draw close, the rest give way.
   // every moved cell snaps to the nearest FREE lattice slot, so cells always align and never overlap
   const placed = useMemo(() => {
@@ -377,8 +708,22 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     for (let c = 0; c < cols; c++) for (let r = c % 2; r < rows; r += 2) slots.push([c, r]);
     const movers = base.filter((b) => b.k !== focusKey && (b.t === 'b' || t.dormantRespond));
     const rng = mulberry32(((f.x * 31 + f.y * 7) | 0) + t.seed * 101);
-    const order = shuffle(movers.map((m) => m.k), rng);
-    const kinSet = new Set(order.slice(0, Math.round(movers.length * t.clusterShare / 100)));
+    const shuffled = shuffle(movers.map((m) => m.k), rng);
+    const kinCount = Math.round(movers.length * t.clusterShare / 100);
+    // Kin by shared tags: rank every other voice by how much it has in common
+    // with this one. Ties — and they are common, since most pairs share
+    // nothing — fall back to the shuffled order, so a field with no tags yet
+    // behaves exactly as it did before and never looks broken.
+    const tie = new Map(shuffled.map((k, i) => [k, i]));
+    const score = new Map();
+    if (t.clusterBy === 'tags') {
+      for (const m of movers) score.set(m.k, relatedness(focusKey, m.k, tagIndex));
+    }
+    const ranked = movers.map((m) => m.k).sort((a, b2) => {
+      const d = (score.get(b2) || 0) - (score.get(a) || 0);
+      return d !== 0 ? d : tie.get(a) - tie.get(b2);
+    });
+    const kinSet = new Set(ranked.slice(0, kinCount));
     const occupied = new Set([focusKey]);
     base.forEach((b) => { if (b.k !== focusKey && !(b.t === 'b' || t.dormantRespond)) occupied.add(b.k); });
     const taken = new Set();
@@ -396,9 +741,23 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
       result.set(b.k, { x: bestS[0] * cx, y: bestS[1] * cy });
     };
     const byDist = (arr) => arr.slice().sort((a, b2) => Math.hypot(a.x - f.x, a.y - f.y) - Math.hypot(b2.x - f.x, b2.y - f.y));
-    for (const b of byDist(movers.filter((m) => kinSet.has(m.k)))) {
+    // How strong the strongest relation is, so pull can be read relative to it
+    // rather than against an absolute the archive may never reach.
+    const maxScore = ranked.length ? (score.get(ranked[0]) || 0) : 0;
+    const scoring = t.clusterBy === 'tags' && maxScore > 0;
+    // A cell that shares a rare tag comes all the way in; a weak relation only
+    // drifts closer. With no tag signal every kin cell pulls the full amount,
+    // which is the behaviour that shipped.
+    const pullFactor = (k) => scoring ? 0.55 + 0.45 * ((score.get(k) || 0) / maxScore) : 1;
+    // Strongest relation gets first claim on the nearest free slot; without
+    // scoring, nearest-first as before.
+    const kin = movers.filter((m) => kinSet.has(m.k));
+    const kinOrder = scoring
+      ? kin.slice().sort((a, b2) => (score.get(b2.k) || 0) - (score.get(a.k) || 0))
+      : byDist(kin);
+    for (const b of kinOrder) {
       const dx = b.x - f.x, dy = b.y - f.y, d = Math.hypot(dx, dy) || 1;
-      const nd = Math.max(d * (1 - t.pull / 100), size * 0.87);
+      const nd = Math.max(d * (1 - (t.pull / 100) * pullFactor(b.k)), size * 0.87);
       assign(b, f.x + dx / d * nd, f.y + dy / d * nd);
     }
     for (const b of byDist(movers.filter((m) => !kinSet.has(m.k)))) {
@@ -407,25 +766,53 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
       assign(b, Math.min(Math.max(f.x + dx / d * nd, 0), W - size), Math.min(Math.max(f.y + dy / d * nd, 0), H - size));
     }
     return base.map((b) => result.has(b.k) ? { ...b, kin: kinSet.has(b.k), ...result.get(b.k) } : b);
-  }, [base, focusKey, cols, rows, cx, cy, t.clusterShare, t.pull, t.push, t.dormantRespond, t.seed, size, W, H]);
-  // bright cells hold the community faces first; approved archive submissions
-  // (from /api/experiences) claim the remaining bright cells, their attached
-  // photo becoming the cell face
-  const faceOf = useMemo(() => {
-    const m = new Map();
-    let i = 0, e = 0;
-    for (const b of base) {
-      if (b.t !== 'b') continue;
-      if (i < faces.length) {
-        m.set(b.k, faces[i++]);
-      } else if (e < experiences.length) {
-        const exp = experiences[e++];
-        const name = exp.displayName || exp.title || 'Archive voice';
-        m.set(b.k, { src: exp.photoUrl || null, photo: true, name, person: { name, experience: exp } });
-      }
+  }, [base, focusKey, cols, rows, cx, cy, t.clusterShare, t.clusterBy, t.pull, t.push, t.dormantRespond, t.seed, size, W, H, tagIndex]);
+  // ── search ────────────────────────────────────────────────────────────────
+  const q = (query || '').trim().toLowerCase();
+  const matchKeys = useMemo(() => {
+    if (!q) return null;
+    const set = new Set();
+    for (const [k, face] of faceOf) {
+      if (haystack(face).includes(q)) set.add(k);
     }
-    return m;
-  }, [base, experiences, faces]);
+    return set;
+  }, [faceOf, q]);
+  useEffect(() => {
+    if (onMatchCount) onMatchCount(matchKeys ? matchKeys.size : 0);
+  }, [matchKeys, onMatchCount]);
+  // a live search takes over the field arrangement; otherwise the clicked-cell
+  // gravity does
+  const arranged = useMemo(() => {
+    if (matchKeys) return gatherMatches(base, matchKeys, cols, rows, cx, cy, size, W, H, t.push);
+    return placed;
+  }, [matchKeys, placed, base, cols, rows, cx, cy, size, W, H, t.push]);
+  // the pointer as a lamp over the comb
+  useFieldLight(fieldRef, {
+    enabled: t.mouseLight !== false,
+    // Reach scales with the cells, so the pool covers a similar number of them
+    // whatever size they are set to.
+    reach: size * ((t.lightReach ?? 260) / 100),
+    cells: arranged,
+  });
+  // with the panel open, slide the field so the cell you clicked clears it
+  useEffect(() => {
+    if (!panelOpen || !focusKey || vp[0] < 881) return;
+    const b = arranged.find((x) => x.k === focusKey);
+    const el = fieldRef.current;
+    if (!b || !el) return;
+    const targetScreenX = panelWidth + (vp[0] - panelWidth) / 2;
+    const cellCenterX = b.x + size / 2, cellCenterY = b.y + size * 0.43;
+    const desiredX = targetScreenX - vp[0] / 2 - (cellCenterX - W / 2);
+    const desiredY = -(cellCenterY - H / 2);
+    panRef.current = {
+      x: Math.max(-maxPanX - slack, Math.min(maxPanX + slack, desiredX)),
+      y: Math.max(-maxPanY, Math.min(maxPanY, desiredY)),
+    };
+    el.classList.add('arch-field--ease');
+    apply();
+    const done = setTimeout(() => el.classList.remove('arch-field--ease'), 760);
+    return () => clearTimeout(done);
+  }, [panelOpen, focusKey, arranged, vp, panelWidth, size, W, H, maxPanX, maxPanY, slack, apply]);
   // vines render beneath the cells, never obscuring comb contents. Three growth
   // styles: "climb" hugs the left/right silhouette from the bottom up, "wrap"
   // traces the cluster's whole outer perimeter, "sprawl" rises as undergrowth
@@ -512,35 +899,62 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     }
   };
   return (
-    <div>
+    <div className={panelOpen ? 'arch arch--panel' : 'arch'}>
       <div className="arch-clip" style={panelOpen ? { filter: 'brightness(0.83)' } : undefined}>
-        <div className="arch-field" ref={fieldRef} style={{ width: W, height: H, transform: 'translate(-50%,-50%)', marginTop: 12 }} onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
+        <div className="arch-field" ref={fieldRef}
+             style={{
+               width: W, height: H, transform: 'translate(-50%,-50%)', marginTop: 12,
+               '--glow-fade': `${t.lightAfterglow ?? 520}ms`,
+               '--glow-strength': (t.lightStrength ?? 70) / 100,
+               '--cell-center': (t.cellCenter ?? 14) / 100,
+               '--glaze': (t.faceGlaze ?? 50) / 100,
+             }}
+             onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
           {vines.map((v) => (
             <div key={v.id} className="vine-sprite" aria-hidden="true" style={{ left: v.x, top: v.y }}>
               <img src="/uploads/vine-sprite.webp" alt="" style={{ height: v.L, width: v.L * VINE_ASPECT * ((t.vineSize ?? 100) / 100), transform: `translateX(-48%) rotate(${v.rot}deg)`, animationDelay: v.delay + 'ms' }} />
             </div>
           ))}
-          {placed.map((b) => (
-            <div key={b.k} className="cell" style={{ left: b.x, top: b.y, width: size, zIndex: b.k === focusKey ? 3 : b.kin ? 2 : 1 }}>
+          {arranged.map((b) => {
+            const face = faceOf.get(b.k);
+            const dimmed = matchKeys && !b.match;
+            return (
+            <div key={b.k} className={'cell' + (dimmed ? ' cell-unmatched' : '')}
+                 data-cx={b.x} data-cy={b.y} data-half={size / 2}
+                 style={{ left: b.x, top: b.y, width: size, zIndex: b.k === focusKey ? 3 : b.match ? 2 : b.kin ? 2 : 1 }}>
               {b.t === 'b'
                 ? (
-                  <div className={'hexcell' + (b.k === focusKey ? ' cell-focus' : '')} tabIndex="0" role="button"
-                       aria-label={faceOf.get(b.k) ? faceOf.get(b.k).name : 'Bright cell'}
+                  <div className={'hexcell' + (b.k === focusKey ? ' cell-focus' : '') + (b.match ? ' cell-match' : '')} tabIndex="0" role="button"
+                       aria-label={face ? face.name : 'Bright cell'}
                        onClick={() => toggleCell(b)}
                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCell(b); } }}>
                     <img src="/assets/cell-bright.png" alt="" />
-                    {t.showFaces && faceOf.get(b.k) && faceOf.get(b.k).src && (
+                    {face && face.src && (
                       <img
-                        className={faceOf.get(b.k).photo ? 'cell-face cell-face-photo' : 'cell-face'}
-                        src={faceOf.get(b.k).src}
-                        alt={faceOf.get(b.k).name}
+                        className={face.photo ? 'cell-face cell-face-photo' : 'cell-face'}
+                        src={face.src}
+                        alt={face.name}
                       />
                     )}
+                    {face && !face.src && face.initials && (
+                      <span className="cell-initials" aria-hidden="true">{face.initials}</span>
+                    )}
+                    {/* a thin film over the whole cell for the light to catch —
+                        wax frame and portrait alike, so a face reads as sitting
+                        under the comb rather than printed on top of it */}
+                    <span className="cell-glaze" aria-hidden="true" />
                   </div>
                 )
-                : <img src="/assets/cell-bright.png" alt="" className="cell-dormant" style={{ width: '100%' }} />}
+                : (
+                  // wrapped so a dormant cell has somewhere to hang the light
+                  // pool; bare wax takes the light more fully than a portrait
+                  <div className="cell-dormant-wrap" aria-hidden="true">
+                    <img src="/assets/cell-bright.png" alt="" className="cell-dormant" style={{ width: '100%' }} />
+                  </div>
+                )}
             </div>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>
@@ -558,6 +972,22 @@ export default function HoneycombApp() {
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [experiences, setExperiences] = useState([]);
   const [people, setPeople] = useState(PEOPLE);
+  const [query, setQuery] = useState('');
+  const [matchCount, setMatchCount] = useState(0);
+  const [session, setSession] = useState({ role: null, name: null });
+
+  useEffect(() => {
+    fetch('/api/session')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d) setSession({ role: d.role, name: d.name }); })
+      .catch(() => undefined);
+  }, []);
+
+  const signOut = useCallback(async () => {
+    await fetch('/api/session', { method: 'DELETE' }).catch(() => undefined);
+    try { localStorage.removeItem('hc-unlocked-until'); } catch { /* private mode */ }
+    window.location.reload();
+  }, []);
 
   // approved archive submissions join the field as additional bright cells
   useEffect(() => {
@@ -589,8 +1019,9 @@ export default function HoneycombApp() {
     } catch { /* private mode */ }
   }, []);
 
-  const enter = () => {
+  const enter = (data) => {
     setView('archive');
+    if (data && data.role) setSession({ role: data.role, name: data.name ?? null });
     try { localStorage.setItem('hc-unlocked-until', String(Date.now() + 30 * 24 * 3600 * 1000)); } catch { /* private mode */ }
   };
 
@@ -607,11 +1038,24 @@ export default function HoneycombApp() {
   }, [closePanel]);
 
   const onNav = (id) => {
-    if (id === 'home') { closePanel(); return; }
+    if (id === 'home') { closePanel(); setQuery(''); return; }
     setPerson(null);
     setFocusKey(null);
     setPageId(id);
   };
+
+  // searching and reading a story fight for the same field, so starting a
+  // search closes whatever panel is open
+  const onQuery = useCallback((value) => {
+    setQuery(value);
+    if (value) { setPageId(null); setPerson(null); setFocusKey(null); }
+  }, []);
+
+  // "Search the archive" inside the Explore panel hands focus to the topbar field
+  const focusSearch = useCallback(() => {
+    closePanel();
+    window.dispatchEvent(new CustomEvent('hc-focus-search'));
+  }, [closePanel]);
 
   const onPersonSelect = (p) => {
     setPageId(null);
@@ -623,9 +1067,15 @@ export default function HoneycombApp() {
   const panelOpen = Boolean(page || person);
 
   return (
-    <div className="hc-page" style={{ background: t.ground, '--cell-opacity': (t.cellOpacity ?? 90) / 100, '--dormant-brightness': (t.dormantBright ?? 72) / 100 }}>
+    <div className="hc-page" style={{
+      background: t.ground,
+      '--cell-opacity': (t.cellOpacity ?? 90) / 100,
+      '--dormant-brightness': (t.dormantBright ?? 72) / 100,
+      '--face-opacity': t.showFaces ? 1 : 0,
+    }}>
       <img src={BACKDROPS[t.backdrop] || BACKDROPS['Archive texture']} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
       {t.vignette && <div className="hc-vignette"></div>}
+      {(t.warmth ?? 0) > 0 && <div className="hc-warm" style={{ opacity: (t.warmth ?? 0) / 100 }} aria-hidden="true"></div>}
       <div className="hc-view" style={{ opacity: view === 'gate' ? 1 : 0, pointerEvents: view === 'gate' ? 'auto' : 'none' }}>
         <Gate onEnter={enter} size={t.cellSize} />
       </div>
@@ -639,12 +1089,19 @@ export default function HoneycombApp() {
             onPersonSelect={onPersonSelect}
             experiences={experiences}
             faces={faces}
+            query={query}
+            onMatchCount={setMatchCount}
           />
         )}
       </div>
       <div className="hc-frame"></div>
-      <TopBar onNav={onNav} onSubmit={openRecorder} activePage={pageId} />
-      <StoryPanel page={page} person={person} onClose={closePanel} openRecorder={openRecorder} />
+      <TopBar
+        onNav={onNav} onSubmit={openRecorder} activePage={pageId}
+        query={query} onQuery={onQuery} matchCount={matchCount}
+        autohide={t.topbarAutohide !== false} keepVisible={panelOpen || recorderOpen}
+        session={session} onSignOut={signOut}
+      />
+      <StoryPanel page={page} person={person} onClose={closePanel} openRecorder={openRecorder} focusSearch={focusSearch} />
       {recorderOpen && <RecorderModal onClose={() => setRecorderOpen(false)} />}
       <TweaksPanel>
         <TweakSection label="Cells" />
@@ -654,21 +1111,30 @@ export default function HoneycombApp() {
         <TweakSlider label="Field width" value={t.fieldWidth} min={800} max={2400} step={20} unit="px" onChange={(v) => setTweak('fieldWidth', v)} />
         <TweakSlider label="Field height" value={t.fieldHeight} min={400} max={1600} step={20} unit="px" onChange={(v) => setTweak('fieldHeight', v)} />
         <TweakSlider label="Bright share" value={t.brightShare} min={10} max={90} unit="%" onChange={(v) => setTweak('brightShare', v)} />
-        <TweakRadio label="Distribution" value={t.distribution} options={['even', 'clustered', 'scattered']} onChange={(v) => setTweak('distribution', v)} />
-        <TweakToggle label="Show faces" value={t.showFaces} onChange={(v) => setTweak('showFaces', v)} />
+        <TweakRadio label="Distribution" value={t.distribution === 'scattered' ? 'even' : t.distribution} options={['even', 'clustered']} onChange={(v) => setTweak('distribution', v)} />
+        <TweakToggle label="Faces always visible" value={t.showFaces} onChange={(v) => setTweak('showFaces', v)} />
         <TweakSlider label="Cell opacity" value={t.cellOpacity ?? 90} min={40} max={100} unit="%" onChange={(v) => setTweak('cellOpacity', v)} />
         <TweakSlider label="Dormant brightness" value={t.dormantBright ?? 72} min={30} max={100} unit="%" onChange={(v) => setTweak('dormantBright', v)} />
+        <TweakSlider label="Cell centre" value={t.cellCenter ?? 14} min={0} max={45} unit="%" onChange={(v) => setTweak('cellCenter', v)} />
+        <TweakToggle label="Mouse light" value={t.mouseLight !== false} onChange={(v) => setTweak('mouseLight', v)} />
+        <TweakSlider label="Light reach" value={t.lightReach ?? 260} min={100} max={600} step={10} unit="%" onChange={(v) => setTweak('lightReach', v)} />
+        <TweakSlider label="Light strength" value={t.lightStrength ?? 70} min={0} max={100} unit="%" onChange={(v) => setTweak('lightStrength', v)} />
+        <TweakSlider label="Face glaze" value={t.faceGlaze ?? 50} min={0} max={100} unit="%" onChange={(v) => setTweak('faceGlaze', v)} />
+        <TweakSlider label="Afterglow" value={t.lightAfterglow ?? 520} min={0} max={1600} step={20} unit="ms" onChange={(v) => setTweak('lightAfterglow', v)} />
         <TweakButton label="Reshuffle field" onClick={() => setTweak('seed', (t.seed || 1) + 1)} />
         <TweakSection label="Gravity" />
+        <TweakRadio label="Kinship" value={t.clusterBy} options={[{ value: 'tags', label: 'Shared tags' }, { value: 'random', label: 'Random' }]} onChange={(v) => setTweak('clusterBy', v)} />
         <TweakSlider label="Cluster share" value={t.clusterShare} min={0} max={100} unit="%" onChange={(v) => setTweak('clusterShare', v)} />
         <TweakSlider label="Pull strength" value={t.pull} min={20} max={90} unit="%" onChange={(v) => setTweak('pull', v)} />
         <TweakSlider label="Push distance" value={t.push} min={40} max={340} unit="px" onChange={(v) => setTweak('push', v)} />
         <TweakToggle label="Dormant cells respond" value={t.dormantRespond} onChange={(v) => setTweak('dormantRespond', v)} />
         <TweakSection label="Background" />
-        <TweakColor label="Ground" value={t.ground} options={['#0D0806', '#120B07', '#1A1210', '#261711']} onChange={(v) => setTweak('ground', v)} />
+        <TweakColor label="Ground" value={t.ground} options={['#0D0806', '#1A1210', '#241711', '#2E1C12']} onChange={(v) => setTweak('ground', v)} />
         <TweakSelect label="Texture image" value={t.backdrop} options={Object.keys(BACKDROPS)} onChange={(v) => setTweak('backdrop', v)} />
         <TweakSlider label="Texture" value={t.textureOpacity} min={0} max={70} unit="%" onChange={(v) => setTweak('textureOpacity', v)} />
+        <TweakSlider label="Warmth" value={t.warmth ?? 0} min={0} max={100} unit="%" onChange={(v) => setTweak('warmth', v)} />
         <TweakToggle label="Vignette" value={t.vignette} onChange={(v) => setTweak('vignette', v)} />
+        <TweakToggle label="Topbar hides until hover" value={t.topbarAutohide !== false} onChange={(v) => setTweak('topbarAutohide', v)} />
         <TweakSection label="Vines" />
         <TweakToggle label="Vines" value={t.vines} onChange={(v) => setTweak('vines', v)} />
         <TweakRadio label="Growth style" value={t.vineStyle ?? 'climb'} options={['climb', 'wrap', 'sprawl']} onChange={(v) => setTweak('vineStyle', v)} />

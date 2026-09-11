@@ -1,21 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { isAuthed } from "../../lib/auth";
-import { S3Client, CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-
-function getR2Client() {
-  return new S3Client({
-    region: "auto",
-    endpoint: process.env.R2_ENDPOINT,
-    forcePathStyle: true,
-    credentials: {
-      accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-      secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-    },
-  });
-}
+import { isModerator } from "../../lib/auth";
+import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 
 export async function POST(request: NextRequest) {
-  if (!isAuthed(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (!r2Configured()) {
+    return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
+  }
   try {
     const { submissionKey } = await request.json();
 
@@ -27,13 +19,13 @@ export async function POST(request: NextRequest) {
 
     // 1. Fetch the JSON submission
     const getCmd = new GetObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: submissionKey,
+      Bucket: BUCKET,
+      Key: phys(submissionKey),
     });
     const response = await client.send(getCmd);
     const bodyStr = await response.Body?.transformToString();
     if (!bodyStr) throw new Error("Empty submission file");
-    
+
     const data = JSON.parse(bodyStr);
 
     // Helper to move a media file to approved
@@ -42,18 +34,18 @@ export async function POST(request: NextRequest) {
       const parts = oldKey.split("/");
       const filename = parts.pop();
       const folder = parts.join("/"); // "image", "video", or "audio"
-      
+
       const newKey = `approved/${folder}/${filename}`;
 
       await client.send(new CopyObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        CopySource: `${process.env.R2_BUCKET_NAME}/${oldKey}`,
-        Key: newKey,
+        Bucket: BUCKET,
+        CopySource: `${BUCKET}/${phys(oldKey)}`,
+        Key: phys(newKey),
       }));
 
       await client.send(new DeleteObjectCommand({
-        Bucket: process.env.R2_BUCKET_NAME,
-        Key: oldKey,
+        Bucket: BUCKET,
+        Key: phys(oldKey),
       }));
 
       return newKey;
@@ -75,16 +67,16 @@ export async function POST(request: NextRequest) {
     const newSubmissionKey = `approved/submissions/${filename}`;
 
     await client.send(new PutObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: newSubmissionKey,
+      Bucket: BUCKET,
+      Key: phys(newSubmissionKey),
       Body: JSON.stringify(data, null, 2),
       ContentType: "application/json",
     }));
 
     // 4. Delete the old JSON submission
     await client.send(new DeleteObjectCommand({
-      Bucket: process.env.R2_BUCKET_NAME,
-      Key: submissionKey,
+      Bucket: BUCKET,
+      Key: phys(submissionKey),
     }));
 
     return NextResponse.json({ success: true, newSubmissionKey });

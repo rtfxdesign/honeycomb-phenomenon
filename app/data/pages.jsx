@@ -38,8 +38,12 @@ export const PAGES = [
     id: 'explore',
     eyebrow: 'WELCOME TO HONEYCOMB-PHENOMENON',
     title: 'A living archive of the unexplained',
-    body: () => (
+    body: ({ focusSearch }) => (
       <>
+        <button className="story-action" type="button" onClick={focusSearch}>
+          SEARCH THE ARCHIVE <span aria-hidden="true">→</span>
+        </button>
+        <p style={{ marginTop: 18 }}>Search by place, year, encounter type, or any detail you remember — matching voices gather together in the comb and the rest give way.</p>
         <h2>Your Experience. Our Collective History.</h2>
         <p>Honeycomb&rsquo;s mission is to support and empower those who have experienced or witnessed a UFO, UAP, or anything related to the Phenomenon, through the building of community, and the curation of shared experiences.</p>
         <p>We have built an ever-evolving platform to share anomalous experiences with others, one that fosters a new understanding that your experience was unique but not isolated. You are not alone.</p>
