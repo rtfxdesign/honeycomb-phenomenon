@@ -344,7 +344,42 @@ button{font:inherit;color:inherit}
   background:linear-gradient(90deg,transparent,rgba(242,191,73,.75),transparent);pointer-events:none}
 
 /* search */
-.site-search{position:relative;display:flex;align-items:center;gap:6px;margin-left:clamp(14px,3vw,40px)}
+/* ── the comb as the way into search ───────────────────────────────────────
+   Hovering the mark brings up a magnifier over it, so the thing the site is
+   for is announced by the thing the site is named after. The wordmark beside
+   it is the home link. */
+.brand{position:relative;gap:15px}
+.search-orb{position:relative;display:grid;place-items:center;padding:0;border:0;background:transparent;cursor:pointer;
+  border-radius:10px;transition:filter .25s var(--ease-quiet)}
+.search-orb img{transition:opacity .25s var(--ease-quiet),filter .25s var(--ease-quiet)}
+.orb-glass{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;
+  font-size:26px;line-height:1;color:var(--gold);opacity:0;transform:scale(.82);
+  text-shadow:0 0 18px rgba(242,191,73,.75),0 0 42px rgba(242,191,73,.35);
+  transition:opacity .25s var(--ease-quiet),transform .25s var(--ease-quiet)}
+.search-orb:hover img,.search-orb:focus-visible img,
+.brand--searching .search-orb img{opacity:.28;filter:saturate(.7)}
+.search-orb:hover .orb-glass,.search-orb:focus-visible .orb-glass,
+.brand--searching .orb-glass{opacity:1;transform:scale(1)}
+.search-orb:hover,.search-orb:focus-visible{filter:drop-shadow(0 0 16px rgba(242,191,73,.3));outline:none}
+.brand-word{padding:0;border:0;background:transparent;color:var(--gold);cursor:pointer;
+  font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em;
+  transition:color .2s ease,opacity .25s var(--ease-quiet)}
+.brand-word:hover,.brand-word:focus-visible{color:var(--hc-gold-bright);outline:none}
+
+/* The field grows out to the right of the comb rather than living in the middle
+   of the bar, so it never runs into the nav or the slide-outs on that side. */
+.site-search{position:absolute;left:0;top:50%;transform:translateY(-50%);
+  display:flex;align-items:center;gap:6px;margin-left:0;pointer-events:none;z-index:2}
+.site-search::before{opacity:0;transition:opacity .2s ease}
+.site-search.is-open{pointer-events:auto}
+.site-search.is-open::before{opacity:1}
+.brand--searching~.site-search,.site-search.is-open{left:calc(76px + 18px)}
+.site-search .search-input{width:0;opacity:0;padding-left:0;border-color:transparent;background:transparent;
+  transition:width .34s var(--ease-quiet),opacity .24s var(--ease-quiet),padding .34s var(--ease-quiet)}
+.site-search.is-open .search-input{width:clamp(210px,24vw,340px);opacity:1;padding:0 54px 0 30px;
+  border-color:rgba(242,191,73,.55);background:rgba(255,255,255,.07)}
+/* while searching, the wordmark steps back so the field has the room */
+.brand--searching .brand-word{opacity:0;pointer-events:none}
 .site-search::before{content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);
   color:rgba(242,191,73,.8);font-size:16px;line-height:1;pointer-events:none}
 .search-toggle{display:none}
@@ -373,7 +408,9 @@ button{font:inherit;color:inherit}
 .community-badge{display:inline-block;margin-left:10px;padding:3px 7px;border:1px solid rgba(242,191,73,.45);
   border-radius:2px;color:var(--gold);font-size:8px;letter-spacing:.14em;vertical-align:middle}
 .brand,.site-header{display:flex;align-items:center}
-.brand{gap:15px;padding:0;border:0;background:transparent;color:var(--gold);text-decoration:none;font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em;cursor:pointer}
+/* .brand is now a wrapper around two separate controls — the comb (search) and
+   the wordmark (home) — so the type styling lives on .brand-word instead */
+.brand{gap:15px;padding:0;border:0;background:transparent;color:var(--gold);text-decoration:none;font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em}
 .brand img{width:76px;height:42px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(242,191,73,.2))}
 .site-header nav{margin-left:auto;display:flex;align-items:center;gap:clamp(22px,2.5vw,42px)}
 .site-header nav a,.site-header nav button{border:0;padding:0;color:var(--cream);background:transparent;text-decoration:none;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;letter-spacing:.13em;cursor:pointer;transition:color .2s ease}
@@ -504,7 +541,14 @@ audio.story-media{max-height:none}
 /* the bar never hides on touch — there is no hover to bring it back */
 .site-header--tucked{transform:translateZ(0);opacity:1;pointer-events:auto}
 .topbar-peek{display:none}
-.site-search{margin-left:auto}
+/* the comb-as-search behaviour is a pointer idea; on touch the bar keeps its
+   own magnifier button and the field drops below the header as before */
+.site-search{position:static;transform:none;margin-left:auto;pointer-events:auto;z-index:auto}
+.brand--searching~.site-search,.site-search.is-open{left:auto}
+.site-search .search-input,.site-search.is-open .search-input{width:auto;opacity:1;transition:none}
+.orb-glass{display:none}
+.search-orb img{opacity:1!important;filter:none!important}
+.brand--searching .brand-word{opacity:1;pointer-events:auto}
 .site-search::before{display:none}
 .search-toggle{display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid rgba(242,191,73,.4);
   border-radius:3px;background:transparent;color:var(--gold);font-size:18px;line-height:1;cursor:pointer}

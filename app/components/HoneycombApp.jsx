@@ -347,15 +347,30 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
   const [searchOpen, setSearchOpen] = useState(false);
   const [tucked, setTucked] = useState(false);
   const searchRef = useRef(null);
-  const go = (id) => { setNavOpen(false); onNav(id); };
+  const go = (id) => { setNavOpen(false); setSearchOpen(false); onNav(id); };
+
+  // On a phone the menu and the search both open into the same strip under the
+  // header, so having both open put one on top of the other. They are now
+  // mutually exclusive: opening either closes the other.
+  const openSearch = (open) => {
+    setSearchOpen(open);
+    if (open) {
+      setNavOpen(false);
+      setTimeout(() => searchRef.current?.focus(), 60);
+    }
+  };
+  const openNav = (open) => {
+    setNavOpen(open);
+    if (open) setSearchOpen(false);
+  };
   useEffect(() => {
     if (!navOpen) return;
-    const close = (e) => { if (!e.target.closest('.site-header')) setNavOpen(false); };
+    const close = (e) => { if (!e.target.closest('.site-header')) openNav(false); };
     window.addEventListener('pointerdown', close);
     return () => window.removeEventListener('pointerdown', close);
   }, [navOpen]);
   useEffect(() => {
-    const focus = () => { setSearchOpen(true); setTimeout(() => searchRef.current?.focus(), 60); };
+    const focus = () => { openSearch(true); };
     window.addEventListener('hc-focus-search', focus);
     return () => window.removeEventListener('hc-focus-search', focus);
   }, []);
@@ -373,14 +388,27 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
     <>
       {hidden && <div className="topbar-peek" aria-hidden="true" />}
       <header className={`site-header${hidden ? ' site-header--tucked' : ''}`}>
-      <button className="brand" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
-        <img src="/hc-connected-field-watermark.svg" alt="" />
-        <span>HONEYCOMB</span>
-      </button>
+      {/* The comb itself is the way into search — it is the main thing the site
+          does, so it gets the most recognisable mark rather than a small icon
+          parked in a corner. The wordmark beside it carries HOME, which is why
+          HOME is no longer a separate nav item. */}
+      <div className={`brand${searchOpen || query ? ' brand--searching' : ''}`}>
+        <button
+          className="search-orb" type="button"
+          aria-label="Search the archive" aria-expanded={searchOpen || Boolean(query)}
+          onClick={() => openSearch(!(searchOpen || query))}
+        >
+          <img src="/hc-connected-field-watermark.svg" alt="" />
+          <span className="orb-glass" aria-hidden="true">⌕</span>
+        </button>
+        <button className="brand-word" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
+          HONEYCOMB
+        </button>
+      </div>
       <div className={`site-search${searchOpen || query ? ' is-open' : ''}`}>
         <button
           className="search-toggle" type="button" aria-label="Search the archive"
-          onClick={() => { setSearchOpen((o) => !o); setTimeout(() => searchRef.current?.focus(), 0); }}
+          onClick={() => openSearch(!(searchOpen || query))}
         >
           <span aria-hidden="true">⌕</span>
         </button>
@@ -400,12 +428,12 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
       <button
         className="menu-button" type="button"
         aria-expanded={navOpen} aria-controls="primary-navigation"
-        onClick={() => setNavOpen((o) => !o)}
+        onClick={() => openNav(!navOpen)}
       >
         <span aria-hidden="true" /> MENU
       </button>
       <nav id="primary-navigation" className={navOpen ? 'nav-open' : ''} aria-label="Primary navigation">
-        <button type="button" onClick={() => go('home')}>HOME</button>
+        {/* no HOME here on purpose — the wordmark is the home link */}
         {PAGES.map((p) => (
           <button
             key={p.id} type="button"
