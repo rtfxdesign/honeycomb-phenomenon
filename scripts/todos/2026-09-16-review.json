@@ -1,0 +1,135 @@
+[
+  {
+    "text": "Make the gold actually gold — brighter, lighter, more yellow and orange. The current palette reads old, antiquated, \"medieval\" to buyers and outside viewers.",
+    "askedBy": "Paul",
+    "owner": "Dane",
+    "priority": "now",
+    "area": "design",
+    "due": "2026-09-20",
+    "notes": "From the 16 Sep review recording. Paul's reference: the gold leaf on a Buddha statue. A Rice viewer asked for something that feels like moving toward the future rather than reaching into the past. Paul wants a live call with Allen and Dane to work through it rather than more async passes, and wants the appearance changes in before the Rice meeting early next week.\n\nThe molten pointer light is already warm and golden — what reads medieval is the ground palette underneath it and the vines, so the fix is narrower than a full re-look."
+  },
+  {
+    "text": "Send gold-leaf reference images to Allen and Dane",
+    "askedBy": "Paul",
+    "owner": "Paul",
+    "priority": "now",
+    "area": "design",
+    "notes": "Paul offered these in the review recording. They should anchor the color call."
+  },
+  {
+    "text": "Reconsider the vines — Paul is no longer sure they fit now that the rest of the site has matured",
+    "askedBy": "Paul",
+    "owner": "Dane",
+    "priority": "soon",
+    "area": "design",
+    "notes": "Not a decision yet. Raised alongside the color note; likely resolved on the same call."
+  },
+  {
+    "text": "The pointer light mutes the cells as they pop up during a shuffle. Keep the glow behind the comb without washing out the active cells.",
+    "askedBy": "Paul",
+    "owner": "Allen",
+    "priority": "now",
+    "area": "build",
+    "due": "2026-09-20",
+    "notes": "\"We love the fact that it lights up behind it, but we wanted to find the way that it did that without it muting the cells as they pop up.\" All five of the Honeycomb team set the tweak panel together and hit this."
+  },
+  {
+    "text": "Walk the tweak panel with Paul — moving one control degrades another, and the team wants Allen's read on the right combination",
+    "askedBy": "Paul",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "build",
+    "notes": "The team's own settings are saved. Worth having them on screen for the call."
+  },
+  {
+    "text": "Make it obvious that the frame panes scroll — nobody in the reviews realised they could",
+    "askedBy": "Liz",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "build",
+    "notes": "\"People didn't inherently know you can go to this portion of the frame and move the scroll.\" Liz's suggestion: the slim scrollbar the left pull-outs already have. Cheapest possible fix; worth trying before anything more elaborate."
+  },
+  {
+    "text": "Are the redundant nav tabs intentional? EXPLORE and the comb both land on search.",
+    "askedBy": "Paul",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "question",
+    "answer": "Half of this shipped on 16 Sep: HOME is gone from the nav, the HONEYCOMB wordmark is home, and the comb mark is now the way into search. EXPLORE still opens a pull-out because it carries the mission copy — the difference Paul spotted is exactly the reason it exists. Whether to keep EXPLORE as a reading pane or fold it into ABOUT is the team's call."
+  },
+  {
+    "text": "Are STORIES and SUBMIT meant to both offer \"share your story\"?",
+    "askedBy": "Liz",
+    "owner": "Allen",
+    "priority": "later",
+    "area": "question",
+    "answer": "Both routes reach the same form. Keeping both costs nothing — some people arrive ready to submit, others read first and then decide — but if the team wants one door, SUBMIT is the one to keep and the prompt at the bottom of STORIES can go."
+  },
+  {
+    "text": "Evie and James are rewriting the site copy. How do changes get made — send them to Allen, or can the team edit directly?",
+    "askedBy": "Paul",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "content",
+    "answer": "Today the copy lives in the code, so the answer is: send the new text (a doc with page and section is enough) and it ships the same day. Making the copy editable from the review dashboard is a real build item — worth deciding whether the rewrite is a one-time pass or something the team will keep doing."
+  },
+  {
+    "text": "Write basic maintenance instructions — what the team can change themselves and what needs Allen",
+    "askedBy": "Paul",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "content",
+    "notes": "Requested in the review recording. Should cover: approving and editing submissions, privacy levels, the tweak panel, this list, and who to send copy changes to."
+  },
+  {
+    "text": "Liz could not change a submission's status after approving it. Reproduce her path and fix whatever blocked her.",
+    "askedBy": "Liz",
+    "owner": "Allen",
+    "priority": "now",
+    "area": "build",
+    "notes": "Paul started to demonstrate on \"Lights over the levee\" and stopped short of saving. On the server side, re-saving privacy on an approved record takes effect immediately — so either the dashboard is not sending it, or the edit path she used is not the one that saves privacy. Needs a click-through, not a code read."
+  },
+  {
+    "text": "When something is set to \"strictly archived, hidden from site\" — where does it go, and who can see it?",
+    "askedBy": "Paul",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "question",
+    "answer": "It stays exactly where it was. Nothing is moved or deleted. The site's API refuses to send an archived record to any browser at all, so visitors and members never see it — the transcript does not even leave the server. Only moderators see it, in the review dashboard, where it is still editable and can be set back to community or public at any time. It is preservation, not deletion."
+  },
+  {
+    "text": "Add search (or folders) to the review dashboard — ~60 records and no way to find one",
+    "askedBy": "Liz",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "build",
+    "notes": "Liz suggested folders; a search box over name, title, tags and status is probably the faster win and gets most of the same benefit. Will only get more pressing as real submissions arrive."
+  },
+  {
+    "text": "Add a name field to the submission form (first name, last initial) so the two letters on each cell are the person's initials, plus an \"anonymous\" checkbox for people who don't want to be named",
+    "askedBy": "Paul",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "build",
+    "answer": "Paul is right about how it works now: the letters are the first letter of the first two words of the title, not initials. \"SF / Sunny Farrell\" lining up was coincidence. Adding the name field and the anonymous checkbox (Liz's addition — the two go together) gives us a real source for the letters.",
+    "notes": "Open question for the build: what the cell shows when someone ticks anonymous — the title letters as today, or something neutral."
+  },
+  {
+    "text": "Swap the manufactured seed stories out one-for-one as real submissions arrive, so the archive is all real within 2–3 weeks",
+    "askedBy": "Paul",
+    "owner": "Paul",
+    "priority": "soon",
+    "area": "content",
+    "answer": "Right call editorially, with one thing to know going in: the kin sorting was tuned against the 50-story set. As it thins out, relatedness gets sparse and the clustering will look worse before it looks better. Expect it, rather than reading it as the feature breaking. It recovers as the real archive grows.",
+    "notes": "Real submissions are starting to line up, per Paul."
+  },
+  {
+    "text": "Rice University tech meeting — Karin Austin (Center for the Impossible) has tech questions; Allen to be on the call",
+    "askedBy": "Paul",
+    "owner": "Allen",
+    "priority": "now",
+    "area": "other",
+    "due": "2026-09-21",
+    "notes": "Monday or Tuesday; Paul to confirm the time. Karin was shown the live site and immediately set up an intro to Amanda Fokey, Executive Director of the Woodson Research Laboratory — the aim is Rice linking across to Honeycomb and using it. The answers from the tech call feed the conversation with Amanda.\n\nLikely topics: how records are stored and protected, the three access tiers, what a researcher can and cannot get out of the archive, the tag-based kin sorting, and James's earlier question about AI-assisted search for researchers."
+  }
+]
