@@ -668,23 +668,45 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     window.addEventListener('resize', onR);
     return () => window.removeEventListener('resize', onR);
   }, []);
-  const size = t.cellSize, cx = size * 0.751, cy = size * 0.428;
-  const rows = Math.max(3, Math.floor((t.fieldHeight - size * 0.866) / cy) + 1);
-  const cols = Math.max(3, Math.floor((t.fieldWidth - size) / cx) + 1);
+  // On a phone the comb is not a canvas to pan around: it is a column as wide
+  // as the screen and as tall as the archive needs, scrolled like a page. A
+  // wide field on a narrow screen left most of the voices off the edge with
+  // nothing to say they were there.
+  const phone = vp[0] < 881;
+  const phoneCols = vp[0] < 400 ? 3 : vp[0] < 700 ? 4 : 5;
+  const size = phone
+    ? Math.min(t.cellSize, Math.floor((vp[0] - 36) / ((phoneCols - 1) * 0.751 + 1)))
+    : t.cellSize;
+  const cx = size * 0.751, cy = size * 0.428;
+  // the comb grows to hold every voice: enough cells that each community face
+  // and each approved story gets its own, whatever the cell-count slider says
+  const voices = faces.length + experiences.length;
+  const cellCount = Math.max(t.cellCount, Math.ceil(voices / Math.max(0.1, t.brightShare / 100)));
+  const cols = phone ? phoneCols : Math.max(3, Math.floor((t.fieldWidth - size) / cx) + 1);
+  // the lattice holds about cols*rows/2 cells; on a phone give it just enough
+  // rows for every cell plus the gaps, with a little slack so it can breathe
+  const rows = phone
+    ? Math.max(6, Math.ceil(((cellCount + (t.gaps || 0)) * 2 / cols) * 1.03) + 1)
+    : Math.max(3, Math.floor((t.fieldHeight - size * 0.866) / cy) + 1);
   const W = (cols - 1) * cx + size, H = (rows - 1) * cy + size;
   // the canvas may exceed the viewport in both axes; mouse near any edge pans
   // the field that way, and touch drags pan directly (applied via ref so
-  // panning skips re-renders)
-  const maxPanX = Math.max(0, (W - (vp[0] - 30)) / 2);
-  const maxPanY = Math.max(0, (H - (vp[1] - 30)) / 2);
+  // panning skips re-renders). Not on a phone, where the page scrolls instead.
+  const maxPanX = phone ? 0 : Math.max(0, (W - (vp[0] - 30)) / 2);
+  const maxPanY = phone ? 0 : Math.max(0, (H - (vp[1] - 30)) / 2);
   // with the story panel open the field is allowed to slide further than usual,
   // so the cell you clicked can clear the panel even on a small field
   const panelWidth = Math.min(vp[0] * 0.44, 704);
   const slack = panelOpen && vp[0] >= 881 ? panelWidth : 0;
   const fieldRef = useRef(null);
   const panRef = useRef({ x: 0, y: 0 });
+  const phoneRef = useRef(phone);
+  phoneRef.current = phone;
   const apply = useCallback(() => {
-    if (fieldRef.current) fieldRef.current.style.transform = `translate(calc(-50% + ${panRef.current.x}px), calc(-50% + ${panRef.current.y}px))`;
+    const el = fieldRef.current;
+    if (!el) return;
+    if (phoneRef.current) { el.style.transform = ''; return; }
+    el.style.transform = `translate(calc(-50% + ${panRef.current.x}px), calc(-50% + ${panRef.current.y}px))`;
   }, []);
   useEffect(() => {
     panRef.current.x = Math.max(-maxPanX - slack, Math.min(maxPanX + slack, panRef.current.x));
@@ -717,10 +739,10 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     raf = requestAnimationFrame(step);
     return () => { window.removeEventListener('mousemove', onMove); document.documentElement.removeEventListener('mouseleave', onLeave); cancelAnimationFrame(raf); };
   }, [maxPanX, maxPanY, panelOpen, apply]);
-  // touch: drag to pan
+  // touch: drag to pan (tablets and up — a phone scrolls the column natively)
   useEffect(() => {
     const el = fieldRef.current;
-    if (!el) return;
+    if (!el || phone) return;
     let start = null;
     const down = (e) => {
       if (e.pointerType !== 'touch') return;
@@ -741,11 +763,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     window.addEventListener('pointermove', move);
     window.addEventListener('pointerup', up);
     return () => { el.removeEventListener('pointerdown', down); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  }, [maxPanX, maxPanY, apply]);
-  // the comb grows to hold every voice: enough cells that each community face
-  // and each approved story gets its own, whatever the cell-count slider says
-  const voices = faces.length + experiences.length;
-  const cellCount = Math.max(t.cellCount, Math.ceil(voices / Math.max(0.1, t.brightShare / 100)));
+  }, [maxPanX, maxPanY, apply, phone]);
   const field = useMemo(
     () => genField(cols, rows, cellCount, t.distribution, t.brightShare, t.gaps, mulberry32(t.seed * 7919 + 13)),
     [cols, rows, cellCount, t.distribution, t.brightShare, t.gaps, t.seed]
@@ -978,10 +996,11 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
   };
   return (
     <div className={panelOpen ? 'arch arch--panel' : 'arch'}>
-      <div className="arch-clip" style={panelOpen ? { filter: 'brightness(0.83)' } : undefined}>
-        <div className="arch-field" ref={fieldRef}
+      <div className={phone ? 'arch-clip arch-clip--scroll' : 'arch-clip'} style={panelOpen ? { filter: 'brightness(0.83)' } : undefined}>
+        <div className={phone ? 'arch-field arch-field--column' : 'arch-field'} ref={fieldRef}
              style={{
-               width: W, height: H, transform: 'translate(-50%,-50%)', marginTop: 12,
+               width: W, height: H,
+               ...(phone ? { margin: '84px auto 60px' } : { transform: 'translate(-50%,-50%)', marginTop: 12 }),
                '--glow-fade': `${t.lightAfterglow ?? 520}ms`,
                '--glow-strength': (t.lightStrength ?? 70) / 100,
                '--cell-center': (t.cellCenter ?? 14) / 100,

@@ -103,6 +103,14 @@ button{font:inherit;color:inherit}
 .arch-clip::before{top:0;background:linear-gradient(180deg,rgba(13,8,6,0.92),transparent)}
 .arch-clip::after{bottom:0;background:linear-gradient(0deg,rgba(13,8,6,0.92),transparent)}
 .arch-field{position:absolute;left:50%;top:50%;z-index:4;touch-action:none}
+/* phone: the comb is a column the page scrolls, not a canvas to drag. The
+   edge fades ride along as sticky bands so the top and bottom of the scroll
+   still dissolve into the ground. */
+.arch-clip--scroll{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(242,191,73,.35) transparent}
+.arch-clip--scroll::before,.arch-clip--scroll::after{position:sticky;display:block;height:90px}
+.arch-clip--scroll::before{top:0;margin-bottom:-90px}
+.arch-clip--scroll::after{bottom:0;margin-top:-90px}
+.arch-field--column{position:relative;left:auto;top:auto;touch-action:pan-y;transform:none!important}
 .vine-sprite{position:absolute;width:0;height:0;pointer-events:none}
 /* max-width:none defeats the Tailwind preflight img reset, which would collapse
    the vine to 0px inside its zero-width anchor */
@@ -607,8 +615,19 @@ audio.story-media{max-height:none}
 .menu-button>span:after{position:absolute;top:4px}
 .site-header nav{position:absolute;top:68px;left:0;right:0;display:grid;gap:0;padding:10px 18px 17px;background:rgba(10,6,3,.97);border:1px solid var(--line);border-radius:7px;opacity:0;pointer-events:none;transform:translateY(-115%);transition:opacity .25s ease,transform .3s ease}
 .site-header nav.nav-open{opacity:1;pointer-events:auto;transform:translateY(0)}
-.site-header nav a,.site-header nav button{padding:13px 5px;text-align:left}
-.site-header nav .share-button{padding:13px 5px;border:0}
+/* the dropdown is a list of thumb targets, not the desktop bar squeezed down */
+.site-header nav a,.site-header nav button{padding:15px 8px;text-align:left;font-size:13px;letter-spacing:.15em;min-height:48px;
+  border-bottom:1px solid rgba(244,232,210,.08)}
+.site-header nav .share-button{padding:15px 8px;border:0;border-bottom:1px solid rgba(244,232,210,.08)}
+.site-header nav > :last-child{border-bottom:0}
+.menu-button{padding:13px 11px}
+.brand{gap:8px}
+/* the × sits under the header, and the eyebrow starts below the × */
+.close-panel{top:84px;right:14px}
+.story-content{padding-top:142px}
+.story-footer{padding:12px 25px 14px}
+/* nobody is tuning sliders on a phone, and the tab covered the field's edge */
+.twk-tab{display:none!important}
 .story-content{overflow-y:auto;overflow-x:hidden}
 .story-content h1{width:100%}
 .story-panel--about .story-content{padding-right:20px}
