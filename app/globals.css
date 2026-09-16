@@ -85,6 +85,39 @@ button{font:inherit;color:inherit}
 .hc-frame{position:absolute;inset:var(--frame-inset);border:var(--frame-border) solid var(--border-frame);border-radius:var(--radius-xl);pointer-events:none;z-index:50}
 .hc-texture{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.14;pointer-events:none}
 .hc-vignette{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 40%,transparent 40%,rgba(13,8,6,0.85) 100%);pointer-events:none}
+
+/* ── the gold-leaf ground ─────────────────────────────────────────────────
+   The cracked leather read brown, and brown read old. This ground is built
+   from light rather than from a photograph of a surface: a deep honey base,
+   a gold glow that comes down from the top the way the comb's own light
+   does, a faint hexagonal lattice so the ground and the comb are the same
+   geometry, and a fine grain so it is still a material and not a gradient.
+   No cracks, no leather, nothing that reads as a thing from a museum case. */
+.hc-page--modern{
+  background:
+    radial-gradient(135% 95% at 50% -12%, #573c12 0%, #33230b 42%, #1a120600 78%),
+    linear-gradient(180deg, #221708 0%, #1a1207 60%, #130d05 100%);
+}
+.hc-ground{position:absolute;inset:0;pointer-events:none;
+  /* lattice: pointy-top hexagons, r=60, tiled — one geometry, comb and ground */
+  --hc-lattice:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='104' height='180' viewBox='0 0 104 180'%3E%3Cg fill='none' stroke='rgb(255 210 130 / 0.065)' stroke-width='1.1'%3E%3Cpath d='M52 0L104 30L104 90L52 120L0 90L0 30Z'/%3E%3Cpath d='M0 90L52 120L52 180L0 210L-52 180L-52 120Z'/%3E%3Cpath d='M104 90L156 120L156 180L104 210L52 180L52 120Z'/%3E%3Cpath d='M0 -90L52 -60L52 0L0 30L-52 0L-52 -60Z'/%3E%3Cpath d='M104 -90L156 -60L156 0L104 30L52 0L52 -60Z'/%3E%3C/g%3E%3C/svg%3E");
+  background:
+    /* the gold coming down */
+    radial-gradient(72% 58% at 50% 0%, rgba(255,198,92,.46) 0%, rgba(236,156,44,.17) 42%, transparent 74%),
+    /* a second, lower light so the bottom is not dead */
+    radial-gradient(55% 42% at 82% 104%, rgba(224,140,40,.28) 0%, transparent 70%),
+    radial-gradient(48% 40% at 12% 96%, rgba(200,126,36,.20) 0%, transparent 70%),
+    var(--hc-lattice);
+  background-size:auto,auto,auto,104px 180px;
+  /* the lattice fades where the comb sits so it never fights the cells */
+  -webkit-mask-image:radial-gradient(90% 80% at 50% 50%, rgba(0,0,0,.72) 0%, #000 100%);
+  mask-image:radial-gradient(90% 80% at 50% 50%, rgba(0,0,0,.72) 0%, #000 100%);
+}
+.hc-grain{position:absolute;inset:0;pointer-events:none;opacity:.11;mix-blend-mode:overlay;
+  background:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='240' height='240' filter='url(%23g)'/%3E%3C/svg%3E");
+  background-size:240px 240px}
+/* the old vignette was tuned for cacao; on gold it only needs to hold the corners */
+.hc-page--modern .hc-vignette{background:radial-gradient(125% 95% at 50% 40%,transparent 52%,rgba(10,6,2,.7) 100%)}
 /* warmth: a golden wash over the ground, so the comb reads warm rather than cool-brown */
 .hc-warm{position:absolute;inset:0;pointer-events:none;mix-blend-mode:soft-light;
   background:radial-gradient(115% 85% at 50% 32%,rgba(255,196,96,0.95),rgba(255,158,46,0.42) 45%,rgba(255,140,30,0.12) 70%,transparent 88%)}

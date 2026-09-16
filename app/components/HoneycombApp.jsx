@@ -42,6 +42,9 @@ const TWEAK_DEFAULTS = {
   cellOpacity: 92,
   dormantBright: 85,
   ground: '#1A1210',
+  // 'Gold leaf' builds the ground from light — honey base, gold from above,
+  // a faint hex lattice, fine grain. 'Archive texture' is the cracked leather.
+  groundStyle: 'Gold leaf',
   backdrop: 'Archive texture',
   textureOpacity: 34,
   warmth: 38,
@@ -1161,14 +1164,23 @@ export default function HoneycombApp() {
   const page = PAGES.find((p) => p.id === pageId) || null;
   const panelOpen = Boolean(page || person);
 
+  const goldGround = (t.groundStyle || 'Gold leaf') === 'Gold leaf';
+
   return (
-    <div className="hc-page" style={{
-      background: t.ground,
+    <div className={goldGround ? 'hc-page hc-page--modern' : 'hc-page'} style={{
+      ...(goldGround ? {} : { background: t.ground }),
       '--cell-opacity': (t.cellOpacity ?? 90) / 100,
       '--dormant-brightness': (t.dormantBright ?? 72) / 100,
       '--face-opacity': t.showFaces ? 1 : 0,
     }}>
-      <img src={BACKDROPS[t.backdrop] || BACKDROPS['Archive texture']} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
+      {goldGround ? (
+        <>
+          <div className="hc-ground" aria-hidden="true" />
+          <div className="hc-grain" aria-hidden="true" />
+        </>
+      ) : (
+        <img src={BACKDROPS[t.backdrop] || BACKDROPS['Archive texture']} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
+      )}
       {t.vignette && <div className="hc-vignette"></div>}
       {(t.warmth ?? 0) > 0 && <div className="hc-warm" style={{ opacity: (t.warmth ?? 0) / 100 }} aria-hidden="true"></div>}
       <div className="hc-view" style={{ opacity: view === 'gate' ? 1 : 0, pointerEvents: view === 'gate' ? 'auto' : 'none' }}>
@@ -1224,7 +1236,8 @@ export default function HoneycombApp() {
         <TweakSlider label="Push distance" value={t.push} min={40} max={340} unit="px" onChange={(v) => setTweak('push', v)} />
         <TweakToggle label="Dormant cells respond" value={t.dormantRespond} onChange={(v) => setTweak('dormantRespond', v)} />
         <TweakSection label="Background" />
-        <TweakColor label="Ground" value={t.ground} options={['#0D0806', '#1A1210', '#241711', '#2E1C12']} onChange={(v) => setTweak('ground', v)} />
+        <TweakRadio label="Ground" value={t.groundStyle || 'Gold leaf'} options={['Gold leaf', 'Archive texture']} onChange={(v) => setTweak('groundStyle', v)} />
+        <TweakColor label="Ground colour (texture only)" value={t.ground} options={['#0D0806', '#1A1210', '#241711', '#2E1C12']} onChange={(v) => setTweak('ground', v)} />
         <TweakSelect label="Texture image" value={t.backdrop} options={Object.keys(BACKDROPS)} onChange={(v) => setTweak('backdrop', v)} />
         <TweakSlider label="Texture" value={t.textureOpacity} min={0} max={70} unit="%" onChange={(v) => setTweak('textureOpacity', v)} />
         <TweakSlider label="Warmth" value={t.warmth ?? 0} min={0} max={100} unit="%" onChange={(v) => setTweak('warmth', v)} />
