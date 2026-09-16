@@ -340,6 +340,57 @@ function Cells({ list, size }) {
   ));
 }
 
+// ── the comb mark, as a magnifier ───────────────────────────────────────────
+// The sixteen cells of the watermark, drawn one by one so they can move. On
+// hover they leave their places and gather onto the rim of a single thick
+// hexagon at the centre of the mark — the lens — and a handle draws out from
+// its lower edge. The comb becomes the glass rather than being covered by one.
+
+const COMB_CELLS = [
+  [115, 250], [115, 400], [250, 325], [250, 475],
+  [385, 100], [385, 250], [385, 400],
+  [520, 175], [520, 325],
+  [655, 100], [655, 250], [655, 400],
+  [790, 175], [790, 325], [790, 475],
+  [925, 250],
+];
+const LENS = { x: 520, y: 290, r: 150 };
+const hexPoints = (cx, cy, r) => {
+  const h = r * 0.8333; // the watermark's cells are 180 wide by 150 tall
+  return `${cx + r},${cy} ${cx + r / 2},${cy + h} ${cx - r / 2},${cy + h} ${cx - r},${cy} ${cx - r / 2},${cy - h} ${cx + r / 2},${cy - h}`;
+};
+const COMB_TARGETS = COMB_CELLS.map(([cx, cy]) => {
+  // each cell heads for the point on the lens rim that lies in its own
+  // direction from the centre, so the ring is made of the cells arriving
+  const a = Math.atan2((cy - LENS.y) * 1.6, cx - LENS.x); // the mark is wide; stretch y so the ring fills evenly
+  const dist = Math.hypot(cx - LENS.x, cy - LENS.y);
+  return {
+    dx: LENS.x + Math.cos(a) * LENS.r - cx,
+    dy: LENS.y + Math.sin(a) * LENS.r * 0.87 - cy,
+    delay: Math.round((dist / 480) * 110),
+  };
+});
+
+function CombMark() {
+  const hp = LENS.r * 0.87;
+  return (
+    <svg className="comb-mark" viewBox="0 0 1040 575" aria-hidden="true" focusable="false">
+      <g className="cm-cells" fill="none" stroke="#E3A444" strokeWidth="11" strokeLinejoin="round">
+        {COMB_CELLS.map(([cx, cy], i) => (
+          <polygon
+            key={i} className="cm-cell" points={hexPoints(cx, cy, 90)}
+            style={{ '--dx': `${COMB_TARGETS[i].dx.toFixed(1)}px`, '--dy': `${COMB_TARGETS[i].dy.toFixed(1)}px`, '--d': `${COMB_TARGETS[i].delay}ms` }}
+          />
+        ))}
+      </g>
+      <g className="cm-glass" fill="none" stroke="#F2BF49" strokeLinejoin="round" strokeLinecap="round">
+        <polygon className="cm-lens" points={`${LENS.x + LENS.r},${LENS.y} ${LENS.x + LENS.r / 2},${LENS.y + hp} ${LENS.x - LENS.r / 2},${LENS.y + hp} ${LENS.x - LENS.r},${LENS.y} ${LENS.x - LENS.r / 2},${LENS.y - hp} ${LENS.x + LENS.r / 2},${LENS.y - hp}`} />
+        <line className="cm-handle" x1={LENS.x + LENS.r / 2 + 8} y1={LENS.y + hp + 6} x2={LENS.x + LENS.r / 2 + 150} y2={LENS.y + hp + 128} pathLength="1" />
+      </g>
+    </svg>
+  );
+}
+
 // ── topbar (from the projecthoneycomb.site deploy) ──────────────────────────
 
 function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autohide, keepVisible, session, onSignOut }) {
@@ -398,8 +449,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
           aria-label="Search the archive" aria-expanded={searchOpen || Boolean(query)}
           onClick={() => openSearch(!(searchOpen || query))}
         >
-          <img src="/hc-connected-field-watermark.svg" alt="" />
-          <span className="orb-glass" aria-hidden="true">⌕</span>
+          <CombMark />
         </button>
         <button className="brand-word" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
           HONEYCOMB

@@ -351,16 +351,34 @@ button{font:inherit;color:inherit}
 .brand{position:relative;gap:15px}
 .search-orb{position:relative;display:grid;place-items:center;padding:0;border:0;background:transparent;cursor:pointer;
   border-radius:10px;transition:filter .25s var(--ease-quiet)}
-.search-orb img{transition:opacity .25s var(--ease-quiet),filter .25s var(--ease-quiet)}
-.orb-glass{position:absolute;inset:0;display:grid;place-items:center;pointer-events:none;
-  font-size:26px;line-height:1;color:var(--gold);opacity:0;transform:scale(.82);
-  text-shadow:0 0 18px rgba(242,191,73,.75),0 0 42px rgba(242,191,73,.35);
-  transition:opacity .25s var(--ease-quiet),transform .25s var(--ease-quiet)}
-.search-orb:hover img,.search-orb:focus-visible img,
-.brand--searching .search-orb img{opacity:.28;filter:saturate(.7)}
-.search-orb:hover .orb-glass,.search-orb:focus-visible .orb-glass,
-.brand--searching .orb-glass{opacity:1;transform:scale(1)}
-.search-orb:hover,.search-orb:focus-visible{filter:drop-shadow(0 0 16px rgba(242,191,73,.3));outline:none}
+.comb-mark{display:block;overflow:visible;filter:drop-shadow(0 0 12px rgba(242,191,73,.2))}
+/* The sixteen cells sit where the watermark drew them. On hover each one
+   travels to its own place on the rim of the lens and shrinks as it goes, so
+   the comb is seen gathering into the glass rather than being replaced by it.
+   Far cells start a beat later and arrive last, which is what coalescing looks
+   like. The lens rim thickens as they land; the handle draws out after. */
+.cm-cell{transform-box:fill-box;transform-origin:center;
+  transition:transform .55s cubic-bezier(.4,.05,.2,1) var(--d,0ms),opacity .35s ease calc(var(--d,0ms) + .18s),
+             stroke-width .4s ease var(--d,0ms)}
+.cm-lens{transform-box:fill-box;transform-origin:center;opacity:0;transform:scale(.62);stroke-width:12;
+  transition:opacity .3s ease .05s,transform .5s cubic-bezier(.3,.1,.2,1) .05s,stroke-width .45s ease .22s}
+.cm-handle{stroke-width:30;stroke-dasharray:1;stroke-dashoffset:1;opacity:0;
+  transition:stroke-dashoffset .3s cubic-bezier(.4,0,.2,1) .05s,opacity .1s ease .05s}
+:is(.search-orb:hover,.search-orb:focus-visible,.brand--searching .search-orb) .cm-cell{
+  transform:translate(var(--dx),var(--dy)) scale(.38);opacity:.22;stroke-width:16}
+:is(.search-orb:hover,.search-orb:focus-visible,.brand--searching .search-orb) .cm-lens{
+  opacity:1;transform:scale(1);stroke-width:30;transition-delay:.12s,.12s,.3s}
+:is(.search-orb:hover,.search-orb:focus-visible,.brand--searching .search-orb) .cm-handle{
+  stroke-dashoffset:0;opacity:1;transition-delay:.42s,.42s}
+:is(.search-orb:hover,.search-orb:focus-visible,.brand--searching .search-orb) .comb-mark{
+  filter:drop-shadow(0 0 14px rgba(242,191,73,.55))}
+.search-orb:hover,.search-orb:focus-visible{outline:none}
+/* on the way back the lens should let go first and the cells return together */
+.search-orb:not(:hover):not(:focus-visible) .cm-cell{transition-delay:.08s,0ms,.08s}
+.brand--searching .search-orb:not(:hover) .cm-cell{transition-delay:var(--d,0ms),calc(var(--d,0ms) + .18s),var(--d,0ms)}
+@media (prefers-reduced-motion:reduce){
+  .cm-cell,.cm-lens,.cm-handle{transition-duration:.01s!important;transition-delay:0s!important}
+}
 .brand-word{padding:0;border:0;background:transparent;color:var(--gold);cursor:pointer;
   font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em;
   transition:color .2s ease,opacity .25s var(--ease-quiet)}
@@ -411,7 +429,7 @@ button{font:inherit;color:inherit}
 /* .brand is now a wrapper around two separate controls — the comb (search) and
    the wordmark (home) — so the type styling lives on .brand-word instead */
 .brand{gap:15px;padding:0;border:0;background:transparent;color:var(--gold);text-decoration:none;font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em}
-.brand img{width:76px;height:42px;object-fit:contain;filter:drop-shadow(0 0 12px rgba(242,191,73,.2))}
+.brand .comb-mark{width:76px;height:42px}
 .site-header nav{margin-left:auto;display:flex;align-items:center;gap:clamp(22px,2.5vw,42px)}
 .site-header nav a,.site-header nav button{border:0;padding:0;color:var(--cream);background:transparent;text-decoration:none;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;letter-spacing:.13em;cursor:pointer;transition:color .2s ease}
 .site-header nav a:focus-visible,.site-header nav a:hover,.site-header nav button:focus-visible,.site-header nav button:hover{color:var(--gold)}
@@ -546,8 +564,9 @@ audio.story-media{max-height:none}
 .site-search{position:static;transform:none;margin-left:auto;pointer-events:auto;z-index:auto}
 .brand--searching~.site-search,.site-search.is-open{left:auto}
 .site-search .search-input,.site-search.is-open .search-input{width:auto;opacity:1;transition:none}
-.orb-glass{display:none}
-.search-orb img{opacity:1!important;filter:none!important}
+.cm-cell{transform:none!important;opacity:1!important;stroke-width:11!important;transition:none!important}
+.cm-glass{display:none}
+.comb-mark{filter:drop-shadow(0 0 12px rgba(242,191,73,.2))!important}
 .brand--searching .brand-word{opacity:1;pointer-events:auto}
 .site-search::before{display:none}
 .search-toggle{display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid rgba(242,191,73,.4);
@@ -560,7 +579,7 @@ audio.story-media{max-height:none}
 .site-search.is-open .search-count{position:fixed;top:88px;right:26px;transform:none;z-index:32}
 .site-search.is-open .search-clear{position:fixed;top:78px;right:20px;transform:none;z-index:32}
 .brand{gap:9px;font-size:clamp(9px,1.5vw,12px);letter-spacing:.11em}
-.brand img{width:54px;height:30px}
+.brand .comb-mark{width:54px;height:30px}
 .site-header nav{gap:clamp(9px,2vw,18px)}
 .site-header nav a,.site-header nav button{font-size:clamp(7px,1.15vw,9px);letter-spacing:.09em;white-space:nowrap}
 .site-header nav .share-button{padding:11px 12px}
