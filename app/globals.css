@@ -102,15 +102,20 @@ button{font:inherit;color:inherit}
 .arch-clip::before,.arch-clip::after{content:"";position:absolute;left:0;right:0;height:110px;z-index:6;pointer-events:none}
 .arch-clip::before{top:0;background:linear-gradient(180deg,rgba(13,8,6,0.92),transparent)}
 .arch-clip::after{bottom:0;background:linear-gradient(0deg,rgba(13,8,6,0.92),transparent)}
-.arch-field{position:absolute;left:50%;top:50%;z-index:4;touch-action:none}
-/* phone: the comb is a column the page scrolls, not a canvas to drag. The
-   edge fades ride along as sticky bands so the top and bottom of the scroll
-   still dissolve into the ground. */
-.arch-clip--scroll{overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:rgba(242,191,73,.35) transparent}
-.arch-clip--scroll::before,.arch-clip--scroll::after{position:sticky;display:block;height:90px}
+/* The frame scrolls. The comb is laid out in flow inside it, centred when it
+   fits and reachable by wheel, trackpad, touch or the scrollbar when it does
+   not — the thin one the pull-out panels already use, so the two read as the
+   same control. The edge fades ride along as sticky bands so the top and
+   bottom of the scroll still dissolve into the ground. */
+.arch-clip--scroll{overflow:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
+  scrollbar-width:thin;scrollbar-color:rgba(242,191,73,.42) transparent;scrollbar-gutter:stable}
+.arch-clip--scroll::-webkit-scrollbar{width:7px;height:7px}
+.arch-clip--scroll::-webkit-scrollbar-thumb{background:rgba(242,191,73,.42);border-radius:7px}
+.arch-clip--scroll::-webkit-scrollbar-track{background:transparent}
+.arch-clip--scroll::before,.arch-clip--scroll::after{position:sticky;display:block;height:90px;left:0;right:0}
 .arch-clip--scroll::before{top:0;margin-bottom:-90px}
 .arch-clip--scroll::after{bottom:0;margin-top:-90px}
-.arch-field--column{position:relative;left:auto;top:auto;touch-action:pan-y;transform:none!important}
+.arch-field{position:relative;z-index:4;touch-action:pan-x pan-y;transition:transform 720ms var(--ease-quiet)}
 .vine-sprite{position:absolute;width:0;height:0;pointer-events:none}
 /* max-width:none defeats the Tailwind preflight img reset, which would collapse
    the vine to 0px inside its zero-width anchor */
@@ -130,7 +135,11 @@ button{font:inherit;color:inherit}
 .hexcell img{width:100%;display:block}
 .hexcell > img:not(.cell-face){opacity:var(--cell-opacity,0.9)}
 .hexcell{container-type:inline-size}
-.hexcell .cell-face{position:absolute;left:11%;top:11%;width:78%;pointer-events:none;
+/* z-index 2: above the warm pool (1), below the glaze (3). The pool used to
+   paint over the portrait, which is what was muting faces as the light passed
+   — a wash of amber laid across a photograph reads as a photograph gone flat.
+   Now the pool lights the wax around the face and the glaze alone touches it. */
+.hexcell .cell-face{position:absolute;left:11%;top:11%;width:78%;z-index:2;pointer-events:none;
   opacity:var(--face-opacity,1);transition:opacity var(--dur-grow) var(--ease-quiet)}
 /* "Faces always visible" off = faces reveal on hover/focus instead of vanishing */
 .hexcell:hover .cell-face,.hexcell:focus-visible .cell-face,.hexcell.cell-focus .cell-face{opacity:1}
@@ -258,10 +267,16 @@ button{font:inherit;color:inherit}
      never even. Static data URI, so it costs one rasterisation and nothing per
      frame. Alpha is held between 0.45 and 1 so it thins the glaze rather than
      punching holes in it. */
-  -webkit-mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
-  mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
-  -webkit-mask-size:100% 100%,150% 150%;
-  mask-size:100% 100%,150% 150%;
+  /* A third mask thins the film over the middle of the cell, where the
+     portrait is, to about a third of its strength at the frame. The wax
+     around a face catches the light fully; the face itself is only touched.
+     "Lighter touch on faces" from the first light review, done properly. */
+  -webkit-mask-image:url('/assets/cell-bright.png'),var(--wax-noise),
+    radial-gradient(circle at 50% 46%,rgba(0,0,0,.32) 0%,rgba(0,0,0,.42) 30%,#000 52%);
+  mask-image:url('/assets/cell-bright.png'),var(--wax-noise),
+    radial-gradient(circle at 50% 46%,rgba(0,0,0,.32) 0%,rgba(0,0,0,.42) 30%,#000 52%);
+  -webkit-mask-size:100% 100%,150% 150%,100% 100%;
+  mask-size:100% 100%,150% 150%,100% 100%;
   -webkit-mask-composite:source-in;
   mask-composite:intersect;
   mix-blend-mode:screen;
@@ -327,7 +342,6 @@ button{font:inherit;color:inherit}
 .cell-unmatched{opacity:0.3;filter:saturate(0.55) brightness(0.7)}
 .cell,.cell-unmatched{transition:left 640ms var(--ease-quiet),top 640ms var(--ease-quiet),opacity 420ms var(--ease-quiet),filter 420ms var(--ease-quiet)}
 .hexcell.cell-match{filter:drop-shadow(0 0 24px rgba(240,168,60,0.62))}
-.arch-field--ease{transition:transform 720ms var(--ease-quiet)}
 /* raw photos (approved submissions) get the hex mask via CSS since they lack baked-in alpha */
 .hexcell .cell-face-photo{aspect-ratio:749/631;object-fit:cover;clip-path:polygon(25% 2%,75% 2%,98% 50%,75% 98%,25% 98%,2% 50%)}
 @media (max-height:760px){.gate-title{font-size:44px}.gate-eyebrow{margin-top:20px}}
@@ -356,22 +370,55 @@ button{font:inherit;color:inherit}
    Hovering the mark brings up a magnifier over it, so the thing the site is
    for is announced by the thing the site is named after. The wordmark beside
    it is the home link. */
-.brand{position:relative;gap:15px}
+.brand{position:relative}
 .search-orb{position:relative;display:grid;place-items:center;padding:0;border:0;background:transparent;cursor:pointer;
   border-radius:10px;transition:filter .25s var(--ease-quiet)}
 .comb-mark{display:block;overflow:visible;filter:drop-shadow(0 0 12px rgba(242,191,73,.2))}
-/* The sixteen cells sit where the watermark drew them. On hover each one
-   travels to its own place on the rim of the lens and shrinks as it goes, so
-   the comb is seen gathering into the glass rather than being replaced by it.
-   Far cells start a beat later and arrive last, which is what coalescing looks
-   like. The lens rim thickens as they land; the handle draws out after. */
+/* The sixteen cells sit where the watermark drew them. Every few seconds — and
+   whenever the pointer rests on it — each one travels to its own place on the
+   rim of the lens and shrinks as it goes, so the comb is seen gathering into
+   the glass rather than being replaced by one. Far cells start a beat later
+   and arrive last, which is what coalescing looks like. The lens rim thickens
+   as they land; the handle draws out after.
+
+   The idle cycle is a keyframe animation with no fill, delayed a few seconds:
+   while it waits, the element sits at its plain styles, which is also where
+   the cycle starts and ends, so nothing ever jumps. Hover and the open search
+   turn the animation off and hold the gathered state through transitions, and
+   because the animation only restarts after its delay, the release back to
+   rest is a transition too. */
 .cm-cell{transform-box:fill-box;transform-origin:center;
   transition:transform .55s cubic-bezier(.4,.05,.2,1) var(--d,0ms),opacity .35s ease calc(var(--d,0ms) + .18s),
-             stroke-width .4s ease var(--d,0ms)}
+             stroke-width .4s ease var(--d,0ms);
+  animation:cm-cell-gather 9s cubic-bezier(.4,.05,.2,1) calc(2.6s + var(--d,0ms)) infinite}
 .cm-lens{transform-box:fill-box;transform-origin:center;opacity:0;transform:scale(.62);stroke-width:12;
-  transition:opacity .3s ease .05s,transform .5s cubic-bezier(.3,.1,.2,1) .05s,stroke-width .45s ease .22s}
+  transition:opacity .3s ease .05s,transform .5s cubic-bezier(.3,.1,.2,1) .05s,stroke-width .45s ease .22s;
+  animation:cm-lens-gather 9s cubic-bezier(.3,.1,.2,1) 2.6s infinite}
 .cm-handle{stroke-width:30;stroke-dasharray:1;stroke-dashoffset:1;opacity:0;
-  transition:stroke-dashoffset .3s cubic-bezier(.4,0,.2,1) .05s,opacity .1s ease .05s}
+  transition:stroke-dashoffset .3s cubic-bezier(.4,0,.2,1) .05s,opacity .1s ease .05s;
+  animation:cm-handle-gather 9s cubic-bezier(.4,0,.2,1) 2.6s infinite}
+/* 9s: gather over ~.7s, hold for ~2s, release over ~.7s, rest for the remainder */
+@keyframes cm-cell-gather{
+  0%{transform:none;opacity:1;stroke-width:11}
+  8%{transform:translate(var(--dx),var(--dy)) scale(.38);opacity:.22;stroke-width:16}
+  30%{transform:translate(var(--dx),var(--dy)) scale(.38);opacity:.22;stroke-width:16}
+  38%,100%{transform:none;opacity:1;stroke-width:11}
+}
+@keyframes cm-lens-gather{
+  0%,3%{opacity:0;transform:scale(.62);stroke-width:12}
+  9%{opacity:1;transform:scale(1);stroke-width:22}
+  12%{stroke-width:30}
+  30%{opacity:1;transform:scale(1);stroke-width:30}
+  36%,100%{opacity:0;transform:scale(.62);stroke-width:12}
+}
+@keyframes cm-handle-gather{
+  0%,10%{stroke-dashoffset:1;opacity:0}
+  11%{opacity:1}
+  15%{stroke-dashoffset:0;opacity:1}
+  29%{stroke-dashoffset:0;opacity:1}
+  32%,100%{stroke-dashoffset:1;opacity:0}
+}
+:is(.search-orb:hover,.search-orb:focus-visible,.brand--searching .search-orb) :is(.cm-cell,.cm-lens,.cm-handle){animation:none}
 :is(.search-orb:hover,.search-orb:focus-visible,.brand--searching .search-orb) .cm-cell{
   transform:translate(var(--dx),var(--dy)) scale(.38);opacity:.22;stroke-width:16}
 :is(.search-orb:hover,.search-orb:focus-visible,.brand--searching .search-orb) .cm-lens{
@@ -385,27 +432,27 @@ button{font:inherit;color:inherit}
 .search-orb:not(:hover):not(:focus-visible) .cm-cell{transition-delay:.08s,0ms,.08s}
 .brand--searching .search-orb:not(:hover) .cm-cell{transition-delay:var(--d,0ms),calc(var(--d,0ms) + .18s),var(--d,0ms)}
 @media (prefers-reduced-motion:reduce){
-  .cm-cell,.cm-lens,.cm-handle{transition-duration:.01s!important;transition-delay:0s!important}
+  .cm-cell,.cm-lens,.cm-handle{transition-duration:.01s!important;transition-delay:0s!important;animation:none!important}
 }
 .brand-word{padding:0;border:0;background:transparent;color:var(--gold);cursor:pointer;
   font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em;
   transition:color .2s ease,opacity .25s var(--ease-quiet)}
 .brand-word:hover,.brand-word:focus-visible{color:var(--hc-gold-bright);outline:none}
 
-/* The field grows out to the right of the comb rather than living in the middle
-   of the bar, so it never runs into the nav or the slide-outs on that side. */
-.site-search{position:absolute;left:0;top:50%;transform:translateY(-50%);
+/* The comb sits in the middle of the bar; the field grows out to its left,
+   toward the wordmark, which steps back while the search is open. The nav on
+   the right and the slide-outs on the left are never in its way. */
+.site-search{position:absolute;right:calc(50% + 38px + 16px);left:auto;top:50%;transform:translateY(-50%);
   display:flex;align-items:center;gap:6px;margin-left:0;pointer-events:none;z-index:2}
 .site-search::before{opacity:0;transition:opacity .2s ease}
 .site-search.is-open{pointer-events:auto}
 .site-search.is-open::before{opacity:1}
-.brand--searching~.site-search,.site-search.is-open{left:calc(76px + 18px)}
 .site-search .search-input{width:0;opacity:0;padding-left:0;border-color:transparent;background:transparent;
   transition:width .34s var(--ease-quiet),opacity .24s var(--ease-quiet),padding .34s var(--ease-quiet)}
 .site-search.is-open .search-input{width:clamp(210px,24vw,340px);opacity:1;padding:0 54px 0 30px;
   border-color:rgba(242,191,73,.55);background:rgba(255,255,255,.07)}
 /* while searching, the wordmark steps back so the field has the room */
-.brand--searching .brand-word{opacity:0;pointer-events:none}
+.site-header--searching .brand-word{opacity:0;pointer-events:none}
 .site-search::before{content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);
   color:rgba(242,191,73,.8);font-size:16px;line-height:1;pointer-events:none}
 .search-toggle{display:none}
@@ -434,9 +481,10 @@ button{font:inherit;color:inherit}
 .community-badge{display:inline-block;margin-left:10px;padding:3px 7px;border:1px solid rgba(242,191,73,.45);
   border-radius:2px;color:var(--gold);font-size:8px;letter-spacing:.14em;vertical-align:middle}
 .brand,.site-header{display:flex;align-items:center}
-/* .brand is now a wrapper around two separate controls — the comb (search) and
-   the wordmark (home) — so the type styling lives on .brand-word instead */
-.brand{gap:15px;padding:0;border:0;background:transparent;color:var(--gold);text-decoration:none;font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em}
+/* three things in the bar: the wordmark (home) on the left, the comb (search)
+   dead centre, the nav on the right. A three-column grid keeps the comb on the
+   centre line whatever the other two weigh. */
+.brand{padding:0;border:0;background:transparent;color:var(--gold);text-decoration:none;font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em}
 .brand .comb-mark{width:76px;height:42px}
 .site-header nav{margin-left:auto;display:flex;align-items:center;gap:clamp(22px,2.5vw,42px)}
 .site-header nav a,.site-header nav button{border:0;padding:0;color:var(--cream);background:transparent;text-decoration:none;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;letter-spacing:.13em;cursor:pointer;transition:color .2s ease}
@@ -444,6 +492,20 @@ button{font:inherit;color:inherit}
 .site-header nav .share-button{padding:15px 21px;border:1px solid rgba(242,191,73,.82);border-radius:3px;color:var(--gold);transition:color .2s ease,background .2s ease}
 .site-header nav .share-button:focus-visible,.site-header nav .share-button:hover{color:var(--ink);background:var(--gold)}
 .menu-button{display:none}
+/* three things in the bar: the wordmark (home) on the left, the comb (search)
+   dead centre, the nav on the right. A three-column grid keeps the comb on the
+   centre line whatever the other two weigh. */
+@media (min-width:881px){
+  .site-header{display:grid;grid-template-columns:1fr auto 1fr;align-items:center}
+  .brand-word{justify-self:start}
+  .brand{justify-self:center;padding:0 22px}
+  .site-header nav{justify-self:end}
+}
+/* mid widths: the nav tightens so it never crowds the comb on the centre line */
+@media (min-width:881px) and (max-width:1220px){
+  .site-header nav{gap:clamp(12px,1.6vw,22px)}
+  .site-header nav .share-button{padding:12px 14px}
+}
 
 /* ─────────── story panel slideout (projecthoneycomb.site deploy) ─────────── */
 
@@ -566,16 +628,22 @@ audio.story-media{max-height:none}
   background:rgba(18,9,5,.97)}
 /* the bar never hides on touch — there is no hover to bring it back */
 .site-header--tucked{transform:translateZ(0);opacity:1;pointer-events:auto}
+/* the comb is a column: vertical scroll only, and vines past the right edge
+   must not open a sideways scroll */
+.arch-clip--scroll{overflow-x:hidden}
+.arch-field{touch-action:pan-y}
 .topbar-peek{display:none}
 /* the comb-as-search behaviour is a pointer idea; on touch the bar keeps its
    own magnifier button and the field drops below the header as before */
 .site-search{position:static;transform:none;margin-left:auto;pointer-events:auto;z-index:auto}
 .brand--searching~.site-search,.site-search.is-open{left:auto}
 .site-search .search-input,.site-search.is-open .search-input{width:auto;opacity:1;transition:none}
-.cm-cell{transform:none!important;opacity:1!important;stroke-width:11!important;transition:none!important}
+.cm-cell{transform:none!important;opacity:1!important;stroke-width:11!important;transition:none!important;animation:none!important}
 .cm-glass{display:none}
 .comb-mark{filter:drop-shadow(0 0 12px rgba(242,191,73,.2))!important}
-.brand--searching .brand-word{opacity:1;pointer-events:auto}
+.site-header--searching .brand-word{opacity:1;pointer-events:auto}
+/* comb first, then the wordmark, as it was */
+.brand{order:-1;margin-right:9px}
 .site-search::before{display:none}
 .search-toggle{display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid rgba(242,191,73,.4);
   border-radius:3px;background:transparent;color:var(--gold);font-size:18px;line-height:1;cursor:pointer}

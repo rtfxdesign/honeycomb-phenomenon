@@ -438,11 +438,16 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
   return (
     <>
       {hidden && <div className="topbar-peek" aria-hidden="true" />}
-      <header className={`site-header${hidden ? ' site-header--tucked' : ''}`}>
-      {/* The comb itself is the way into search — it is the main thing the site
-          does, so it gets the most recognisable mark rather than a small icon
-          parked in a corner. The wordmark beside it carries HOME, which is why
-          HOME is no longer a separate nav item. */}
+      <header className={`site-header${hidden ? ' site-header--tucked' : ''}${searchOpen || query ? ' site-header--searching' : ''}`}>
+      {/* The wordmark on the left is the home link, which is why HOME is no
+          longer a nav item. The comb sits in the middle of the bar on its own
+          and is the way into search — it is the main thing the site does, so
+          it gets the most recognisable mark, centred, and it gathers itself
+          into a magnifying glass every few seconds so nobody has to hover to
+          find that out. */}
+      <button className="brand-word" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
+        HONEYCOMB
+      </button>
       <div className={`brand${searchOpen || query ? ' brand--searching' : ''}`}>
         <button
           className="search-orb" type="button"
@@ -450,9 +455,6 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
           onClick={() => openSearch(!(searchOpen || query))}
         >
           <CombMark />
-        </button>
-        <button className="brand-word" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
-          HONEYCOMB
         </button>
       </div>
       <div className={`site-search${searchOpen || query ? ' is-open' : ''}`}>
@@ -689,48 +691,49 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     ? Math.max(6, Math.ceil(((cellCount + (t.gaps || 0)) * 2 / cols) * 1.03) + 1)
     : Math.max(3, Math.floor((t.fieldHeight - size * 0.866) / cy) + 1);
   const W = (cols - 1) * cx + size, H = (rows - 1) * cy + size;
-  // the canvas may exceed the viewport in both axes; mouse near any edge pans
-  // the field that way, and touch drags pan directly (applied via ref so
-  // panning skips re-renders). Not on a phone, where the page scrolls instead.
-  const maxPanX = phone ? 0 : Math.max(0, (W - (vp[0] - 30)) / 2);
-  const maxPanY = phone ? 0 : Math.max(0, (H - (vp[1] - 30)) / 2);
-  // with the story panel open the field is allowed to slide further than usual,
-  // so the cell you clicked can clear the panel even on a small field
-  const panelWidth = Math.min(vp[0] * 0.44, 704);
-  const slack = panelOpen && vp[0] >= 881 ? panelWidth : 0;
+  // The field is a real scrolling area. It used to be a canvas moved by a
+  // transform — panned by the mouse near an edge, dragged on touch — and
+  // nobody in the reviews found either, because nothing said the comb went
+  // on past the frame. Now the frame scrolls: the wheel and the trackpad
+  // work, touch drags work, and there is a thin scrollbar on each axis that
+  // says how much more there is. The edge-of-screen drift is kept as a
+  // convenience on top; it just moves the scroll position now.
+  const clipRef = useRef(null);
   const fieldRef = useRef(null);
-  const panRef = useRef({ x: 0, y: 0 });
-  const phoneRef = useRef(phone);
-  phoneRef.current = phone;
-  const apply = useCallback(() => {
+  // with the story panel open the field is allowed to slide further than the
+  // scroll range, so the cell you clicked can clear the panel even on a small
+  // field. That extra is a transform on top of the scroll, and it eases back.
+  const panelWidth = Math.min(vp[0] * 0.44, 704);
+  const clipH = vp[1] - 30;
+  // start in the middle of the comb on a desktop; at the top on a phone
+  useEffect(() => {
+    const clip = clipRef.current;
+    if (!clip) return;
     const el = fieldRef.current;
-    if (!el) return;
-    if (phoneRef.current) { el.style.transform = ''; return; }
-    el.style.transform = `translate(calc(-50% + ${panRef.current.x}px), calc(-50% + ${panRef.current.y}px))`;
-  }, []);
+    if (phone) { clip.scrollTop = 0; clip.scrollLeft = 0; return; }
+    // centre on the comb itself, not on the scroll range — vines hanging past
+    // the field's edge add a little range beyond it
+    clip.scrollLeft = Math.max(0, (el ? el.offsetLeft : 0) + (W - clip.clientWidth) / 2);
+    clip.scrollTop = Math.max(0, (el ? el.offsetTop : 0) + (H - clip.clientHeight) / 2);
+  }, [W, H, phone]);
+  // desktop: the pointer near an edge of the screen drifts the scroll that way
   useEffect(() => {
-    panRef.current.x = Math.max(-maxPanX - slack, Math.min(maxPanX + slack, panRef.current.x));
-    panRef.current.y = Math.max(-maxPanY, Math.min(maxPanY, panRef.current.y));
-    apply();
-  });
-  // desktop: mouse-edge auto panning
-  useEffect(() => {
+    if (phone) return undefined;
     const mouse = { x: -1, y: -1, on: false };
     const onMove = (e) => { mouse.x = e.clientX; mouse.y = e.clientY; mouse.on = !(e.target.closest && e.target.closest('.twk-panel,.twk-tab,.site-header,.story-panel,.modal-backdrop')); };
     const onLeave = () => { mouse.on = false; };
     let raf;
     const ZONE = 90;
     const step = () => {
-      if (mouse.on && !panelOpen && (maxPanX > 0 || maxPanY > 0)) {
+      const clip = clipRef.current;
+      if (clip && mouse.on && !panelOpen) {
         const vw = window.innerWidth, vh = window.innerHeight;
-        let { x, y } = panRef.current;
-        if (mouse.y >= 0 && mouse.y < ZONE) y += (1 - mouse.y / ZONE) * 14;
-        else if (mouse.y > vh - ZONE) y -= (1 - (vh - mouse.y) / ZONE) * 14;
-        if (mouse.x >= 0 && mouse.x < ZONE) x += (1 - mouse.x / ZONE) * 14;
-        else if (mouse.x > vw - ZONE) x -= (1 - (vw - mouse.x) / ZONE) * 14;
-        x = Math.max(-maxPanX, Math.min(maxPanX, x));
-        y = Math.max(-maxPanY, Math.min(maxPanY, y));
-        if (x !== panRef.current.x || y !== panRef.current.y) { panRef.current = { x, y }; apply(); }
+        let dx = 0, dy = 0;
+        if (mouse.y >= 0 && mouse.y < ZONE) dy = -(1 - mouse.y / ZONE) * 14;
+        else if (mouse.y > vh - ZONE) dy = (1 - (vh - mouse.y) / ZONE) * 14;
+        if (mouse.x >= 0 && mouse.x < ZONE) dx = -(1 - mouse.x / ZONE) * 14;
+        else if (mouse.x > vw - ZONE) dx = (1 - (vw - mouse.x) / ZONE) * 14;
+        if (dx || dy) { clip.scrollLeft += dx; clip.scrollTop += dy; }
       }
       raf = requestAnimationFrame(step);
     };
@@ -738,32 +741,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     document.documentElement.addEventListener('mouseleave', onLeave);
     raf = requestAnimationFrame(step);
     return () => { window.removeEventListener('mousemove', onMove); document.documentElement.removeEventListener('mouseleave', onLeave); cancelAnimationFrame(raf); };
-  }, [maxPanX, maxPanY, panelOpen, apply]);
-  // touch: drag to pan (tablets and up — a phone scrolls the column natively)
-  useEffect(() => {
-    const el = fieldRef.current;
-    if (!el || phone) return;
-    let start = null;
-    const down = (e) => {
-      if (e.pointerType !== 'touch') return;
-      start = { x: e.clientX, y: e.clientY, px: panRef.current.x, py: panRef.current.y, moved: false };
-    };
-    const move = (e) => {
-      if (!start || e.pointerType !== 'touch') return;
-      const dx = e.clientX - start.x, dy = e.clientY - start.y;
-      if (Math.abs(dx) + Math.abs(dy) > 8) start.moved = true;
-      panRef.current = {
-        x: Math.max(-maxPanX, Math.min(maxPanX, start.px + dx)),
-        y: Math.max(-maxPanY, Math.min(maxPanY, start.py + dy)),
-      };
-      apply();
-    };
-    const up = () => { start = null; };
-    el.addEventListener('pointerdown', down);
-    window.addEventListener('pointermove', move);
-    window.addEventListener('pointerup', up);
-    return () => { el.removeEventListener('pointerdown', down); window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); };
-  }, [maxPanX, maxPanY, apply, phone]);
+  }, [panelOpen, phone]);
   const field = useMemo(
     () => genField(cols, rows, cellCount, t.distribution, t.brightShare, t.gaps, mulberry32(t.seed * 7919 + 13)),
     [cols, rows, cellCount, t.distribution, t.brightShare, t.gaps, t.seed]
@@ -892,23 +870,36 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
   });
   // with the panel open, slide the field so the cell you clicked clears it
   useEffect(() => {
-    if (!panelOpen || !focusKey || vp[0] < 881) return;
+    const el = fieldRef.current, clip = clipRef.current;
+    if (!el || !clip) return undefined;
+    if (!panelOpen || !focusKey || phone) {
+      // the extra shove eases back to nothing when the panel closes
+      el.style.transform = '';
+      return undefined;
+    }
     const b = arranged.find((x) => x.k === focusKey);
-    const el = fieldRef.current;
-    if (!b || !el) return;
+    if (!b) return undefined;
+    // where the cell should land on screen: centred in the room beside the panel
     const targetScreenX = panelWidth + (vp[0] - panelWidth) / 2;
+    const targetScreenY = vp[1] / 2;
     const cellCenterX = b.x + size / 2, cellCenterY = b.y + size * 0.43;
-    const desiredX = targetScreenX - vp[0] / 2 - (cellCenterX - W / 2);
-    const desiredY = -(cellCenterY - H / 2);
-    panRef.current = {
-      x: Math.max(-maxPanX - slack, Math.min(maxPanX + slack, desiredX)),
-      y: Math.max(-maxPanY, Math.min(maxPanY, desiredY)),
-    };
-    el.classList.add('arch-field--ease');
-    apply();
-    const done = setTimeout(() => el.classList.remove('arch-field--ease'), 760);
-    return () => clearTimeout(done);
-  }, [panelOpen, focusKey, arranged, vp, panelWidth, size, W, H, maxPanX, maxPanY, slack, apply]);
+    const clipBox = clip.getBoundingClientRect();
+    // the field's offset inside the scroll area (its centring margins)
+    const offX = el.offsetLeft, offY = el.offsetTop;
+    // scroll as far toward the target as the scroll range allows...
+    const wantLeft = offX + cellCenterX - (targetScreenX - clipBox.left);
+    const wantTop = offY + cellCenterY - (targetScreenY - clipBox.top);
+    const maxLeft = Math.max(0, clip.scrollWidth - clip.clientWidth);
+    const maxTop = Math.max(0, clip.scrollHeight - clip.clientHeight);
+    const left = Math.max(0, Math.min(maxLeft, wantLeft));
+    const top = Math.max(0, Math.min(maxTop, wantTop));
+    clip.scrollTo({ left, top, behavior: 'smooth' });
+    // ...and the rest of the way is a transform, so a cell near the left edge
+    // of a small field still clears the panel
+    const shove = left - wantLeft;
+    el.style.transform = shove ? `translateX(${Math.round(shove)}px)` : '';
+    return undefined;
+  }, [panelOpen, focusKey, arranged, vp, panelWidth, size, phone]);
   // vines render beneath the cells, never obscuring comb contents. Three growth
   // styles: "climb" hugs the left/right silhouette from the bottom up, "wrap"
   // traces the cluster's whole outer perimeter, "sprawl" rises as undergrowth
@@ -996,11 +987,18 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
   };
   return (
     <div className={panelOpen ? 'arch arch--panel' : 'arch'}>
-      <div className={phone ? 'arch-clip arch-clip--scroll' : 'arch-clip'} style={panelOpen ? { filter: 'brightness(0.83)' } : undefined}>
-        <div className={phone ? 'arch-field arch-field--column' : 'arch-field'} ref={fieldRef}
+      {/* no dimming of the field while the panel is open: it muted the very
+          cells that were gathering toward the one you clicked */}
+      <div className="arch-clip arch-clip--scroll" ref={clipRef}>
+        <div className="arch-field arch-field--flow" ref={fieldRef}
              style={{
                width: W, height: H,
-               ...(phone ? { margin: '84px auto 60px' } : { transform: 'translate(-50%,-50%)', marginTop: 12 }),
+               // phone: below the header, then the column. desktop: centred in
+               // the frame when it fits, and scrollable from the middle when
+               // it does not
+               margin: phone
+                 ? '84px auto 60px'
+                 : `${Math.max(12, Math.round((clipH - H) / 2))}px auto ${Math.max(12, Math.round((clipH - H) / 2))}px`,
                '--glow-fade': `${t.lightAfterglow ?? 520}ms`,
                '--glow-strength': (t.lightStrength ?? 70) / 100,
                '--cell-center': (t.cellCenter ?? 14) / 100,
