@@ -48,7 +48,7 @@ const TWEAK_DEFAULTS = {
   warmth: 38,
   faceGrade: 'colorized',
   panelWidth: 36,   // story / page flyouts, % of the screen (desktop)
-  aboutWidth: 62,   // the About flyout, which carries the bios
+  aboutWidth: 36,   // the About flyout; the bios reflow to whatever width it gets
   vignette: true,
   topbarTucks: false,
   vines: true,
@@ -909,40 +909,31 @@ function Archive({ t, panelOpen, panelPct, focusKey, setFocusKey, onPersonSelect
     reach: size * ((t.lightReach ?? 260) / 100),
     cells: arranged,
   });
-  // with the panel open, slide the field so the cell you clicked clears it
+  // With a flyout open the frame itself has moved beside the panel, so the
+  // clicked cell is never under it. All that is left is to keep it in view:
+  // once the frame has finished sliding (its left edge eases over .72s),
+  // scroll the least amount that brings the cell inside it. No transform —
+  // the old shove pushed the whole comb aside and left bare ground behind.
   useEffect(() => {
     const el = fieldRef.current, clip = clipRef.current;
     if (!el || !clip) return undefined;
-    if (!panelOpen || !focusKey || phone) {
-      // the extra shove eases back to nothing when the panel closes
-      el.style.transform = '';
-      return undefined;
-    }
+    el.style.transform = '';
+    if (!panelOpen || !focusKey || phone) return undefined;
     const b = arranged.find((x) => x.k === focusKey);
     if (!b) return undefined;
-    // where the cell should land on screen: centred in the room beside the panel
-    const clipBox = clip.getBoundingClientRect();
-    // where the cell should land on screen: the middle of the frame, which
-    // now begins at the panel's edge
-    const targetScreenX = clipBox.left + clipBox.width / 2;
-    const targetScreenY = vp[1] / 2;
-    const cellCenterX = b.x + size / 2, cellCenterY = b.y + size * 0.43;
-    // the field's offset inside the scroll area (its centring margins)
-    const offX = el.offsetLeft, offY = el.offsetTop;
-    // scroll as far toward the target as the scroll range allows...
-    const wantLeft = offX + cellCenterX - (targetScreenX - clipBox.left);
-    const wantTop = offY + cellCenterY - (targetScreenY - clipBox.top);
-    const maxLeft = Math.max(0, clip.scrollWidth - clip.clientWidth);
-    const maxTop = Math.max(0, clip.scrollHeight - clip.clientHeight);
-    const left = Math.max(0, Math.min(maxLeft, wantLeft));
-    const top = Math.max(0, Math.min(maxTop, wantTop));
-    clip.scrollTo({ left, top, behavior: 'smooth' });
-    // ...and the rest of the way is a transform, so a cell near the left edge
-    // of a small field still clears the panel
-    const shove = left - wantLeft;
-    el.style.transform = shove ? `translateX(${Math.round(shove)}px)` : '';
-    return undefined;
-  }, [panelOpen, focusKey, arranged, vp, panelWidth, size, phone]);
+    const settle = setTimeout(() => {
+      const box = clip.getBoundingClientRect();
+      // the cell's edges relative to the frame's visible box
+      const pad = size * 0.6;
+      const left = el.offsetLeft + b.x - clip.scrollLeft, right = left + size;
+      const top = el.offsetTop + b.y - clip.scrollTop, bottom = top + size * 0.866;
+      let dx = 0, dy = 0;
+      if (left < pad) dx = left - pad; else if (right > box.width - pad) dx = right - (box.width - pad);
+      if (top < pad) dy = top - pad; else if (bottom > box.height - pad) dy = bottom - (box.height - pad);
+      if (dx || dy) clip.scrollBy({ left: dx, top: dy, behavior: 'smooth' });
+    }, 760);
+    return () => clearTimeout(settle);
+  }, [panelOpen, focusKey, arranged, vp, size, phone]);
   // vines render beneath the cells, never obscuring comb contents. Three growth
   // styles: "climb" hugs the left/right silhouette from the bottom up, "wrap"
   // traces the cluster's whole outer perimeter, "sprawl" rises as undergrowth
@@ -1204,7 +1195,7 @@ export default function HoneycombApp() {
   const page = PAGES.find((p) => p.id === pageId) || null;
   const panelOpen = Boolean(page || person);
   // flyout width as a share of the screen (Tweaks); the About panel is wider
-  const panelPct = page?.id === 'about' ? (t.aboutWidth ?? 62) : (t.panelWidth ?? 36);
+  const panelPct = page?.id === 'about' ? (t.aboutWidth ?? 36) : (t.panelWidth ?? 36);
 
   return (
     <div className="hc-page" style={{
@@ -1287,7 +1278,7 @@ export default function HoneycombApp() {
         <TweakToggle label="Topbar hides until hover" value={t.topbarTucks === true} onChange={(v) => setTweak('topbarTucks', v)} />
         <TweakSection label="Flyouts" />
         <TweakSlider label="Panel width" value={t.panelWidth ?? 36} min={24} max={60} unit="%" onChange={(v) => setTweak('panelWidth', v)} />
-        <TweakSlider label="About panel width" value={t.aboutWidth ?? 62} min={40} max={90} unit="%" onChange={(v) => setTweak('aboutWidth', v)} />
+        <TweakSlider label="About panel width" value={t.aboutWidth ?? 36} min={40} max={90} unit="%" onChange={(v) => setTweak('aboutWidth', v)} />
         <TweakSection label="Vines" />
         <TweakToggle label="Vines" value={t.vines} onChange={(v) => setTweak('vines', v)} />
         <TweakRadio label="Growth style" value={t.vineStyle ?? 'climb'} options={['climb', 'wrap', 'sprawl']} onChange={(v) => setTweak('vineStyle', v)} />
