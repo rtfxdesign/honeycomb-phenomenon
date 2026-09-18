@@ -371,7 +371,7 @@ export default function RecorderModal({ onClose }) {
                 </div>
                 <small className="field-hint">
                   {namePreview
-                    ? <>Your cell will read <strong>{namePreview}</strong>. You can change this later by writing to us.</>
+                    ? <>Your cell will read <strong>{namePreview}</strong> — you can change this later by writing to us.</>
                     : <>Leave both blank to stay anonymous — your cell will show your place, or your title, instead.</>}
                 </small>
               </div>

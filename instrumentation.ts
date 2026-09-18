@@ -16,3 +16,7 @@ export function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") Sentry.init(options);
   if (process.env.NEXT_RUNTIME === "edge") Sentry.init(options);
 }
+
+// Errors thrown while rendering server components reach Sentry through this
+// hook; the same beforeSend scrub applies to them.
+export const onRequestError = Sentry.captureRequestError;

@@ -1,8 +1,49 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+// Transport posture for a site whose visitors may assume they are watched.
+// Set here as well as in netlify.toml: the toml block only reaches static
+// files, while pages and API routes are served by the Next runtime, which
+// applies these. What a network observer can still see is that
+// projecthoneycomb.site was visited and roughly how much moved; not the
+// content. See /privacy.
+const SECURITY_HEADERS = [
+  { key: "X-Content-Type-Options", value: "nosniff" },
+  { key: "X-Frame-Options", value: "DENY" },
+  // Never tell another site where a visitor came from.
+  { key: "Referrer-Policy", value: "no-referrer" },
+  // HTTPS only, remembered by the browser for a year, subdomains included.
+  { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+  // The recorder needs the camera and microphone; nothing else is granted.
+  { key: "Permissions-Policy", value: "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()" },
+  { key: "Cross-Origin-Opener-Policy", value: "same-origin" },
+  // Every origin the page may talk to, named. Report-only for this release so
+  // a missed origin shows in the console rather than breaking an upload; it
+  // becomes enforcing once a full submission has been observed clean. Fonts
+  // are self-hosted, so no third-party origin appears at all.
+  {
+    key: "Content-Security-Policy-Report-Only",
+    value: [
+      "default-src 'self'",
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'",
+      "img-src 'self' data: blob: https://*.r2.cloudflarestorage.com",
+      "media-src 'self' blob: https://*.r2.cloudflarestorage.com",
+      "connect-src 'self' https://*.r2.cloudflarestorage.com",
+      "font-src 'self'",
+      "worker-src 'self' blob:",
+      "frame-ancestors 'none'",
+      "base-uri 'self'",
+      "form-action 'self'",
+      "object-src 'none'",
+    ].join("; "),
+  },
+];
+
 const nextConfig: NextConfig = {
-  /* config options here */
+  async headers() {
+    return [{ source: "/(.*)", headers: SECURITY_HEADERS }];
+  },
 };
 
 export default withSentryConfig(nextConfig, {
