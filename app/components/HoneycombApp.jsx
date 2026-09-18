@@ -15,6 +15,7 @@ import {
 import { PEOPLE } from '../data/people';
 import { PAGES } from '../data/pages';
 import RecorderModal from './RecorderModal';
+import { cellLabel, initialsOf } from '../lib/name';
 
 const TWEAK_DEFAULTS = {
   cellSize: 156,
@@ -46,7 +47,7 @@ const TWEAK_DEFAULTS = {
   textureOpacity: 34,
   warmth: 38,
   vignette: true,
-  topbarAutohide: true,
+  topbarTucks: false,
   vines: true,
   vineSeed: 1,
   vineStyle: 'climb',
@@ -396,7 +397,12 @@ function CombMark() {
 function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autohide, keepVisible, session, onSignOut }) {
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [searchFocused, setSearchFocused] = useState(false);
   const [tucked, setTucked] = useState(false);
+  // On a desktop the field is open from the start (CSS, .site-search), so
+  // search is on screen at every scroll position without a click; the state
+  // here only widens it on focus. On a phone it opens into a strip under the
+  // header, so there it stays behind the magnifier until wanted.
   const searchRef = useRef(null);
   const go = (id) => { setNavOpen(false); setSearchOpen(false); onNav(id); };
 
@@ -438,7 +444,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
   return (
     <>
       {hidden && <div className="topbar-peek" aria-hidden="true" />}
-      <header className={`site-header${hidden ? ' site-header--tucked' : ''}${searchOpen || query ? ' site-header--searching' : ''}`}>
+      <header className={`site-header${hidden ? ' site-header--tucked' : ''}${searchFocused || query ? ' site-header--searching' : ''}`}>
       {/* The wordmark on the left is the home link, which is why HOME is no
           longer a nav item. The comb sits in the middle of the bar on its own
           and is the way into search — it is the main thing the site does, so
@@ -448,16 +454,16 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
       <button className="brand-word" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
         HONEYCOMB
       </button>
-      <div className={`brand${searchOpen || query ? ' brand--searching' : ''}`}>
+      <div className={`brand${searchFocused || query ? ' brand--searching' : ''}`}>
         <button
           className="search-orb" type="button"
           aria-label="Search the archive" aria-expanded={searchOpen || Boolean(query)}
-          onClick={() => openSearch(!(searchOpen || query))}
+          onClick={() => { if (searchOpen || query) searchRef.current?.focus(); else openSearch(true); }}
         >
           <CombMark />
         </button>
       </div>
-      <div className={`site-search${searchOpen || query ? ' is-open' : ''}`}>
+      <div className={`site-search${searchOpen || query ? ' is-open' : ''}${searchFocused ? ' is-focused' : ''}`}>
         <button
           className="search-toggle" type="button" aria-label="Search the archive"
           onClick={() => openSearch(!(searchOpen || query))}
@@ -467,6 +473,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
         <input
           ref={searchRef} className="search-input" type="search" value={query}
           onChange={(e) => onQuery(e.target.value)}
+          onFocus={() => setSearchFocused(true)} onBlur={() => setSearchFocused(false)}
           placeholder="Search place, year, tag, or words"
           aria-label="Search the archive"
         />
@@ -519,8 +526,26 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
 
 function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
   const open = Boolean(page || person);
+  const asideRef = useRef(null);
+  // A down-arrow at the foot of the copy while there is more of it below the
+  // fold, gone once the reader reaches the end. Driven by the scroll metrics
+  // of .panel-copy and set on its parent, where the arrow is drawn (CSS
+  // .story-content::after). The native scrollbar stays; this is in addition.
+  useEffect(() => {
+    const el = asideRef.current?.querySelector('.panel-copy');
+    const host = el?.parentElement;
+    if (!el || !host) return undefined;
+    const update = () => { host.dataset.more = el.scrollHeight - el.scrollTop - el.clientHeight > 12 ? 'true' : 'false'; };
+    update();
+    el.addEventListener('scroll', update, { passive: true });
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    for (const child of el.children) ro.observe(child);
+    return () => { el.removeEventListener('scroll', update); ro.disconnect(); delete host.dataset.more; };
+  }, [page, person]);
   return (
     <aside
+      ref={asideRef}
       className={`story-panel ${page?.id === 'about' ? 'story-panel--about' : ''}`}
       aria-hidden={!open} aria-live="polite"
     >
@@ -760,11 +785,11 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
         m.set(b.k, faces[i++]);
       } else if (e < experiences.length) {
         const exp = experiences[e++];
-        const name = exp.displayName || exp.title || 'Archive voice';
+        // name as the contributor chose to show it, else place, else title
+        const name = cellLabel(exp) || 'Archive voice';
         // a story with no photo still needs to be findable in the comb, so the
         // cell carries its initials instead of a portrait
-        const initials = String(exp.displayName || exp.title || '?')
-          .split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+        const initials = initialsOf(name) || '?';
         m.set(b.k, { src: exp.photoUrl || null, photo: true, initials, name, person: { name, experience: exp } });
       }
     }
@@ -1193,7 +1218,7 @@ export default function HoneycombApp() {
       <TopBar
         onNav={onNav} onSubmit={openRecorder} activePage={pageId}
         query={query} onQuery={onQuery} matchCount={matchCount}
-        autohide={t.topbarAutohide !== false} keepVisible={panelOpen || recorderOpen}
+        autohide={t.topbarTucks === true} keepVisible={panelOpen || recorderOpen}
         session={session} onSignOut={signOut}
       />
       <StoryPanel page={page} person={person} onClose={closePanel} openRecorder={openRecorder} focusSearch={focusSearch} />
@@ -1229,7 +1254,7 @@ export default function HoneycombApp() {
         <TweakSlider label="Texture" value={t.textureOpacity} min={0} max={70} unit="%" onChange={(v) => setTweak('textureOpacity', v)} />
         <TweakSlider label="Warmth" value={t.warmth ?? 0} min={0} max={100} unit="%" onChange={(v) => setTweak('warmth', v)} />
         <TweakToggle label="Vignette" value={t.vignette} onChange={(v) => setTweak('vignette', v)} />
-        <TweakToggle label="Topbar hides until hover" value={t.topbarAutohide !== false} onChange={(v) => setTweak('topbarAutohide', v)} />
+        <TweakToggle label="Topbar hides until hover" value={t.topbarTucks === true} onChange={(v) => setTweak('topbarTucks', v)} />
         <TweakSection label="Vines" />
         <TweakToggle label="Vines" value={t.vines} onChange={(v) => setTweak('vines', v)} />
         <TweakRadio label="Growth style" value={t.vineStyle ?? 'climb'} options={['climb', 'wrap', 'sprawl']} onChange={(v) => setTweak('vineStyle', v)} />

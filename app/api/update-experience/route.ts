@@ -2,11 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { isModerator } from "../../lib/auth";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
+import { formatDisplayName, NAME_DISPLAY_LEVELS } from "../../lib/name";
 
 // Fields the review dashboard may edit; everything else in the stored JSON
 // (media keys, ids, timestamps, status) is preserved as-is.
 const EDITABLE_FIELDS = [
   "title",
+  // The name is kept as parts plus a display level, so how much of it shows
+  // can be changed later without asking the contributor again. displayName
+  // is re-derived from them below whenever any of the three change.
+  "firstName",
+  "lastName",
+  "nameDisplay",
   "displayName",
   "location",
   "experienceYear",
@@ -60,6 +67,11 @@ export async function POST(request: NextRequest) {
           data[field] = String(updates[field] ?? "");
         }
       }
+    }
+    if (data.nameDisplay && !NAME_DISPLAY_LEVELS.includes(data.nameDisplay)) data.nameDisplay = "full";
+    const nameTouched = ["firstName", "lastName", "nameDisplay"].some((f) => f in updates);
+    if (nameTouched && (data.firstName || data.lastName)) {
+      data.displayName = formatDisplayName(data.firstName, data.lastName, data.nameDisplay);
     }
     data.editedAt = new Date().toISOString();
 

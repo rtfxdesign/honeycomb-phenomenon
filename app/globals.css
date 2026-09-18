@@ -442,15 +442,16 @@ button{font:inherit;color:inherit}
 /* The comb sits in the middle of the bar; the field grows out to its left,
    toward the wordmark, which steps back while the search is open. The nav on
    the right and the slide-outs on the left are never in its way. */
+/* Open at rest on a desktop, so the field is on screen and focusable at every
+   scroll position; it widens when focused. (On a phone, below, it lives
+   behind the magnifier and opens into a strip under the header.) */
 .site-search{position:absolute;right:calc(50% + 38px + 16px);left:auto;top:50%;transform:translateY(-50%);
-  display:flex;align-items:center;gap:6px;margin-left:0;pointer-events:none;z-index:2}
-.site-search::before{opacity:0;transition:opacity .2s ease}
-.site-search.is-open{pointer-events:auto}
-.site-search.is-open::before{opacity:1}
-.site-search .search-input{width:0;opacity:0;padding-left:0;border-color:transparent;background:transparent;
+  display:flex;align-items:center;gap:6px;margin-left:0;pointer-events:auto;z-index:2}
+.site-search::before{opacity:1;transition:opacity .2s ease}
+.site-search .search-input{width:clamp(170px,20vw,300px);opacity:1;padding:0 54px 0 30px;
+  border-color:rgba(242,191,73,.55);background:rgba(255,255,255,.07);
   transition:width .34s var(--ease-quiet),opacity .24s var(--ease-quiet),padding .34s var(--ease-quiet)}
-.site-search.is-open .search-input{width:clamp(210px,24vw,340px);opacity:1;padding:0 54px 0 30px;
-  border-color:rgba(242,191,73,.55);background:rgba(255,255,255,.07)}
+.site-search.is-focused .search-input{width:clamp(210px,24vw,340px)}
 /* while searching, the wordmark steps back so the field has the room */
 .site-header--searching .brand-word{opacity:0;pointer-events:none}
 .site-search::before{content:"⌕";position:absolute;left:11px;top:50%;transform:translateY(-50%);
@@ -746,3 +747,62 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
 .twk-lbl{color:rgba(255,255,255,0.92)!important}
 .twk-val{color:rgba(255,255,255,0.55)!important}
 .twk-sect{color:rgba(255,255,255,0.5)!important}
+
+/* ───────────── 2026-09 sprint: recorder consent, names, submission ID ───────────── */
+
+/* the link to /privacy and the removal instructions, on the privacy step */
+.privacy-note{margin:22px 0 0;padding:16px 18px;border:1px solid var(--field-line);background:rgba(255,255,255,.03);
+  font-size:13px;line-height:1.6;color:var(--text-soft)}
+.privacy-note p{margin:0}
+.privacy-note p+p{margin-top:10px}
+.privacy-note-link a,.consent-row a,.submission-id-block a,.removal-note a{color:var(--gold);text-decoration:none;
+  border-bottom:1px solid rgba(242,191,73,.4)}
+.privacy-note-link a:hover,.consent-row a:hover,.submission-id-block a:hover,.removal-note a:hover{border-bottom-color:var(--gold)}
+.privacy-note-link{font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase}
+
+/* how much of the name to show */
+.name-display .display-options{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px}
+.name-display .display-options button{display:flex;flex-direction:column;gap:3px;padding:11px 12px;border:1px solid var(--field-line);
+  background:rgba(255,255,255,.03);color:var(--text);cursor:pointer;text-align:left;font:inherit}
+.name-display .display-options button b{font-family:Inter,sans-serif;font-size:14px;font-weight:600;color:#fff7e8}
+.name-display .display-options button small{font-size:10.5px;letter-spacing:.04em;color:var(--text-soft)}
+.name-display .display-options button.selected{border-color:var(--honey);background:rgba(242,191,73,.1)}
+.name-display .field-hint{display:block;margin-top:10px;font-size:12.5px;line-height:1.55;color:var(--text-soft)}
+.name-display .field-hint strong{color:var(--cream)}
+@media (max-width:640px){.name-display .display-options{grid-template-columns:1fr}}
+
+/* the authorization line, right before the button that commits */
+.consent-row{display:flex;gap:12px;align-items:flex-start;margin:22px 0 0;font-size:13px;line-height:1.6;color:var(--text-soft);cursor:pointer}
+.consent-row input{flex:none;width:18px;height:18px;margin-top:3px;accent-color:var(--gold)}
+.consent-row a{white-space:nowrap}
+
+/* confirmation: the ID, copyable, and what to do with it */
+.submission-id-block{margin:26px auto 30px;max-width:560px;padding:20px 22px;border:1px solid rgba(242,191,73,.4);
+  background:rgba(242,191,73,.06);text-align:left;font-size:13.5px;line-height:1.62;color:var(--text-soft)}
+.submission-id-label{display:block;margin-bottom:8px;font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;
+  letter-spacing:.22em;text-transform:uppercase;color:var(--gold)}
+.submission-id-row{display:flex;align-items:center;gap:14px;flex-wrap:wrap;margin-bottom:14px}
+.submission-id{font-family:Montserrat,sans-serif;font-size:clamp(20px,3.2vw,28px);font-weight:600;letter-spacing:.12em;
+  color:#fff7e8;user-select:all;-webkit-user-select:all}
+.copy-id{padding:8px 14px;border:1px solid var(--gold);border-radius:3px;background:transparent;color:var(--gold);cursor:pointer;
+  font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.copy-id:hover{background:rgba(242,191,73,.12)}
+.submission-id-block p{margin:0}
+.submission-id-block p+p{margin-top:10px}
+.submission-id-block .removal-note{padding-top:12px;border-top:1px solid rgba(242,191,73,.2);font-size:12.5px}
+
+/* ───────────── flyouts: a nudge when there is more to read ───────────── */
+
+/* .panel-copy scrolls; the arrow lives on its parent so it stays put while
+   the copy moves under it. data-more is set by StoryPanel from the scroll
+   metrics: shown while there is content below the fold, gone at the end. The
+   native scrollbar stays — this is in addition to it, not instead of it. */
+.story-content::after{content:"";position:absolute;left:50%;bottom:22px;z-index:4;width:13px;height:13px;
+  border-right:2px solid var(--gold);border-bottom:2px solid var(--gold);transform:translateX(-50%) rotate(45deg);
+  opacity:0;pointer-events:none;filter:drop-shadow(0 0 6px #0a0602) drop-shadow(0 0 10px #0a0602);
+  transition:opacity .32s var(--ease-quiet)}
+.story-content[data-more="true"]::after{opacity:.9;animation:scroll-nudge 1.7s ease-in-out infinite}
+@keyframes scroll-nudge{0%,100%{transform:translate(-50%,0) rotate(45deg)}50%{transform:translate(-50%,5px) rotate(45deg)}}
+@media (prefers-reduced-motion:reduce){.story-content[data-more="true"]::after{animation:none}}
+@media (max-width:880px){.story-content::after{bottom:12px}}
+

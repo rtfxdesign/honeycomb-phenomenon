@@ -4,9 +4,16 @@
 // this repo's backend: media goes straight to R2 via presigned URL
 // (bypassing Netlify's payload limits) and the submission lands in the
 // private review queue via /api/submit-experience.
+//
+// What the contributor is told before and after they commit is part of the
+// record, not decoration: the link to how their story is handled, the
+// removal instructions, and the submission ID they can quote to have it
+// taken down. Those three appear on every path — text, audio and video.
 
 import React, { useState, useRef, useEffect } from 'react';
 import { uploadToR2 } from '../lib/upload';
+import { REMOVAL_EMAIL, PRIVACY_PATH } from '../lib/contact';
+import { NAME_DISPLAY_OPTIONS, formatDisplayName } from '../lib/name';
 
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
@@ -14,10 +21,33 @@ function formatBytes(bytes) {
   return `${(bytes / Math.pow(1024, i)).toFixed(1)} ${['B', 'KB', 'MB', 'GB'][i]}`;
 }
 
+function HandlingLink({ children }) {
+  return (
+    <a href={PRIVACY_PATH} target="_blank" rel="noopener">
+      {children || 'How we handle your story and files'} <span aria-hidden="true">↗</span>
+    </a>
+  );
+}
+
+// The same removal text on the privacy step and on the confirmation screen.
+function RemovalNote({ id }) {
+  const subject = id ? `?subject=${encodeURIComponent(`Remove ${id}`)}` : '';
+  return (
+    <p className="removal-note">
+      To remove your submission, email <a href={`mailto:${REMOVAL_EMAIL}${subject}`}>{REMOVAL_EMAIL}</a> with
+      the name you submitted under. If you stayed anonymous, include the date, the approximate time and a
+      short description so we can find it.
+    </p>
+  );
+}
+
 export default function RecorderModal({ onClose }) {
   const [step, setStep] = useState(1);
   const [mode, setMode] = useState('video');
   const [privacy, setPrivacy] = useState('public');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
+  const [nameDisplay, setNameDisplay] = useState('full');
   const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [year, setYear] = useState(new Date().getFullYear().toString());
@@ -33,12 +63,16 @@ export default function RecorderModal({ onClose }) {
   const [progress, setProgress] = useState(0);
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
+  const [consent, setConsent] = useState(false);
+  const [submissionId, setSubmissionId] = useState('');
+  const [copied, setCopied] = useState(false);
   const recorderRef = useRef(null);
   const streamRef = useRef(null);
   const chunksRef = useRef([]);
   const audioChunksRef = useRef([]);
   const audioRecorderRef = useRef(null);
   const speechRef = useRef(null);
+  const idRef = useRef(null);
 
   useEffect(() => () => {
     if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
@@ -142,12 +176,31 @@ export default function RecorderModal({ onClose }) {
     setTagInput('');
   };
 
+  const copyId = async () => {
+    try {
+      await navigator.clipboard.writeText(submissionId);
+    } catch {
+      // clipboard blocked: select the text so a long-press or ctrl+c works
+      const range = document.createRange();
+      range.selectNodeContents(idRef.current);
+      const sel = window.getSelection();
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2200);
+  };
+
   const submitExperience = async (event) => {
     event.preventDefault();
     // A recording is an account in itself. Asking someone to also type it out
     // before they may submit is the work machine transcription removes.
     if (!title.trim() || (!storyText.trim() && !mediaFile)) {
       setStatus('Please add a title, and either a few words or a recording.');
+      return;
+    }
+    if (!consent) {
+      setStatus('Please confirm the account is yours to share.');
       return;
     }
     setSubmitting(true);
@@ -198,6 +251,9 @@ export default function RecorderModal({ onClose }) {
 
     const payload = {
       title: title.trim(),
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      nameDisplay,
       location: location.trim(),
       experienceYear: year.trim(),
       experienceType: 'Other',
@@ -209,6 +265,7 @@ export default function RecorderModal({ onClose }) {
       audioKey: audioKey || (mode === 'audio' ? mediaKey : '') || undefined,
       photoKey: photoKey || undefined,
       hashtags: tags,
+      consent: true,
     };
 
     try {
@@ -218,6 +275,8 @@ export default function RecorderModal({ onClose }) {
         body: JSON.stringify(payload),
       });
       if (!response.ok) throw new Error('Unable to preserve this experience right now.');
+      const result = await response.json();
+      setSubmissionId(result.id || '');
       setStep(4);
       setStatus('Your experience has been preserved privately and added to the review queue. Nothing is published automatically.');
     } catch (error) {
@@ -227,6 +286,8 @@ export default function RecorderModal({ onClose }) {
       setProgress(0);
     }
   };
+
+  const namePreview = formatDisplayName(firstName, lastName, nameDisplay);
 
   return (
     <div className="modal-backdrop" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) close(); }}>
@@ -263,7 +324,7 @@ export default function RecorderModal({ onClose }) {
         {step === 2 && (
           <>
             <p className="eyebrow"><span /> Step 2 of 3</p>
-            <h2 id="recorder-title">You decide who can see it.</h2>
+            <h2 id="recorder-title">You decide who can see it</h2>
             <p className="modal-lede">Your privacy setting is attached to the experience—not buried in account settings.</p>
             <div className="privacy-list">
               {[
@@ -277,6 +338,10 @@ export default function RecorderModal({ onClose }) {
                 </button>
               ))}
             </div>
+            <div className="privacy-note">
+              <p className="privacy-note-link"><HandlingLink /></p>
+              <RemovalNote />
+            </div>
             <div className="modal-actions">
               <button type="button" className="back-action" onClick={() => setStep(1)}>← Back</button>
               <button type="button" className="primary-action" onClick={() => setStep(3)}>Continue <span>→</span></button>
@@ -287,8 +352,29 @@ export default function RecorderModal({ onClose }) {
         {step === 3 && (
           <form onSubmit={submitExperience}>
             <p className="eyebrow"><span /> Step 3 of 3</p>
-            <h2 id="recorder-title">Tell us what happened.</h2>
+            <h2 id="recorder-title">Tell us what happened</h2>
             <div className="form-grid">
+              <label className="field"><span>First name</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" placeholder="Jane" /></label>
+              <label className="field"><span>Last name</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" placeholder="Doe" /></label>
+              <div className="field field-wide name-display">
+                <span>Show my name as</span>
+                <div className="display-options" role="radiogroup" aria-label="How your name appears">
+                  {NAME_DISPLAY_OPTIONS.map(([value, label]) => (
+                    <button
+                      key={value} type="button" role="radio" aria-checked={nameDisplay === value}
+                      className={nameDisplay === value ? 'selected' : ''} onClick={() => setNameDisplay(value)}
+                    >
+                      <b>{formatDisplayName(firstName || 'Jane', lastName || 'Doe', value)}</b>
+                      <small>{label}</small>
+                    </button>
+                  ))}
+                </div>
+                <small className="field-hint">
+                  {namePreview
+                    ? <>Your cell will read <strong>{namePreview}</strong>. You can change this later by writing to us.</>
+                    : <>Leave both blank to stay anonymous — your cell will show your place, or your title, instead.</>}
+                </small>
+              </div>
               <label className="field field-wide"><span>A short title</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="The light above the pines" required /></label>
               <label className="field"><span>Place</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Hudson Valley, NY" /></label>
               <label className="field"><span>Year</span><input value={year} onChange={(event) => setYear(event.target.value)} inputMode="numeric" placeholder="1986" /></label>
@@ -331,10 +417,17 @@ export default function RecorderModal({ onClose }) {
                 </div>
               )}
             </div>
+            <label className="consent-row">
+              <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} required />
+              <span>
+                This account is mine to share. I authorize Honeycomb to keep it under the privacy setting I chose,
+                and I have read <HandlingLink>how my story and files are handled</HandlingLink>.
+              </span>
+            </label>
             {status && <p className="form-status" role="status">{status}</p>}
             <div className="modal-actions">
               <button type="button" className="back-action" onClick={() => setStep(2)}>← Back</button>
-              <button className="primary-action" disabled={submitting}>{submitting ? 'Saving…' : 'Add to the archive'} <span>↗</span></button>
+              <button className="primary-action" disabled={submitting || !consent}>{submitting ? 'Saving…' : 'Add to the archive'} <span>↗</span></button>
             </div>
           </form>
         )}
@@ -343,8 +436,23 @@ export default function RecorderModal({ onClose }) {
           <div className="success-state">
             <div className="success-cell">✓</div>
             <p className="eyebrow"><span /> Experience received</p>
-            <h2>Thank you for trusting the archive.</h2>
+            <h2>Thank you for trusting the archive</h2>
             <p>{status}</p>
+            {submissionId && (
+              <div className="submission-id-block">
+                <span className="submission-id-label">Your submission ID</span>
+                <div className="submission-id-row">
+                  <code className="submission-id" ref={idRef}>{submissionId}</code>
+                  <button type="button" className="copy-id" onClick={copyId} aria-live="polite">{copied ? 'Copied ✓' : 'Copy'}</button>
+                </div>
+                <p>
+                  Email <a href={`mailto:${REMOVAL_EMAIL}?subject=${encodeURIComponent(`Remove ${submissionId}`)}`}>{REMOVAL_EMAIL}</a> with
+                  this ID in the subject line and your submission will be removed automatically; otherwise we can remove it
+                  manually with whatever details you have.
+                </p>
+                <RemovalNote id={submissionId} />
+              </div>
+            )}
             <button type="button" className="primary-action" onClick={close}>Return to Honeycomb <span>→</span></button>
           </div>
         )}

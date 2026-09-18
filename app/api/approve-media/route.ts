@@ -52,11 +52,18 @@ export async function POST(request: NextRequest) {
     };
 
     // 2. Move associated media files
+    const originalMediaKey = data.mediaKey;
     if (data.mediaKey && !data.mediaKey.startsWith("approved/")) {
       data.mediaKey = await moveMediaToApproved(data.mediaKey);
     }
     if (data.photoKey && !data.photoKey.startsWith("approved/")) {
       data.photoKey = await moveMediaToApproved(data.photoKey);
+    }
+    // A video carries its own audio track for transcription. For an audio
+    // submission audioKey *is* mediaKey, already moved above; otherwise it is
+    // a second object and was being left behind in the pending prefix.
+    if (data.audioKey && !data.audioKey.startsWith("approved/")) {
+      data.audioKey = data.audioKey === originalMediaKey ? data.mediaKey : await moveMediaToApproved(data.audioKey);
     }
 
     // 3. Update the JSON status and save it to approved/submissions/

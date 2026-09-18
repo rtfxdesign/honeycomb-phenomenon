@@ -2,11 +2,16 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { formatDisplayName, NAME_DISPLAY_OPTIONS } from "../lib/name";
 
 interface SubmissionData {
   id: string;
   title: string;
   displayName?: string;
+  firstName?: string;
+  lastName?: string;
+  nameDisplay?: string;
+  consentAt?: string;
   location: string;
   experienceYear: string;
   experienceType?: string;
@@ -38,6 +43,9 @@ interface Submission {
 interface EditState {
   title: string;
   displayName: string;
+  firstName: string;
+  lastName: string;
+  nameDisplay: string;
   location: string;
   experienceYear: string;
   privacy: string;
@@ -249,6 +257,9 @@ export default function ReviewDashboard() {
     setEdit({
       title: submission.data.title || "",
       displayName: submission.data.displayName || "",
+      firstName: submission.data.firstName || "",
+      lastName: submission.data.lastName || "",
+      nameDisplay: submission.data.nameDisplay || "full",
       location: submission.data.location || "",
       experienceYear: submission.data.experienceYear || "",
       privacy: submission.data.privacy || "public",
@@ -264,6 +275,9 @@ export default function ReviewDashboard() {
       const updates = {
         title: edit.title,
         displayName: edit.displayName,
+        firstName: edit.firstName,
+        lastName: edit.lastName,
+        nameDisplay: edit.nameDisplay,
         location: edit.location,
         experienceYear: edit.experienceYear,
         privacy: edit.privacy,
@@ -490,9 +504,33 @@ export default function ReviewDashboard() {
                 <input style={inputStyle} value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
-                <div>
-                  <span style={labelStyle}>Display name (shown on the cell)</span>
-                  <input style={inputStyle} value={edit.displayName} onChange={e => setEdit({ ...edit, displayName: e.target.value })} placeholder="e.g. John Berg" />
+                <div style={{ display: "grid", gap: "0.5rem" }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
+                    <div>
+                      <span style={labelStyle}>First name</span>
+                      <input style={inputStyle} value={edit.firstName} onChange={e => setEdit({ ...edit, firstName: e.target.value })} placeholder="Jane" />
+                    </div>
+                    <div>
+                      <span style={labelStyle}>Last name</span>
+                      <input style={inputStyle} value={edit.lastName} onChange={e => setEdit({ ...edit, lastName: e.target.value })} placeholder="Doe" />
+                    </div>
+                  </div>
+                  <div>
+                    <span style={labelStyle}>Show name as</span>
+                    <select style={inputStyle} value={edit.nameDisplay} onChange={e => setEdit({ ...edit, nameDisplay: e.target.value })}>
+                      {NAME_DISPLAY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                    </select>
+                  </div>
+                  {(edit.firstName || edit.lastName) ? (
+                    <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
+                      Cell reads: <strong>{formatDisplayName(edit.firstName, edit.lastName, edit.nameDisplay)}</strong>
+                    </div>
+                  ) : (
+                    <div>
+                      <span style={labelStyle}>Display name (no first/last on this record)</span>
+                      <input style={inputStyle} value={edit.displayName} onChange={e => setEdit({ ...edit, displayName: e.target.value })} placeholder="e.g. John Berg" />
+                    </div>
+                  )}
                 </div>
                 <div>
                   <span style={labelStyle}>Privacy</span>
@@ -525,6 +563,11 @@ export default function ReviewDashboard() {
                 )}
               </div>
               <div style={{ fontSize: "0.85rem", opacity: 0.7, display: "flex", gap: "1rem", flexWrap: "wrap" }}>
+                {submission.data.id && (
+                  <span title="Submission ID — what a contributor quotes to have this removed">
+                    🆔 <code style={{ userSelect: "all", letterSpacing: "0.06em" }}>{submission.data.id}</code>
+                  </span>
+                )}
                 {displayName && <span>👤 {displayName}</span>}
                 <span>⌖ {location || "Unknown"}</span>
                 <span>📅 {experienceYear || "Unknown"}</span>

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { headers } from "next/headers";
+import "./fonts.css";
 import "./globals.css";
 
 const title = "Honeycomb — Your Experience. Our Collective History.";
@@ -35,17 +36,12 @@ export async function generateMetadata(): Promise<Metadata> {
   };
 }
 
+// Fonts are served from this origin (app/fonts.css → /public/fonts), so a
+// visitor's browser never contacts Google. No third-party request leaves the
+// page at all; see /privacy.
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Inter:wght@400..700&family=Montserrat:wght@400..700&display=swap"
-        />
-      </head>
       <body>{children}</body>
     </html>
   );

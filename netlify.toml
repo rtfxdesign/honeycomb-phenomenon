@@ -11,8 +11,23 @@
 [context.production.environment]
   HONEYCOMB_ENVIRONMENT = "production"
 
+# Transport posture for a site whose visitors may assume they are watched.
+# What a network observer can still see is that projecthoneycomb.site was
+# visited and roughly how much moved; the content is not visible. See /privacy.
 [[headers]]
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"
+    # Never tell another site where a visitor came from.
+    Referrer-Policy = "no-referrer"
+    # HTTPS only, remembered by the browser for a year, subdomains included.
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    # The recorder needs the camera and microphone; nothing else is granted.
+    Permissions-Policy = "camera=(self), microphone=(self), geolocation=(), payment=(), usb=(), interest-cohort=()"
+    Cross-Origin-Opener-Policy = "same-origin"
+    # Every origin the page may talk to, named. Report-only for this deploy
+    # so a missed origin shows up in the console rather than breaking an
+    # upload; it becomes enforcing once a full submission has been observed
+    # clean. Fonts are self-hosted, so no third-party origin appears at all.
+    Content-Security-Policy-Report-Only = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.r2.cloudflarestorage.com; media-src 'self' blob: https://*.r2.cloudflarestorage.com; connect-src 'self' https://*.r2.cloudflarestorage.com; font-src 'self'; worker-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'"

@@ -29,18 +29,12 @@ export async function POST(request: NextRequest) {
       if (bodyStr) {
         const data = JSON.parse(bodyStr);
 
-        // 2. Delete associated media files
-        if (data.mediaKey) {
-          await client.send(new DeleteObjectCommand({
-            Bucket: BUCKET,
-            Key: phys(data.mediaKey),
-          }));
-        }
-        if (data.photoKey) {
-          await client.send(new DeleteObjectCommand({
-            Bucket: BUCKET,
-            Key: phys(data.photoKey),
-          }));
+        // 2. Delete every object the record points at. "Removed" has to mean
+        // the recording, its audio track and the photo, not just the JSON —
+        // the audio track was previously left behind.
+        const keys = new Set([data.mediaKey, data.audioKey, data.photoKey].filter(Boolean));
+        for (const k of keys) {
+          await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: phys(k) }));
         }
       }
     } catch (err) {
