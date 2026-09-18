@@ -46,6 +46,7 @@ const TWEAK_DEFAULTS = {
   backdrop: 'Archive texture',
   textureOpacity: 34,
   warmth: 38,
+  faceGrade: 'colorized',
   vignette: true,
   topbarTucks: false,
   vines: true,
@@ -391,6 +392,16 @@ function CombMark() {
     </svg>
   );
 }
+
+// Portrait grades for the Tweaks "Portrait grade" control. Applied to every
+// face in the comb through --face-grade (see .hexcell .cell-face in
+// globals.css). "clean" lowers saturation and turns the hue a few degrees
+// off amber; "bright" goes further and lifts the portrait itself slightly.
+const FACE_GRADES = {
+  colorized: 'saturate(1)',
+  clean: 'saturate(0.86) hue-rotate(-7deg) contrast(1.04)',
+  bright: 'saturate(0.8) hue-rotate(-10deg) contrast(1.05) brightness(1.07)',
+};
 
 // ── topbar (from the projecthoneycomb.site deploy) ──────────────────────────
 
@@ -1192,6 +1203,10 @@ export default function HoneycombApp() {
       '--cell-opacity': (t.cellOpacity ?? 90) / 100,
       '--dormant-brightness': (t.dormantBright ?? 72) / 100,
       '--face-opacity': t.showFaces ? 1 : 0,
+      // Portrait treatment only (E2). The colourised portraits read brown
+      // under the warm field; these pull the sepia out without touching the
+      // cell light or texture. Identity filter for the current look.
+      '--face-grade': FACE_GRADES[t.faceGrade] || FACE_GRADES.colorized,
     }}>
       <img src={BACKDROPS[t.backdrop] || BACKDROPS['Archive texture']} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
       {t.vignette && <div className="hc-vignette"></div>}
@@ -1253,6 +1268,9 @@ export default function HoneycombApp() {
         <TweakSelect label="Texture image" value={t.backdrop} options={Object.keys(BACKDROPS)} onChange={(v) => setTweak('backdrop', v)} />
         <TweakSlider label="Texture" value={t.textureOpacity} min={0} max={70} unit="%" onChange={(v) => setTweak('textureOpacity', v)} />
         <TweakSlider label="Warmth" value={t.warmth ?? 0} min={0} max={100} unit="%" onChange={(v) => setTweak('warmth', v)} />
+        <TweakRadio label="Portrait grade" value={t.faceGrade || 'colorized'}
+                    options={[{ value: 'colorized', label: 'As is' }, { value: 'clean', label: 'Cleaner' }, { value: 'bright', label: 'Brighter' }]}
+                    onChange={(v) => setTweak('faceGrade', v)} />
         <TweakToggle label="Vignette" value={t.vignette} onChange={(v) => setTweak('vignette', v)} />
         <TweakToggle label="Topbar hides until hover" value={t.topbarTucks === true} onChange={(v) => setTweak('topbarTucks', v)} />
         <TweakSection label="Vines" />

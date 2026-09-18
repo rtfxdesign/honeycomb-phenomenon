@@ -295,7 +295,7 @@ button{font:inherit;color:inherit}
 /* The photograph itself now barely moves — the glaze carries the light, and
    doubling the two made faces look blown out as the pointer went by. */
 .hexcell .cell-face{
-  filter:brightness(calc(1 + var(--lit) * 0.05));
+  filter:var(--face-grade,saturate(1)) brightness(calc(1 + var(--lit) * 0.05));
   transition:opacity var(--dur-grow) var(--ease-quiet),filter var(--glow-fade,520ms) var(--ease-quiet);
 }
 
