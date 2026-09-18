@@ -18,40 +18,38 @@ import RecorderModal from './RecorderModal';
 import { cellLabel, initialsOf } from '../lib/name';
 
 const TWEAK_DEFAULTS = {
-  cellSize: 156,
-  cellCount: 38,
-  brightShare: 75,
+  // the settings the review settled on, 2026-09-18
+  cellSize: 135,
+  cellCount: 50,
+  brightShare: 70,
   distribution: 'clustered',
   seed: 1,
-  gaps: 3,
+  gaps: 7,
   fieldWidth: 1600,
   fieldHeight: 1000,
-  // middle-of-the-road gravity — the settings that read best in review
-  clusterShare: 50,
+  clusterShare: 74,
   clusterBy: 'tags',
-  pull: 55,
-  push: 190,
+  pull: 72,
+  push: 251,
   dormantRespond: false,
   showFaces: true,
   // the pointer as a lamp over the comb
   mouseLight: true,
   lightReach: 260,      // % of a cell's width — how far the pool carries
   lightStrength: 70,    // %
-  lightAfterglow: 520,  // ms for a cell to let go of the light
-  cellCenter: 14,       // % of the middle given over to the ground behind
+  lightAfterglow: 1460, // ms for a cell to let go of the light
+  cellCenter: 43,       // % of the middle given over to the ground behind
   faceGlaze: 50,        // % — the film over a portrait for the light to catch
-  cellOpacity: 92,
-  dormantBright: 85,
-  ground: '#1A1210',
-  backdrop: 'Archive texture',
-  textureOpacity: 34,
-  warmth: 38,
-  faceGrade: 'colorized',
-  panelWidth: 36,   // story / page flyouts, % of the screen (desktop)
-  aboutPanel: 36,   // the About flyout; the bios reflow to whatever width it gets
+  cellOpacity: 50,
+  dormantBright: 75,
+  ground: '#2E1C12',
+  backdrop: 'Honey cells',
+  textureOpacity: 60,
+  warmth: 74,
+  faceGrade: 'bright',
   vignette: true,
   topbarTucks: false,
-  vines: true,
+  vines: false,
   vineSeed: 1,
   vineStyle: 'climb',
   vineSize: 100,
@@ -1194,8 +1192,8 @@ export default function HoneycombApp() {
   const openRecorder = () => setRecorderOpen(true);
   const page = PAGES.find((p) => p.id === pageId) || null;
   const panelOpen = Boolean(page || person);
-  // flyout width as a share of the screen (Tweaks); the About panel is wider
-  const panelPct = page?.id === 'about' ? (t.aboutPanel ?? 36) : (t.panelWidth ?? 36);
+  // every flyout is 36% of the screen (see .story-panel in globals.css)
+  const panelPct = 36;
 
   return (
     <div className="hc-page" style={{
@@ -1203,8 +1201,6 @@ export default function HoneycombApp() {
       '--cell-opacity': (t.cellOpacity ?? 90) / 100,
       '--dormant-brightness': (t.dormantBright ?? 72) / 100,
       '--face-opacity': t.showFaces ? 1 : 0,
-      '--panel-pct': `${t.panelWidth ?? 36}vw`,
-      '--about-pct': `${t.aboutPanel ?? 36}vw`,
       // Portrait treatment only (E2). The colourised portraits read brown
       // under the warm field; these pull the sepia out without touching the
       // cell light or texture. Identity filter for the current look.
@@ -1276,9 +1272,6 @@ export default function HoneycombApp() {
                     onChange={(v) => setTweak('faceGrade', v)} />
         <TweakToggle label="Vignette" value={t.vignette} onChange={(v) => setTweak('vignette', v)} />
         <TweakToggle label="Topbar hides until hover" value={t.topbarTucks === true} onChange={(v) => setTweak('topbarTucks', v)} />
-        <TweakSection label="Flyouts" />
-        <TweakSlider label="Panel width" value={t.panelWidth ?? 36} min={24} max={60} unit="%" onChange={(v) => setTweak('panelWidth', v)} />
-        <TweakSlider label="About panel width" value={t.aboutPanel ?? 36} min={24} max={90} unit="%" onChange={(v) => setTweak('aboutPanel', v)} />
         <TweakSection label="Vines" />
         <TweakToggle label="Vines" value={t.vines} onChange={(v) => setTweak('vines', v)} />
         <TweakRadio label="Growth style" value={t.vineStyle ?? 'climb'} options={['climb', 'wrap', 'sprawl']} onChange={(v) => setTweak('vineStyle', v)} />

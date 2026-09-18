@@ -514,7 +514,7 @@ button{font:inherit;color:inherit}
 
 /* ─────────── story panel slideout (projecthoneycomb.site deploy) ─────────── */
 
-.story-panel{position:fixed;z-index:20;top:0;bottom:0;left:0;width:var(--panel-pct,44vw);display:flex;flex-direction:column;background:#0a0602;border-right:1px solid rgba(224,151,37,.28);box-shadow:28px 0 80px rgba(0,0,0,.44);overflow:hidden;transform:translateX(calc(-100% - 2px));visibility:hidden;transition:transform .72s cubic-bezier(.2,.78,.2,1),visibility 0s linear .72s}
+.story-panel{position:fixed;z-index:20;top:0;bottom:0;left:0;width:36vw;display:flex;flex-direction:column;background:#0a0602;border-right:1px solid rgba(224,151,37,.28);box-shadow:28px 0 80px rgba(0,0,0,.44);overflow:hidden;transform:translateX(calc(-100% - 2px));visibility:hidden;transition:transform .72s cubic-bezier(.2,.78,.2,1),visibility 0s linear .72s}
 .story-panel[aria-hidden="false"]{transform:translateX(0);visibility:visible;transition-delay:0s}
 .close-panel{position:absolute;z-index:2;top:126px;right:25px;width:43px;height:43px;display:grid;place-items:center;border:1px solid rgba(244,232,210,.32);border-radius:50%;background:rgba(255,255,255,.015);color:var(--cream);font-size:28px;line-height:1;cursor:pointer}
 .story-content{flex:1;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:visible;position:relative;padding:clamp(148px,17vh,178px) clamp(48px,6.4vw,102px) 42px}
@@ -528,7 +528,7 @@ button{font:inherit;color:inherit}
 .panel-copy .declaration{color:var(--cream);font-size:19px;font-weight:600}
 .panel-copy h2{margin:26px 0 9px;color:var(--cream);font-family:Montserrat,sans-serif;font-size:18px;letter-spacing:.03em}
 .panel-copy .story-action{margin-top:28px;text-decoration:none}
-.story-panel--about{width:var(--about-pct,78vw);container-type:inline-size}
+.story-panel--about{width:36vw;container-type:inline-size}
 /* the bios follow the panel's width, not the screen's: two columns with a
    smaller portrait when the panel is narrow, one column when it is narrower still */
 @container (max-width:900px){.story-panel .bio,.story-panel .bio--reverse{grid-template-columns:1fr;gap:12px;padding:26px 0}.story-panel .bio--reverse .bio-copy,.story-panel .bio--reverse .bio-portrait{order:0}.story-panel .bio-portrait{width:min(58cqw,230px)}}
