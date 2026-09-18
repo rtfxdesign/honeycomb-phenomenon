@@ -98,7 +98,11 @@ button{font:inherit;color:inherit}
 .gate-note{font-family:var(--font-story);font-size:var(--type-body-sm);color:var(--text-muted);margin:28px 0 0}
 .gate-note span{color:var(--text-gold)}
 .arch-tag{position:absolute;bottom:44px;left:0;right:0;text-align:center;font-family:var(--font-display);font-size:14px;color:var(--text-muted);margin:0;z-index:5;pointer-events:none}
-.arch-clip{position:absolute;inset:15px;border-radius:var(--radius-xl);overflow:hidden;z-index:4;transition:filter 480ms var(--ease-quiet)}
+.arch-clip{position:absolute;inset:15px;border-radius:var(--radius-xl);overflow:hidden;z-index:4;
+  transition:filter 480ms var(--ease-quiet),left .72s cubic-bezier(.2,.78,.2,1)}
+/* with a flyout open the frame begins where the panel ends: the comb is
+   beside the panel, never under it. Phones keep the panel over the column. */
+@media (min-width:881px){.arch--panel .arch-clip{left:calc(var(--panel-w,0px) + 15px)}}
 .arch-clip::before,.arch-clip::after{content:"";position:absolute;left:0;right:0;height:110px;z-index:6;pointer-events:none}
 .arch-clip::before{top:0;background:linear-gradient(180deg,rgba(13,8,6,0.92),transparent)}
 .arch-clip::after{bottom:0;background:linear-gradient(0deg,rgba(13,8,6,0.92),transparent)}
@@ -510,7 +514,7 @@ button{font:inherit;color:inherit}
 
 /* ─────────── story panel slideout (projecthoneycomb.site deploy) ─────────── */
 
-.story-panel{position:fixed;z-index:20;top:0;bottom:0;left:0;width:min(44vw,704px);display:flex;flex-direction:column;background:#0a0602;border-right:1px solid rgba(224,151,37,.28);box-shadow:28px 0 80px rgba(0,0,0,.44);overflow:hidden;transform:translateX(calc(-100% - 2px));visibility:hidden;transition:transform .72s cubic-bezier(.2,.78,.2,1),visibility 0s linear .72s}
+.story-panel{position:fixed;z-index:20;top:0;bottom:0;left:0;width:var(--panel-pct,44vw);display:flex;flex-direction:column;background:#0a0602;border-right:1px solid rgba(224,151,37,.28);box-shadow:28px 0 80px rgba(0,0,0,.44);overflow:hidden;transform:translateX(calc(-100% - 2px));visibility:hidden;transition:transform .72s cubic-bezier(.2,.78,.2,1),visibility 0s linear .72s}
 .story-panel[aria-hidden="false"]{transform:translateX(0);visibility:visible;transition-delay:0s}
 .close-panel{position:absolute;z-index:2;top:126px;right:25px;width:43px;height:43px;display:grid;place-items:center;border:1px solid rgba(244,232,210,.32);border-radius:50%;background:rgba(255,255,255,.015);color:var(--cream);font-size:28px;line-height:1;cursor:pointer}
 .story-content{flex:1;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:visible;position:relative;padding:clamp(148px,17vh,178px) clamp(48px,6.4vw,102px) 42px}
@@ -524,7 +528,7 @@ button{font:inherit;color:inherit}
 .panel-copy .declaration{color:var(--cream);font-size:19px;font-weight:600}
 .panel-copy h2{margin:26px 0 9px;color:var(--cream);font-family:Montserrat,sans-serif;font-size:18px;letter-spacing:.03em}
 .panel-copy .story-action{margin-top:28px;text-decoration:none}
-.story-panel--about{width:min(78vw,1180px)}
+.story-panel--about{width:var(--about-pct,78vw)}
 .story-panel--about .story-content h1{max-width:860px}
 .story-panel--about .panel-copy{max-width:none;max-height:calc(100svh - 330px);padding-right:22px}
 .bios{gap:0;padding-bottom:28px}
@@ -648,13 +652,19 @@ audio.story-media{max-height:none}
 .site-search::before{display:none}
 .search-toggle{display:grid;place-items:center;width:36px;height:36px;padding:0;border:1px solid rgba(242,191,73,.4);
   border-radius:3px;background:transparent;color:var(--gold);font-size:18px;line-height:1;cursor:pointer}
-.search-input{position:absolute;top:calc(100% + 8px);left:0;right:0;width:auto;display:none;height:44px;
-  background:rgba(10,6,3,.97);border-color:var(--line);padding:0 54px 0 14px}
-.site-search.is-open .search-input{display:block}
-.site-search.is-open{position:static}
-.site-search.is-open .search-input{left:12px;right:12px;top:66px;position:fixed;z-index:31}
-.site-search.is-open .search-count{position:fixed;top:88px;right:26px;transform:none;z-index:32}
-.site-search.is-open .search-clear{position:fixed;top:78px;right:20px;transform:none;z-index:32}
+/* The field opens inside the bar — comb mark, then the input filling the
+   rest, the magnifier turned into a × — rather than dropping a strip over
+   the comb. The wordmark and the menu step aside while it is open. */
+.search-input{display:none;width:auto;height:38px;background:rgba(10,6,3,.97);border-color:var(--line);padding:0 54px 0 14px}
+.site-search{gap:8px}
+.site-search.is-open{position:relative;right:auto;left:auto;top:auto;transform:none;flex:1;min-width:0;display:flex;align-items:center;margin-left:8px}
+.site-search.is-open .search-input{display:block;flex:1;min-width:0}
+.site-search.is-open .search-count{position:absolute;right:calc(36px + 8px + 30px);top:50%;transform:translateY(-50%)}
+.site-search.is-open .search-clear{position:absolute;right:calc(36px + 8px + 6px);top:50%;transform:translateY(-50%)}
+.site-search.is-open .search-toggle{order:2;flex:none}
+.site-header:has(.site-search.is-open) .brand-word,
+.site-header:has(.site-search.is-open) .menu-button,
+.site-header:has(.site-search.is-open) nav:not(.nav-open){display:none}
 .brand{gap:9px;font-size:clamp(9px,1.5vw,12px);letter-spacing:.11em}
 .brand .comb-mark{width:54px;height:30px}
 .site-header nav{gap:clamp(9px,2vw,18px)}

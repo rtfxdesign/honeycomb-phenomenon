@@ -47,6 +47,8 @@ const TWEAK_DEFAULTS = {
   textureOpacity: 34,
   warmth: 38,
   faceGrade: 'colorized',
+  panelWidth: 36,   // story / page flyouts, % of the screen (desktop)
+  aboutWidth: 62,   // the About flyout, which carries the bios
   vignette: true,
   topbarTucks: false,
   vines: true,
@@ -477,9 +479,9 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
       <div className={`site-search${searchOpen || query ? ' is-open' : ''}${searchFocused ? ' is-focused' : ''}`}>
         <button
           className="search-toggle" type="button" aria-label="Search the archive"
-          onClick={() => openSearch(!(searchOpen || query))}
+          onClick={() => { if (query) { onQuery(''); openSearch(false); } else openSearch(!searchOpen); }}
         >
-          <span aria-hidden="true">⌕</span>
+          <span aria-hidden="true">{searchOpen || query ? '×' : '⌕'}</span>
         </button>
         <input
           ref={searchRef} className="search-input" type="search" value={query}
@@ -698,7 +700,7 @@ function Gate({ onEnter, size }) {
 
 // ── archive field (design project, + person panel wiring + touch panning) ───
 
-function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences, faces, query, onMatchCount }) {
+function Archive({ t, panelOpen, panelPct, focusKey, setFocusKey, onPersonSelect, experiences, faces, query, onMatchCount }) {
   const [vp, setVp] = useState(() => (typeof window === 'undefined' ? [1280, 800] : [window.innerWidth, window.innerHeight]));
   useEffect(() => {
     const onR = () => setVp([window.innerWidth, window.innerHeight]);
@@ -739,7 +741,10 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
   // with the story panel open the field is allowed to slide further than the
   // scroll range, so the cell you clicked can clear the panel even on a small
   // field. That extra is a transform on top of the scroll, and it eases back.
-  const panelWidth = Math.min(vp[0] * 0.44, 704);
+  // the open flyout's width on screen, from its share of the screen: the
+  // frame's left edge moves to it (CSS --panel-w on .arch), so the comb sits
+  // beside the panel rather than under it. Phones keep the panel over the column.
+  const panelWidth = phone || !panelOpen ? 0 : Math.round(vp[0] * (panelPct ?? 44) / 100);
   const clipH = vp[1] - 30;
   // start in the middle of the comb on a desktop; at the top on a phone
   useEffect(() => {
@@ -916,10 +921,12 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     const b = arranged.find((x) => x.k === focusKey);
     if (!b) return undefined;
     // where the cell should land on screen: centred in the room beside the panel
-    const targetScreenX = panelWidth + (vp[0] - panelWidth) / 2;
+    const clipBox = clip.getBoundingClientRect();
+    // where the cell should land on screen: the middle of the frame, which
+    // now begins at the panel's edge
+    const targetScreenX = clipBox.left + clipBox.width / 2;
     const targetScreenY = vp[1] / 2;
     const cellCenterX = b.x + size / 2, cellCenterY = b.y + size * 0.43;
-    const clipBox = clip.getBoundingClientRect();
     // the field's offset inside the scroll area (its centring margins)
     const offX = el.offsetLeft, offY = el.offsetTop;
     // scroll as far toward the target as the scroll range allows...
@@ -1022,7 +1029,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     }
   };
   return (
-    <div className={panelOpen ? 'arch arch--panel' : 'arch'}>
+    <div className={panelOpen ? 'arch arch--panel' : 'arch'} style={{ '--panel-w': `${Math.round(panelWidth)}px` }}>
       {/* no dimming of the field while the panel is open: it muted the very
           cells that were gathering toward the one you clicked */}
       <div className="arch-clip arch-clip--scroll" ref={clipRef}>
@@ -1196,6 +1203,8 @@ export default function HoneycombApp() {
   const openRecorder = () => setRecorderOpen(true);
   const page = PAGES.find((p) => p.id === pageId) || null;
   const panelOpen = Boolean(page || person);
+  // flyout width as a share of the screen (Tweaks); the About panel is wider
+  const panelPct = page?.id === 'about' ? (t.aboutWidth ?? 62) : (t.panelWidth ?? 36);
 
   return (
     <div className="hc-page" style={{
@@ -1203,6 +1212,8 @@ export default function HoneycombApp() {
       '--cell-opacity': (t.cellOpacity ?? 90) / 100,
       '--dormant-brightness': (t.dormantBright ?? 72) / 100,
       '--face-opacity': t.showFaces ? 1 : 0,
+      '--panel-pct': `${t.panelWidth ?? 36}vw`,
+      '--about-pct': `${t.aboutWidth ?? 62}vw`,
       // Portrait treatment only (E2). The colourised portraits read brown
       // under the warm field; these pull the sepia out without touching the
       // cell light or texture. Identity filter for the current look.
@@ -1219,6 +1230,7 @@ export default function HoneycombApp() {
           <Archive
             t={t}
             panelOpen={panelOpen}
+            panelPct={panelPct}
             focusKey={focusKey}
             setFocusKey={setFocusKey}
             onPersonSelect={onPersonSelect}
@@ -1273,6 +1285,9 @@ export default function HoneycombApp() {
                     onChange={(v) => setTweak('faceGrade', v)} />
         <TweakToggle label="Vignette" value={t.vignette} onChange={(v) => setTweak('vignette', v)} />
         <TweakToggle label="Topbar hides until hover" value={t.topbarTucks === true} onChange={(v) => setTweak('topbarTucks', v)} />
+        <TweakSection label="Flyouts" />
+        <TweakSlider label="Panel width" value={t.panelWidth ?? 36} min={24} max={60} unit="%" onChange={(v) => setTweak('panelWidth', v)} />
+        <TweakSlider label="About panel width" value={t.aboutWidth ?? 62} min={40} max={90} unit="%" onChange={(v) => setTweak('aboutWidth', v)} />
         <TweakSection label="Vines" />
         <TweakToggle label="Vines" value={t.vines} onChange={(v) => setTweak('vines', v)} />
         <TweakRadio label="Growth style" value={t.vineStyle ?? 'climb'} options={['climb', 'wrap', 'sprawl']} onChange={(v) => setTweak('vineStyle', v)} />
