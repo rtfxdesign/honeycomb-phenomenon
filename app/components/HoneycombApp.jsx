@@ -48,7 +48,7 @@ const TWEAK_DEFAULTS = {
   warmth: 38,
   faceGrade: 'colorized',
   panelWidth: 36,   // story / page flyouts, % of the screen (desktop)
-  aboutWidth: 36,   // the About flyout; the bios reflow to whatever width it gets
+  aboutPanel: 36,   // the About flyout; the bios reflow to whatever width it gets
   vignette: true,
   topbarTucks: false,
   vines: true,
@@ -1195,7 +1195,7 @@ export default function HoneycombApp() {
   const page = PAGES.find((p) => p.id === pageId) || null;
   const panelOpen = Boolean(page || person);
   // flyout width as a share of the screen (Tweaks); the About panel is wider
-  const panelPct = page?.id === 'about' ? (t.aboutWidth ?? 36) : (t.panelWidth ?? 36);
+  const panelPct = page?.id === 'about' ? (t.aboutPanel ?? 36) : (t.panelWidth ?? 36);
 
   return (
     <div className="hc-page" style={{
@@ -1204,7 +1204,7 @@ export default function HoneycombApp() {
       '--dormant-brightness': (t.dormantBright ?? 72) / 100,
       '--face-opacity': t.showFaces ? 1 : 0,
       '--panel-pct': `${t.panelWidth ?? 36}vw`,
-      '--about-pct': `${t.aboutWidth ?? 62}vw`,
+      '--about-pct': `${t.aboutPanel ?? 36}vw`,
       // Portrait treatment only (E2). The colourised portraits read brown
       // under the warm field; these pull the sepia out without touching the
       // cell light or texture. Identity filter for the current look.
@@ -1278,7 +1278,7 @@ export default function HoneycombApp() {
         <TweakToggle label="Topbar hides until hover" value={t.topbarTucks === true} onChange={(v) => setTweak('topbarTucks', v)} />
         <TweakSection label="Flyouts" />
         <TweakSlider label="Panel width" value={t.panelWidth ?? 36} min={24} max={60} unit="%" onChange={(v) => setTweak('panelWidth', v)} />
-        <TweakSlider label="About panel width" value={t.aboutWidth ?? 36} min={40} max={90} unit="%" onChange={(v) => setTweak('aboutWidth', v)} />
+        <TweakSlider label="About panel width" value={t.aboutPanel ?? 36} min={24} max={90} unit="%" onChange={(v) => setTweak('aboutPanel', v)} />
         <TweakSection label="Vines" />
         <TweakToggle label="Vines" value={t.vines} onChange={(v) => setTweak('vines', v)} />
         <TweakRadio label="Growth style" value={t.vineStyle ?? 'climb'} options={['climb', 'wrap', 'sprawl']} onChange={(v) => setTweak('vineStyle', v)} />
