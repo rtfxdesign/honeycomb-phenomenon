@@ -157,12 +157,24 @@ function useFieldLight(fieldRef, { enabled, reach, cells }) {
   }, [fieldRef, enabled, reach, cells]);
 }
 
+// A backdrop is a still (a path) or a loop ({ video, poster }): twelve seconds
+// of the source clip at 1600px, muted, looping, with its first frame as the
+// poster so the ground is there before the clip is.
 const BACKDROPS = {
   'Archive texture': '/assets/archive-background.webp',
   'Bees at work': '/uploads/bees.jpg',
   'Honey cells': '/uploads/honey-cells.jpg',
   'Wax structure': '/uploads/wax-structure.jpg',
   'Golden dunes': '/uploads/golden-dunes.jpg',
+  'Comb, backlit': '/uploads/comb-backlit.webp',
+  'Wax cells': '/uploads/wax-cells.webp',
+  'Honey frame': '/uploads/honey-frame.webp',
+  'Honey, dripping': '/uploads/honey-dripping.webp',
+  'Comb, intricate (loop)': { video: '/uploads/comb-intricate.mp4', poster: '/uploads/comb-intricate-poster.webp' },
+  'Golden cells (loop)': { video: '/uploads/comb-golden-cells.mp4', poster: '/uploads/comb-golden-cells-poster.webp' },
+  'Soft focus (loop)': { video: '/uploads/comb-soft-focus.mp4', poster: '/uploads/comb-soft-focus-poster.webp' },
+  'Macro comb (loop)': { video: '/uploads/comb-macro.mp4', poster: '/uploads/comb-macro-poster.webp' },
+  'Abstract gold (loop)': { video: '/uploads/comb-abstract.mp4', poster: '/uploads/comb-abstract-poster.webp' },
 };
 
 // ── field generation (unchanged from the design project) ────────────────────
@@ -1206,7 +1218,13 @@ export default function HoneycombApp() {
       // cell light or texture. Identity filter for the current look.
       '--face-grade': FACE_GRADES[t.faceGrade] || FACE_GRADES.colorized,
     }}>
-      <img src={BACKDROPS[t.backdrop] || BACKDROPS['Archive texture']} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
+      {(() => {
+        const bd = BACKDROPS[t.backdrop] || BACKDROPS['Archive texture'];
+        return typeof bd === 'string'
+          ? <img src={bd} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
+          : <video key={bd.video} src={bd.video} poster={bd.poster} className="hc-texture" style={{ opacity: t.textureOpacity / 100 }}
+                   autoPlay muted loop playsInline preload="auto" aria-hidden="true" />;
+      })()}
       {t.vignette && <div className="hc-vignette"></div>}
       {(t.warmth ?? 0) > 0 && <div className="hc-warm" style={{ opacity: (t.warmth ?? 0) / 100 }} aria-hidden="true"></div>}
       <div className="hc-view" style={{ opacity: view === 'gate' ? 1 : 0, pointerEvents: view === 'gate' ? 'auto' : 'none' }}>
