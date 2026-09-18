@@ -826,3 +826,15 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
   .story-panel--about .story-content{padding-right:25px}
   .story-panel--about .panel-copy{max-width:none}
 }
+
+/* The search field sits in the grid beside the comb rather than being pinned
+   to the centre line: when the nav is wider than its column the comb drifts
+   left of centre and a centre-anchored field ran under it. Now they are two
+   cells side by side and cannot overlap, whatever the nav weighs. */
+@media (min-width:881px){
+  .site-header{grid-template-columns:1fr auto auto 1fr}
+  .brand-word{order:0}
+  .site-search{position:relative;right:auto;left:auto;top:auto;transform:none;order:1;justify-self:end;margin-right:14px}
+  .brand{order:2}
+  .site-header nav{order:3}
+}
