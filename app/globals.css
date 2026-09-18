@@ -819,3 +819,10 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
 @media (prefers-reduced-motion:reduce){.story-content[data-more="true"]::after{animation:none}}
 @media (max-width:880px){.story-content::after{bottom:12px}}
 
+
+/* About: the copy and its scrollbar run out to the same right edge as the ×,
+   instead of stopping short and leaving a dead column beside the text */
+@media (min-width:881px){
+  .story-panel--about .story-content{padding-right:25px}
+  .story-panel--about .panel-copy{max-width:none}
+}
