@@ -1060,7 +1060,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
             return (
             <div key={b.k} className={'cell' + (dimmed ? ' cell-unmatched' : '')}
                  data-cx={b.x} data-cy={b.y} data-half={size / 2}
-                 style={{ left: b.x, top: b.y, width: size, zIndex: b.k === focusKey ? 3 : b.match ? 2 : b.kin ? 2 : 1 }}>
+                 style={{ left: b.x, top: b.y, width: size, '--cell-w': `${size}px`, zIndex: b.k === focusKey ? 3 : b.match ? 2 : b.kin ? 2 : 1 }}>
               {b.t === 'b'
                 ? (
                   <div className={'hexcell' + (b.k === focusKey ? ' cell-focus' : '') + (b.match ? ' cell-match' : '')} tabIndex="0" role="button"

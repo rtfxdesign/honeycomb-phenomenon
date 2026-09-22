@@ -148,7 +148,7 @@ button{font:inherit;color:inherit}
 .cell-initials{position:absolute;left:11%;top:11%;width:78%;height:78%;display:grid;place-items:center;
   clip-path:polygon(25% 2%,75% 2%,98% 50%,75% 98%,25% 98%,2% 50%);
   background:radial-gradient(circle at 50% 38%,rgba(242,191,73,0.30),rgba(38,23,9,0.92) 74%);
-  color:var(--gold);font-family:Montserrat,sans-serif;font-size:20cqw;font-weight:600;letter-spacing:0.06em;
+  color:var(--gold);font-family:Montserrat,sans-serif;font-size:calc(var(--cell-w,135px) * 0.2);font-weight:600;letter-spacing:0.06em;z-index:3;
   text-shadow:0 2px 12px rgba(0,0,0,0.65);pointer-events:none}
 /* ── the pointer as a light source ──────────────────────────────────────────
    --lit (0..1) and --lx (-1..1) are written per cell by useFieldLight. Nothing
