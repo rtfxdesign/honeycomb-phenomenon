@@ -846,3 +846,8 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
 }
 .arch--gold .hexcell:has(.cell-face) > img:not(.cell-face){-webkit-mask-image:none;mask-image:none}
 .arch--gold .cell-initials{color:#fff4dc;text-shadow:0 1px 10px rgba(0,0,0,.9),0 0 2px rgba(0,0,0,.8)}
+
+/* A bright cell with nobody in it yet — the comb keeps a few spare — is solid
+   gold like a dormant one, not a gold ring around a hole. The hole is for a
+   story without a photo, where the initials sit in it. */
+.arch--gold .hexcell:not(:has(.cell-face)):not(:has(.cell-initials)) > img{-webkit-mask-image:none;mask-image:none}
