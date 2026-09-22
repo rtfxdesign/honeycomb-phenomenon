@@ -41,9 +41,9 @@ const TWEAK_DEFAULTS = {
   lightAfterglow: 1460, // ms for a cell to let go of the light
   cellCenter: 43,       // % of the middle given over to the ground behind
   faceGlaze: 50,        // % — the film over a portrait for the light to catch
-  cellOpacity: 78,    // gold leaf wants more presence than the old wax did
-  dormantBright: 75,
-  ground: '#171412',
+  cellOpacity: 92,    // gold leaf wants more presence than the old wax did
+  dormantBright: 95,
+  ground: '#000000',
   backdrop: 'None',
   textureOpacity: 0,
   warmth: 28,
@@ -1088,7 +1088,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                   // wrapped so a dormant cell has somewhere to hang the light
                   // pool; bare wax takes the light more fully than a portrait
                   <div className="cell-dormant-wrap" aria-hidden="true">
-                    <img src="/assets/cell-bright.png" alt="" className="cell-dormant" style={{ width: '100%' }} />
+                    <img src={t.dormantLook === 'wax' ? '/assets/cell-bright.png' : '/assets/cell-gold.png'} alt="" className="cell-dormant" style={{ width: '100%' }} />
                   </div>
                 )}
             </div>
@@ -1275,7 +1275,7 @@ export default function HoneycombApp() {
         <TweakSlider label="Push distance" value={t.push} min={40} max={340} unit="px" onChange={(v) => setTweak('push', v)} />
         <TweakToggle label="Dormant cells respond" value={t.dormantRespond} onChange={(v) => setTweak('dormantRespond', v)} />
         <TweakSection label="Background" />
-        <TweakColor label="Ground" value={t.ground} options={['#0B0A09', '#121110', '#171412', '#1C1814', '#0D0806', '#1A1210', '#241711', '#2E1C12']} onChange={(v) => setTweak('ground', v)} />
+        <TweakColor label="Ground" value={t.ground} options={['#000000', '#0B0A09', '#121110', '#171412', '#1C1814', '#0D0806', '#1A1210', '#241711', '#2E1C12']} onChange={(v) => setTweak('ground', v)} />
         <TweakSelect label="Texture image" value={t.backdrop} options={Object.keys(BACKDROPS)} onChange={(v) => setTweak('backdrop', v)} />
         <TweakSlider label="Texture" value={t.textureOpacity} min={0} max={70} unit="%" onChange={(v) => setTweak('textureOpacity', v)} />
         <TweakSlider label="Warmth" value={t.warmth ?? 0} min={0} max={100} unit="%" onChange={(v) => setTweak('warmth', v)} />

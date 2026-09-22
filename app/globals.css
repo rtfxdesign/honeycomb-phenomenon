@@ -829,30 +829,10 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
 
 
 /* ───────────── dormant cells as gold leaf ─────────────
-   The cell image keeps only its rim (an inverse radial mask); the interior is
-   a leaf-gold gradient painted on the wrapper underneath, clipped to the hex
-   by the cell's own alpha and mottled a little by the wax noise so it reads
-   as beaten metal rather than a flat fill. One organic colour, not ten
-   cracked cells. Brightness applies to the whole cell so rim and leaf dim
-   together. */
-.arch--gold .cell-dormant-wrap{
-  background:
-    radial-gradient(ellipse 70% 62% at 36% 30%, rgba(255,232,160,.55) 0%, rgba(255,232,160,0) 60%),
-    radial-gradient(ellipse 80% 90% at 68% 78%, rgba(120,72,10,.55) 0%, rgba(120,72,10,0) 62%),
-    linear-gradient(152deg, #e9c25a 0%, #d3a23a 34%, #b98722 62%, #a2741a 100%);
-  -webkit-mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
-  mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
-  -webkit-mask-size:100% 100%,140% 140%;
-  mask-size:100% 100%,140% 140%;
-  -webkit-mask-composite:source-in;
-  mask-composite:intersect;
-  filter:brightness(calc(var(--dormant-brightness,0.72) + var(--lit) * 0.30));
-  opacity:var(--cell-opacity,0.9);
-  transition:filter var(--glow-fade,520ms) var(--ease-quiet);
-}
-/* the image is now just the rim: everything inside ~78% of the hex is cut away */
+   The dormant cell is Paul's gold-leaf hex (cell-gold.png), whole: no centre
+   cut-out, no desaturation — the leaf keeps its colour and only dims with
+   the Dormant brightness slider, lifting under the light like the wax did. */
 .arch--gold .cell-dormant{
-  filter:none;opacity:1;
-  -webkit-mask-image:radial-gradient(circle at 50% 50%, transparent 0%, transparent 34%, rgba(0,0,0,.35) 40%, #000 46%);
-  mask-image:radial-gradient(circle at 50% 50%, transparent 0%, transparent 34%, rgba(0,0,0,.35) 40%, #000 46%);
+  -webkit-mask-image:none;mask-image:none;
+  filter:brightness(calc(var(--dormant-brightness,0.72) + var(--lit) * 0.30));
 }
