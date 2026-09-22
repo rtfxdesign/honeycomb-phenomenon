@@ -1,5 +1,4 @@
-// Slideout page content. Copy is the "Final Site Copy" doc (2026-09) verbatim,
-// with Paul's rule applied: titles carry no trailing period.
+// Slideout page content ported from the most recent projecthoneycomb.site deploy.
 
 const TEAM = [
   {
@@ -38,15 +37,18 @@ export const PAGES = [
   {
     id: 'explore',
     eyebrow: 'WELCOME TO HONEYCOMB-PHENOMENON',
-    title: 'Your Experience. Our Collective History',
+    title: 'A living archive of the unexplained',
     body: ({ focusSearch }) => (
       <>
         <button className="story-action" type="button" onClick={focusSearch}>
           SEARCH THE ARCHIVE <span aria-hidden="true">→</span>
         </button>
         <p style={{ marginTop: 18 }}>Search by place, year, encounter type, or any detail you remember — matching voices gather together in the comb and the rest give way.</p>
-        <p>Honeycomb is an archive, a compendium of encounters built by experiencers as a searchable database to facilitate learning, community, and growth. We understand that inexplicable does not mean impossible, and we want to create a trusted space for sharing these extraordinary events.</p>
-        <p>Our platform will evolve over time, as contributions get made by you. By providing the platform, we hope to encourage the formation of a trusted community, where together we can work to untangle the meaning behind contact.</p>
+        <h2>Your Experience. Our Collective History.</h2>
+        <p>Honeycomb&rsquo;s mission is to support and empower those who have experienced or witnessed a UFO, UAP, or anything related to the Phenomenon, through the building of community, and the curation of shared experiences.</p>
+        <p>We have built an ever-evolving platform to share anomalous experiences with others, one that fosters a new understanding that your experience was unique but not isolated. You are not alone.</p>
+        <p>For too long stigma and secrecy have caused us to keep these profound encounters to ourselves, often hiding them from even our closest loved ones.</p>
+        <p className="declaration">We are here to change that.</p>
       </>
     ),
   },
@@ -59,6 +61,7 @@ export const PAGES = [
         <p>Over the past decade, we have been documenting these interactions to build a visual, searchable database. Here, you can safely record your story, archive your encounter, search and view other encounters, and connect with a global community of people with similar yet personal experiences.</p>
         <p>This is our path to disclosure. This information belongs to all of us. No one can classify or hide your story&mdash;and your experience might just be another key, unlocking humanity&rsquo;s understanding of our place in the universe.</p>
         <h2>Join the Journey</h2>
+        <p>We are building this archive with you. One person at a time. One experience at a time.</p>
         <button className="story-action" type="button" onClick={openRecorder}>
           SHARE YOUR STORY TODAY <span aria-hidden="true">→</span>
         </button>

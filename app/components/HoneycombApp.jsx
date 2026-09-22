@@ -32,6 +32,7 @@ const TWEAK_DEFAULTS = {
   pull: 72,
   push: 251,
   dormantRespond: false,
+  dormantLook: 'gold',  // 'gold' leaf interiors, or 'wax' for the cracked comb
   showFaces: true,
   // the pointer as a lamp over the comb
   mouseLight: true,
@@ -40,12 +41,12 @@ const TWEAK_DEFAULTS = {
   lightAfterglow: 1460, // ms for a cell to let go of the light
   cellCenter: 43,       // % of the middle given over to the ground behind
   faceGlaze: 50,        // % — the film over a portrait for the light to catch
-  cellOpacity: 50,
+  cellOpacity: 78,    // gold leaf wants more presence than the old wax did
   dormantBright: 75,
-  ground: '#2E1C12',
-  backdrop: 'Honey cells',
-  textureOpacity: 60,
-  warmth: 74,
+  ground: '#171412',
+  backdrop: 'None',
+  textureOpacity: 0,
+  warmth: 28,
   faceGrade: 'bright',
   vignette: true,
   topbarTucks: false,
@@ -157,10 +158,10 @@ function useFieldLight(fieldRef, { enabled, reach, cells }) {
   }, [fieldRef, enabled, reach, cells]);
 }
 
-// A backdrop is a still (a path) or a loop ({ video, poster }): twelve seconds
-// of the source clip at 1600px, muted, looping, with its first frame as the
-// poster so the ground is there before the clip is.
+// A backdrop is a still, or nothing at all — 'None' leaves the ground colour
+// on its own. (Video loops were tried and dropped: they cost the browser.)
 const BACKDROPS = {
+  'None': null,
   'Archive texture': '/assets/archive-background.webp',
   'Bees at work': '/uploads/bees.jpg',
   'Honey cells': '/uploads/honey-cells.jpg',
@@ -170,11 +171,6 @@ const BACKDROPS = {
   'Wax cells': '/uploads/wax-cells.webp',
   'Honey frame': '/uploads/honey-frame.webp',
   'Honey, dripping': '/uploads/honey-dripping.webp',
-  'Comb, intricate (loop)': { video: '/uploads/comb-intricate.mp4', poster: '/uploads/comb-intricate-poster.webp' },
-  'Golden cells (loop)': { video: '/uploads/comb-golden-cells.mp4', poster: '/uploads/comb-golden-cells-poster.webp' },
-  'Soft focus (loop)': { video: '/uploads/comb-soft-focus.mp4', poster: '/uploads/comb-soft-focus-poster.webp' },
-  'Macro comb (loop)': { video: '/uploads/comb-macro.mp4', poster: '/uploads/comb-macro-poster.webp' },
-  'Abstract gold (loop)': { video: '/uploads/comb-abstract.mp4', poster: '/uploads/comb-abstract-poster.webp' },
 };
 
 // ── field generation (unchanged from the design project) ────────────────────
@@ -710,7 +706,7 @@ function Gate({ onEnter, size }) {
 
 // ── archive field (design project, + person panel wiring + touch panning) ───
 
-function Archive({ t, panelOpen, panelPct, focusKey, setFocusKey, onPersonSelect, experiences, faces, query, onMatchCount }) {
+function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences, faces, query, onMatchCount }) {
   const [vp, setVp] = useState(() => (typeof window === 'undefined' ? [1280, 800] : [window.innerWidth, window.innerHeight]));
   useEffect(() => {
     const onR = () => setVp([window.innerWidth, window.innerHeight]);
@@ -751,10 +747,7 @@ function Archive({ t, panelOpen, panelPct, focusKey, setFocusKey, onPersonSelect
   // with the story panel open the field is allowed to slide further than the
   // scroll range, so the cell you clicked can clear the panel even on a small
   // field. That extra is a transform on top of the scroll, and it eases back.
-  // the open flyout's width on screen, from its share of the screen: the
-  // frame's left edge moves to it (CSS --panel-w on .arch), so the comb sits
-  // beside the panel rather than under it. Phones keep the panel over the column.
-  const panelWidth = phone || !panelOpen ? 0 : Math.round(vp[0] * (panelPct ?? 44) / 100);
+  const panelWidth = Math.min(vp[0] * 0.44, 704);
   const clipH = vp[1] - 30;
   // start in the middle of the comb on a desktop; at the top on a phone
   useEffect(() => {
@@ -919,31 +912,38 @@ function Archive({ t, panelOpen, panelPct, focusKey, setFocusKey, onPersonSelect
     reach: size * ((t.lightReach ?? 260) / 100),
     cells: arranged,
   });
-  // With a flyout open the frame itself has moved beside the panel, so the
-  // clicked cell is never under it. All that is left is to keep it in view:
-  // once the frame has finished sliding (its left edge eases over .72s),
-  // scroll the least amount that brings the cell inside it. No transform —
-  // the old shove pushed the whole comb aside and left bare ground behind.
+  // with the panel open, slide the field so the cell you clicked clears it
   useEffect(() => {
     const el = fieldRef.current, clip = clipRef.current;
     if (!el || !clip) return undefined;
-    el.style.transform = '';
-    if (!panelOpen || !focusKey || phone) return undefined;
+    if (!panelOpen || !focusKey || phone) {
+      // the extra shove eases back to nothing when the panel closes
+      el.style.transform = '';
+      return undefined;
+    }
     const b = arranged.find((x) => x.k === focusKey);
     if (!b) return undefined;
-    const settle = setTimeout(() => {
-      const box = clip.getBoundingClientRect();
-      // the cell's edges relative to the frame's visible box
-      const pad = size * 0.6;
-      const left = el.offsetLeft + b.x - clip.scrollLeft, right = left + size;
-      const top = el.offsetTop + b.y - clip.scrollTop, bottom = top + size * 0.866;
-      let dx = 0, dy = 0;
-      if (left < pad) dx = left - pad; else if (right > box.width - pad) dx = right - (box.width - pad);
-      if (top < pad) dy = top - pad; else if (bottom > box.height - pad) dy = bottom - (box.height - pad);
-      if (dx || dy) clip.scrollBy({ left: dx, top: dy, behavior: 'smooth' });
-    }, 760);
-    return () => clearTimeout(settle);
-  }, [panelOpen, focusKey, arranged, vp, size, phone]);
+    // where the cell should land on screen: centred in the room beside the panel
+    const targetScreenX = panelWidth + (vp[0] - panelWidth) / 2;
+    const targetScreenY = vp[1] / 2;
+    const cellCenterX = b.x + size / 2, cellCenterY = b.y + size * 0.43;
+    const clipBox = clip.getBoundingClientRect();
+    // the field's offset inside the scroll area (its centring margins)
+    const offX = el.offsetLeft, offY = el.offsetTop;
+    // scroll as far toward the target as the scroll range allows...
+    const wantLeft = offX + cellCenterX - (targetScreenX - clipBox.left);
+    const wantTop = offY + cellCenterY - (targetScreenY - clipBox.top);
+    const maxLeft = Math.max(0, clip.scrollWidth - clip.clientWidth);
+    const maxTop = Math.max(0, clip.scrollHeight - clip.clientHeight);
+    const left = Math.max(0, Math.min(maxLeft, wantLeft));
+    const top = Math.max(0, Math.min(maxTop, wantTop));
+    clip.scrollTo({ left, top, behavior: 'smooth' });
+    // ...and the rest of the way is a transform, so a cell near the left edge
+    // of a small field still clears the panel
+    const shove = left - wantLeft;
+    el.style.transform = shove ? `translateX(${Math.round(shove)}px)` : '';
+    return undefined;
+  }, [panelOpen, focusKey, arranged, vp, panelWidth, size, phone]);
   // vines render beneath the cells, never obscuring comb contents. Three growth
   // styles: "climb" hugs the left/right silhouette from the bottom up, "wrap"
   // traces the cluster's whole outer perimeter, "sprawl" rises as undergrowth
@@ -1030,7 +1030,7 @@ function Archive({ t, panelOpen, panelPct, focusKey, setFocusKey, onPersonSelect
     }
   };
   return (
-    <div className={panelOpen ? 'arch arch--panel' : 'arch'} style={{ '--panel-w': `${Math.round(panelWidth)}px` }}>
+    <div className={(panelOpen ? 'arch arch--panel' : 'arch') + (t.dormantLook === 'wax' ? '' : ' arch--gold')}>
       {/* no dimming of the field while the panel is open: it muted the very
           cells that were gathering toward the one you clicked */}
       <div className="arch-clip arch-clip--scroll" ref={clipRef}>
@@ -1204,8 +1204,6 @@ export default function HoneycombApp() {
   const openRecorder = () => setRecorderOpen(true);
   const page = PAGES.find((p) => p.id === pageId) || null;
   const panelOpen = Boolean(page || person);
-  // every flyout is 36% of the screen (see .story-panel in globals.css)
-  const panelPct = 36;
 
   return (
     <div className="hc-page" style={{
@@ -1218,13 +1216,9 @@ export default function HoneycombApp() {
       // cell light or texture. Identity filter for the current look.
       '--face-grade': FACE_GRADES[t.faceGrade] || FACE_GRADES.colorized,
     }}>
-      {(() => {
-        const bd = BACKDROPS[t.backdrop] || BACKDROPS['Archive texture'];
-        return typeof bd === 'string'
-          ? <img src={bd} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
-          : <video key={bd.video} src={bd.video} poster={bd.poster} className="hc-texture" style={{ opacity: t.textureOpacity / 100 }}
-                   autoPlay muted loop playsInline preload="auto" aria-hidden="true" />;
-      })()}
+      {(t.backdrop in BACKDROPS ? BACKDROPS[t.backdrop] : BACKDROPS['Archive texture']) && (
+        <img src={t.backdrop in BACKDROPS ? BACKDROPS[t.backdrop] : BACKDROPS['Archive texture']} alt="" className="hc-texture" style={{ opacity: t.textureOpacity / 100 }} />
+      )}
       {t.vignette && <div className="hc-vignette"></div>}
       {(t.warmth ?? 0) > 0 && <div className="hc-warm" style={{ opacity: (t.warmth ?? 0) / 100 }} aria-hidden="true"></div>}
       <div className="hc-view" style={{ opacity: view === 'gate' ? 1 : 0, pointerEvents: view === 'gate' ? 'auto' : 'none' }}>
@@ -1235,7 +1229,6 @@ export default function HoneycombApp() {
           <Archive
             t={t}
             panelOpen={panelOpen}
-            panelPct={panelPct}
             focusKey={focusKey}
             setFocusKey={setFocusKey}
             onPersonSelect={onPersonSelect}
@@ -1267,6 +1260,7 @@ export default function HoneycombApp() {
         <TweakToggle label="Faces always visible" value={t.showFaces} onChange={(v) => setTweak('showFaces', v)} />
         <TweakSlider label="Cell opacity" value={t.cellOpacity ?? 90} min={40} max={100} unit="%" onChange={(v) => setTweak('cellOpacity', v)} />
         <TweakSlider label="Dormant brightness" value={t.dormantBright ?? 72} min={30} max={100} unit="%" onChange={(v) => setTweak('dormantBright', v)} />
+        <TweakRadio label="Dormant cells" value={t.dormantLook || 'gold'} options={[{ value: 'gold', label: 'Gold leaf' }, { value: 'wax', label: 'Wax' }]} onChange={(v) => setTweak('dormantLook', v)} />
         <TweakSlider label="Cell centre" value={t.cellCenter ?? 14} min={0} max={45} unit="%" onChange={(v) => setTweak('cellCenter', v)} />
         <TweakToggle label="Mouse light" value={t.mouseLight !== false} onChange={(v) => setTweak('mouseLight', v)} />
         <TweakSlider label="Light reach" value={t.lightReach ?? 260} min={100} max={600} step={10} unit="%" onChange={(v) => setTweak('lightReach', v)} />
@@ -1281,7 +1275,7 @@ export default function HoneycombApp() {
         <TweakSlider label="Push distance" value={t.push} min={40} max={340} unit="px" onChange={(v) => setTweak('push', v)} />
         <TweakToggle label="Dormant cells respond" value={t.dormantRespond} onChange={(v) => setTweak('dormantRespond', v)} />
         <TweakSection label="Background" />
-        <TweakColor label="Ground" value={t.ground} options={['#0D0806', '#1A1210', '#241711', '#2E1C12']} onChange={(v) => setTweak('ground', v)} />
+        <TweakColor label="Ground" value={t.ground} options={['#0B0A09', '#121110', '#171412', '#1C1814', '#0D0806', '#1A1210', '#241711', '#2E1C12']} onChange={(v) => setTweak('ground', v)} />
         <TweakSelect label="Texture image" value={t.backdrop} options={Object.keys(BACKDROPS)} onChange={(v) => setTweak('backdrop', v)} />
         <TweakSlider label="Texture" value={t.textureOpacity} min={0} max={70} unit="%" onChange={(v) => setTweak('textureOpacity', v)} />
         <TweakSlider label="Warmth" value={t.warmth ?? 0} min={0} max={100} unit="%" onChange={(v) => setTweak('warmth', v)} />

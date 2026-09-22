@@ -104,7 +104,7 @@ export default function PrivacyPage() {
           <dt>You</dt>
           <dd>Your own draft, in your browser, until you submit. After that you cannot log in to see it; the submission ID is your handle on it.</dd>
           <dt>Honeycomb moderators</dt>
-          <dd>The members of the Honeycomb team who hold the moderator password. They see everything in the pending queue and the archive, at every visibility level, because they are the ones deciding.</dd>
+          <dd>The six members of the Honeycomb team — Paul, Liz, Dane, James, Eavie and Allen — and no one else. They hold the moderator password and see everything in the pending queue and the archive, at every visibility level, because they are the ones deciding.</dd>
           <dt>Site visitors</dt>
           <dd>Approved <em>public</em> stories only, after entering the site password. Visitors never see the queue, declined submissions, or anything marked community-only or strictly archived.</dd>
           <dt>Members</dt>

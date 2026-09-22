@@ -13,8 +13,8 @@ test("defines the complete Honeycomb experience", async () => {
   assert.match(app, /Enter the <em>Honeycomb\./);
   assert.match(people, /point of light within a shared history/);
   assert.match(app, /Share your experience/);
-  assert.match(pages, /Your Experience\. Our Collective History'/); // title, no trailing period
-  assert.match(pages, /compendium of encounters/);
+  assert.match(pages, /Your Experience\. Our Collective History\./);
+  assert.match(pages, /living archive/i);
   assert.doesNotMatch(`${app}\n${layout}`, /codex-preview|Your site is taking shape|react-loading-skeleton/i);
 });
 

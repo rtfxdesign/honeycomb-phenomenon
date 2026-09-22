@@ -84,8 +84,6 @@ button{font:inherit;color:inherit}
 .hc-page{position:fixed;inset:0;background:var(--color-bg)}
 .hc-frame{display:none;position:absolute;inset:var(--frame-inset);border:var(--frame-border) solid var(--border-frame);border-radius:var(--radius-xl);pointer-events:none;z-index:50}
 .hc-texture{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0.14;pointer-events:none}
-/* a moving backdrop holds its poster for anyone who has asked for less motion */
-@media (prefers-reduced-motion:reduce){video.hc-texture{display:none}}
 .hc-vignette{position:absolute;inset:0;background:radial-gradient(120% 90% at 50% 40%,transparent 40%,rgba(13,8,6,0.85) 100%);pointer-events:none}
 /* warmth: a golden wash over the ground, so the comb reads warm rather than cool-brown */
 .hc-warm{position:absolute;inset:0;pointer-events:none;mix-blend-mode:soft-light;
@@ -102,9 +100,6 @@ button{font:inherit;color:inherit}
 .arch-tag{position:absolute;bottom:44px;left:0;right:0;text-align:center;font-family:var(--font-display);font-size:14px;color:var(--text-muted);margin:0;z-index:5;pointer-events:none}
 .arch-clip{position:absolute;inset:0;border-radius:0;overflow:hidden;z-index:4;
   transition:filter 480ms var(--ease-quiet),left .72s cubic-bezier(.2,.78,.2,1)}
-/* with a flyout open the frame begins where the panel ends: the comb is
-   beside the panel, never under it. Phones keep the panel over the column. */
-@media (min-width:881px){.arch--panel .arch-clip{left:var(--panel-w,0px)}}
 .arch-clip::before,.arch-clip::after{content:"";position:absolute;left:0;right:0;height:110px;z-index:6;pointer-events:none}
 .arch-clip::before{top:0;background:linear-gradient(180deg,rgba(13,8,6,0.92),transparent)}
 .arch-clip::after{bottom:0;background:linear-gradient(0deg,rgba(13,8,6,0.92),transparent)}
@@ -516,7 +511,7 @@ button{font:inherit;color:inherit}
 
 /* ─────────── story panel slideout (projecthoneycomb.site deploy) ─────────── */
 
-.story-panel{position:fixed;z-index:20;top:0;bottom:0;left:0;width:36vw;display:flex;flex-direction:column;background:#0a0602;border-right:1px solid rgba(224,151,37,.28);box-shadow:28px 0 80px rgba(0,0,0,.44);overflow:hidden;transform:translateX(calc(-100% - 2px));visibility:hidden;transition:transform .72s cubic-bezier(.2,.78,.2,1),visibility 0s linear .72s}
+.story-panel{position:fixed;z-index:20;top:0;bottom:0;left:0;width:min(44vw,704px);display:flex;flex-direction:column;background:#0a0602;border-right:1px solid rgba(224,151,37,.28);box-shadow:28px 0 80px rgba(0,0,0,.44);overflow:hidden;transform:translateX(calc(-100% - 2px));visibility:hidden;transition:transform .72s cubic-bezier(.2,.78,.2,1),visibility 0s linear .72s}
 .story-panel[aria-hidden="false"]{transform:translateX(0);visibility:visible;transition-delay:0s}
 .close-panel{position:absolute;z-index:2;top:126px;right:25px;width:43px;height:43px;display:grid;place-items:center;border:1px solid rgba(244,232,210,.32);border-radius:50%;background:rgba(255,255,255,.015);color:var(--cream);font-size:28px;line-height:1;cursor:pointer}
 .story-content{flex:1;display:flex;flex-direction:column;justify-content:flex-start;min-height:0;overflow:visible;position:relative;padding:clamp(148px,17vh,178px) clamp(48px,6.4vw,102px) 42px}
@@ -530,10 +525,7 @@ button{font:inherit;color:inherit}
 .panel-copy .declaration{color:var(--cream);font-size:19px;font-weight:600}
 .panel-copy h2{margin:26px 0 9px;color:var(--cream);font-family:Montserrat,sans-serif;font-size:18px;letter-spacing:.03em}
 .panel-copy .story-action{margin-top:28px;text-decoration:none}
-.story-panel--about{width:36vw;container-type:inline-size}
-/* the bios follow the panel's width, not the screen's: two columns with a
-   smaller portrait when the panel is narrow, one column when it is narrower still */
-@container (max-width:900px){.story-panel .bio,.story-panel .bio--reverse{grid-template-columns:1fr;gap:12px;padding:26px 0}.story-panel .bio--reverse .bio-copy,.story-panel .bio--reverse .bio-portrait{order:0}.story-panel .bio-portrait{width:min(58cqw,230px)}}
+.story-panel--about{width:min(78vw,1180px)}
 .story-panel--about .story-content h1{max-width:860px}
 .story-panel--about .panel-copy{max-width:none;max-height:calc(100svh - 330px);padding-right:22px}
 .bios{gap:0;padding-bottom:28px}
@@ -822,12 +814,6 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
 @media (max-width:880px){.story-content::after{bottom:12px}}
 
 
-/* About: the copy and its scrollbar run out to the same right edge as the ×,
-   instead of stopping short and leaving a dead column beside the text */
-@media (min-width:881px){
-  .story-panel--about .story-content{padding-right:25px}
-  .story-panel--about .panel-copy{max-width:none}
-}
 
 /* The search field sits in the grid beside the comb rather than being pinned
    to the centre line: when the nav is wider than its column the comb drifts
@@ -839,4 +825,34 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
   .site-search{position:relative;right:auto;left:auto;top:auto;transform:none;order:1;justify-self:end;margin-right:14px}
   .brand{order:2}
   .site-header nav{order:3}
+}
+
+
+/* ───────────── dormant cells as gold leaf ─────────────
+   The cell image keeps only its rim (an inverse radial mask); the interior is
+   a leaf-gold gradient painted on the wrapper underneath, clipped to the hex
+   by the cell's own alpha and mottled a little by the wax noise so it reads
+   as beaten metal rather than a flat fill. One organic colour, not ten
+   cracked cells. Brightness applies to the whole cell so rim and leaf dim
+   together. */
+.arch--gold .cell-dormant-wrap{
+  background:
+    radial-gradient(ellipse 70% 62% at 36% 30%, rgba(255,232,160,.55) 0%, rgba(255,232,160,0) 60%),
+    radial-gradient(ellipse 80% 90% at 68% 78%, rgba(120,72,10,.55) 0%, rgba(120,72,10,0) 62%),
+    linear-gradient(152deg, #e9c25a 0%, #d3a23a 34%, #b98722 62%, #a2741a 100%);
+  -webkit-mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  mask-image:url('/assets/cell-bright.png'),var(--wax-noise);
+  -webkit-mask-size:100% 100%,140% 140%;
+  mask-size:100% 100%,140% 140%;
+  -webkit-mask-composite:source-in;
+  mask-composite:intersect;
+  filter:brightness(calc(var(--dormant-brightness,0.72) + var(--lit) * 0.30));
+  opacity:var(--cell-opacity,0.9);
+  transition:filter var(--glow-fade,520ms) var(--ease-quiet);
+}
+/* the image is now just the rim: everything inside ~78% of the hex is cut away */
+.arch--gold .cell-dormant{
+  filter:none;opacity:1;
+  -webkit-mask-image:radial-gradient(circle at 50% 50%, transparent 0%, transparent 34%, rgba(0,0,0,.35) 40%, #000 46%);
+  mask-image:radial-gradient(circle at 50% 50%, transparent 0%, transparent 34%, rgba(0,0,0,.35) 40%, #000 46%);
 }
