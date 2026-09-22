@@ -836,3 +836,13 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
   -webkit-mask-image:none;mask-image:none;
   filter:brightness(calc(var(--dormant-brightness,0.72) + var(--lit) * 0.30));
 }
+
+/* A story without a photo, in gold mode: the gold rim with the ground showing
+   through the middle and the initials in cream on it, so it reads as a cell
+   with something in it rather than an empty one that happens to be darker. */
+.arch--gold .hexcell > img:not(.cell-face){
+  -webkit-mask-image:radial-gradient(circle at 50% 50%, rgba(0,0,0,.08) 0%, rgba(0,0,0,.16) 30%, #000 47%);
+  mask-image:radial-gradient(circle at 50% 50%, rgba(0,0,0,.08) 0%, rgba(0,0,0,.16) 30%, #000 47%);
+}
+.arch--gold .hexcell:has(.cell-face) > img:not(.cell-face){-webkit-mask-image:none;mask-image:none}
+.arch--gold .cell-initials{color:#fff4dc;text-shadow:0 1px 10px rgba(0,0,0,.9),0 0 2px rgba(0,0,0,.8)}

@@ -1067,7 +1067,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                        aria-label={face ? face.name : 'Bright cell'}
                        onClick={() => toggleCell(b)}
                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCell(b); } }}>
-                    <img src="/assets/cell-bright.png" alt="" />
+                    <img src={t.dormantLook === 'wax' ? '/assets/cell-bright.png' : '/assets/cell-gold.png'} alt="" />
                     {face && face.src && (
                       <img
                         className={face.photo ? 'cell-face cell-face-photo' : 'cell-face'}
