@@ -488,10 +488,10 @@ button{font:inherit;color:inherit}
    centre line whatever the other two weigh. */
 .brand{padding:0;border:0;background:transparent;color:var(--gold);text-decoration:none;font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em}
 .brand .comb-mark{width:76px;height:42px}
-.site-header nav{margin-left:auto;display:flex;align-items:center;gap:clamp(22px,2.5vw,42px)}
-.site-header nav a,.site-header nav button{border:0;padding:0;color:var(--cream);background:transparent;text-decoration:none;font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;letter-spacing:.13em;cursor:pointer;transition:color .2s ease}
+.site-header nav{margin-left:auto;display:flex;align-items:center;gap:clamp(14px,1.7vw,26px)}
+.site-header nav a,.site-header nav button{border:0;padding:0;color:var(--cream);background:transparent;text-decoration:none;font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.11em;cursor:pointer;transition:color .2s ease}
 .site-header nav a:focus-visible,.site-header nav a:hover,.site-header nav button:focus-visible,.site-header nav button:hover{color:var(--gold)}
-.site-header nav .share-button{padding:15px 21px;border:1px solid rgba(242,191,73,.82);border-radius:3px;color:var(--gold);transition:color .2s ease,background .2s ease}
+.site-header nav .share-button{padding:13px 16px;border:1px solid rgba(242,191,73,.82);border-radius:3px;color:var(--gold);transition:color .2s ease,background .2s ease}
 .site-header nav .share-button:focus-visible,.site-header nav .share-button:hover{color:var(--ink);background:var(--gold)}
 .menu-button{display:none}
 /* three things in the bar: the wordmark (home) on the left, the comb (search)
@@ -505,8 +505,9 @@ button{font:inherit;color:inherit}
 }
 /* mid widths: the nav tightens so it never crowds the comb on the centre line */
 @media (min-width:881px) and (max-width:1220px){
-  .site-header nav{gap:clamp(12px,1.6vw,22px)}
-  .site-header nav .share-button{padding:12px 14px}
+  .site-header nav{gap:clamp(9px,1.1vw,14px)}
+  .site-header nav a,.site-header nav button{font-size:9px;letter-spacing:.09em}
+  .site-header nav .share-button{padding:10px 12px}
 }
 
 /* ─────────── story panel slideout (projecthoneycomb.site deploy) ─────────── */
@@ -546,6 +547,15 @@ button{font:inherit;color:inherit}
 .contact-list strong{font-family:Montserrat,sans-serif;font-size:12px;letter-spacing:.08em}
 .contact-list span{color:var(--muted);font-size:12px}
 .contact-list a:focus-visible span,.contact-list a:hover span{color:var(--gold)}
+/* Partners and Allies: a roster of names, each a cell in the same wall as the
+   contact list. Empty rosters say so in the panel's own voice. */
+.roster{list-style:none;margin:0 0 25px;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:1px;background:rgba(216,145,38,.26)}
+.roster li>a,.roster li>div{display:flex;flex-direction:column;gap:6px;height:100%;padding:16px 14px;background:#0d0804;color:var(--cream);text-decoration:none}
+.roster img{width:44px;height:44px;object-fit:contain;margin-bottom:4px}
+.roster strong{font-family:Montserrat,sans-serif;font-size:12px;letter-spacing:.08em}
+.roster span{color:var(--muted);font-size:12px;line-height:1.45}
+.roster a:focus-visible strong,.roster a:hover strong{color:var(--gold)}
+.roster-empty{margin:0 0 25px;padding:16px 18px;border:1px dashed rgba(216,145,38,.4);color:var(--muted);font-size:14px;line-height:1.5}
 .story-meta{display:grid;grid-template-columns:1.3fr 1fr;gap:22px;margin:34px 0 0;padding:21px 0;border-top:1px solid rgba(216,145,38,.35);border-bottom:1px solid rgba(216,145,38,.2);list-style:none}
 .story-meta div{min-width:0}
 .story-meta dt{color:var(--amber);font-family:Montserrat;font-size:8px;letter-spacing:.18em}

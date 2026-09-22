@@ -33,6 +33,42 @@ const TEAM = [
   },
 ];
 
+// Organisations that work alongside Honeycomb, and the people and groups who
+// stand with experiencers. Each entry: { name, role, url?, logo? }. An empty
+// list renders as a note that the names are still being confirmed.
+const PARTNERS = [];
+const ADVISORS = [
+  { name: 'Karin Austin', role: 'Director, Center for the Impossible, Rice University', url: 'https://profiles.rice.edu/staff/karin-austin' },
+  { name: 'Andrea Oddo', role: 'Technology and privacy advisor' },
+];
+const ALLIES = [];
+
+const ROSTER_EMAIL = 'contact@projecthoneycomb.site';
+
+function Roster({ entries, empty }) {
+  if (!entries.length) return <p className="roster-empty">{empty}</p>;
+  return (
+    <ul className="roster">
+      {entries.map((e) => {
+        const inner = (
+          <>
+            {e.logo && <img src={e.logo} alt="" />}
+            <strong>{e.name}</strong>
+            {e.role && <span>{e.role}</span>}
+          </>
+        );
+        return (
+          <li key={e.name}>
+            {e.url
+              ? <a href={e.url} target="_blank" rel="noreferrer">{inner}</a>
+              : <div>{inner}</div>}
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 export const PAGES = [
   {
     id: 'explore',
@@ -86,6 +122,44 @@ export const PAGES = [
           </article>
         ))}
       </div>
+    ),
+  },
+  {
+    id: 'partners',
+    eyebrow: 'WORKING ALONGSIDE US',
+    title: 'Partners',
+    body: () => (
+      <>
+        <p>Honeycomb is built with organizations that share the work: archives that preserve what is recorded here, research groups that study it with care, and community projects that help experiencers find each other.</p>
+        <p>A partner is a group we work with directly &mdash; sharing what we learn, pointing people to one another, and keeping every experience in the hands of the person who lived it.</p>
+        <Roster entries={PARTNERS} empty="The first partners are being confirmed. They will be listed here as they come on board." />
+        <h2>Work with Honeycomb</h2>
+        <p>If your organization records, studies, or supports anomalous experience and wants to work with us, we would like to hear from you.</p>
+        <a className="story-action" href={`mailto:${ROSTER_EMAIL}?subject=Partnering%20with%20Honeycomb`}>
+          PARTNER WITH HONEYCOMB <span aria-hidden="true">→</span>
+        </a>
+      </>
+    ),
+  },
+  {
+    id: 'allies',
+    eyebrow: 'STANDING WITH EXPERIENCERS',
+    title: 'Allies',
+    body: () => (
+      <>
+        <p>An ally is anyone who has lent Honeycomb a voice, a platform, or their time so that no one has to carry an encounter alone: journalists, pilots, researchers, podcasters, and experiencers who have chosen to speak.</p>
+        <p>They do not run the archive and they do not see anything the public cannot. What they give is reach, credibility, and the simple fact of standing beside people who were once told to stay quiet.</p>
+        <h2>Advisors</h2>
+        <p>People who advise Honeycomb on how an archive of lived experience should be kept: with consent, with care, and with the contributor in control.</p>
+        <Roster entries={ADVISORS} empty="" />
+        <h2>Allies</h2>
+        <Roster entries={ALLIES} empty="Our allies are being gathered with their permission. They will be named here once they have agreed to it." />
+        <h2>Stand with us</h2>
+        <p>If you want to add your name, your show, or your community to this list, write to us.</p>
+        <a className="story-action" href={`mailto:${ROSTER_EMAIL}?subject=Standing%20with%20Honeycomb`}>
+          BECOME AN ALLY <span aria-hidden="true">→</span>
+        </a>
+      </>
     ),
   },
   {
