@@ -1,0 +1,90 @@
+/* /about — the people behind Honeycomb (V4 design). Everything is prefixed
+   tp- so none of it touches the archive's own .cell / .bio / .hero styles. */
+.tp{--tp-ink:#080604;--tp-panel:rgba(15,9,5,.975);--tp-cream:#f4e8d2;--tp-muted:#c6a982;--tp-amber:#d89126;
+  --tp-gold:#f2bf49;--tp-honey:#f7d27a;--tp-line:rgba(224,151,37,.42);
+  min-height:100vh;min-height:100dvh;color:var(--tp-cream);font-family:Lora,Georgia,serif;font-size:17px;line-height:1.66;
+  background:radial-gradient(ellipse 70% 50% at 50% 0%,rgba(216,145,38,.10),transparent 60%),var(--tp-ink)}
+.tp a{color:var(--tp-gold);text-decoration:none}
+.tp a:hover{color:var(--tp-honey)}
+.tp a:focus-visible,.tp button:focus-visible{outline:1px solid var(--tp-gold);outline-offset:3px}
+.tp-ui{font-family:Montserrat,sans-serif;font-weight:600;letter-spacing:.22em;text-transform:uppercase;font-size:10.5px}
+.tp-wrap{max-width:1240px;margin:0 auto;padding:0 clamp(20px,4vw,56px)}
+
+.tp-head{display:flex;justify-content:space-between;align-items:center;padding:30px 0;gap:16px}
+.tp .tp-brand{color:var(--tp-gold);font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,18px);font-weight:600;letter-spacing:.16em}
+.tp .tp-back{color:var(--tp-muted);font-size:10px;letter-spacing:.14em}
+.tp .tp-back:hover{color:var(--tp-gold)}
+
+.tp-hero{padding:36px 0 8px;max-width:760px}
+.tp-eyebrow{color:var(--tp-gold);margin:0 0 18px}
+.tp h1{font-family:Inter,sans-serif;font-weight:600;font-size:clamp(38px,5.4vw,68px);letter-spacing:-.045em;line-height:1.01;
+  margin:0 0 22px;color:#fff7e8;text-wrap:balance}
+.tp-lede{margin:0;color:var(--tp-muted);max-width:56ch}
+
+.tp-layout{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(24px,4vw,64px);align-items:start;margin:40px 0 72px}
+
+/* the comb */
+.tp-field{position:relative;min-height:320px}
+.tp-field canvas{position:absolute;left:0;top:0;pointer-events:none;z-index:2}
+.tp-cell{position:absolute;opacity:0;transform:scale(.92);border:0;padding:0;margin:0;background:transparent;color:inherit;font:inherit;
+  cursor:pointer;transition:opacity .5s ease-out,transform .5s cubic-bezier(.16,1,.3,1),filter .3s}
+.tp-cell[data-on]{opacity:1;transform:none}
+.tp-cell--dim{filter:brightness(.55) saturate(.6)}
+.tp-cell--dim:hover,.tp-cell--dim:focus-visible{filter:brightness(.82) saturate(.85)}
+.tp-cell:focus-visible{outline:none}
+.tp-hex{position:absolute;inset:0;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:#1a1108;overflow:hidden}
+.tp-hex img{width:100%;height:100%;object-fit:cover;display:block;filter:sepia(.25) contrast(1.05)}
+.tp-init{position:absolute;inset:0;display:grid;place-items:center;font-family:Inter,sans-serif;font-weight:600;
+  font-size:clamp(20px,2.4vw,34px);letter-spacing:-.03em;color:var(--tp-gold);background:linear-gradient(160deg,#1f150a,#0d0804)}
+/* initials make room for the name tag when it shows */
+.tp-init{transition:transform .25s}
+.tp-cell:hover .tp-init,.tp-cell:focus-visible .tp-init,.tp-cell--sel .tp-init{transform:translateY(-14%)}
+.tp-cell--pend{cursor:default}
+.tp-cell--pend .tp-hex{background:transparent}
+.tp-tag{position:absolute;left:0;right:0;bottom:11%;text-align:center;pointer-events:none;z-index:3;
+  text-shadow:0 1px 10px rgba(0,0,0,.95);opacity:0;transform:translateY(5px);transition:opacity .25s,transform .25s}
+.tp-cell:hover .tp-tag,.tp-cell:focus-visible .tp-tag,.tp-cell--sel .tp-tag{opacity:1;transform:none}
+.tp-nm{display:block;font-family:Montserrat,sans-serif;font-weight:600;font-size:clamp(9px,.9vw,12px);letter-spacing:.08em;color:#fff7e8}
+.tp-rl{display:block;margin-top:2px;font-family:Montserrat,sans-serif;font-size:clamp(7.5px,.65vw,9px);letter-spacing:.16em;
+  text-transform:uppercase;color:var(--tp-gold)}
+.tp-glabel{position:absolute;display:flex;gap:10px;align-items:center;pointer-events:none;z-index:3;white-space:nowrap;
+  color:var(--tp-muted);font-size:9.5px}
+.tp-glabel::before{content:"";width:24px;height:1px;background:var(--tp-amber)}
+
+/* the reading panel */
+.tp-bio{position:sticky;top:32px;border:1px solid var(--tp-line);background:var(--tp-panel);padding:clamp(22px,3vw,40px);
+  min-height:360px;scroll-margin-top:20px}
+.tp-k{margin:0 0 14px;display:flex;gap:12px;align-items:center;color:var(--tp-gold)}
+.tp-k span:last-child{color:var(--tp-muted)}
+.tp-bio h2{font-family:Inter,sans-serif;font-weight:600;font-size:clamp(26px,3vw,38px);letter-spacing:-.04em;line-height:1.05;
+  margin:0 0 6px;color:#fff7e8}
+.tp-role{font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.18em;text-transform:uppercase;color:var(--tp-muted);
+  margin:0 0 22px;font-weight:600}
+.tp-bio p{margin:0;font-size:16px}
+.tp-bio p+p{margin-top:14px}
+.tp-bio .tp-role+p{margin-top:0}
+.tp-note{color:var(--tp-muted);font-style:italic}
+.tp .tp-mail{display:inline-block;margin-top:24px;font-family:Montserrat,sans-serif;font-size:10px;letter-spacing:.1em;font-weight:600;
+  color:var(--tp-gold);border-bottom:1px solid var(--tp-line);padding-bottom:3px}
+.tp .tp-mail:hover{border-color:var(--tp-gold)}
+.tp .tp-cta{display:inline-flex;align-items:center;gap:20px;min-height:46px;padding:0 22px;border:1px solid var(--tp-gold);border-radius:3px;
+  background:linear-gradient(135deg,#f0b039,#d98a21);color:var(--tp-ink);font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;
+  letter-spacing:.1em;text-transform:uppercase;margin-top:18px}
+.tp .tp-cta:hover{filter:brightness(1.08);color:var(--tp-ink)}
+
+/* allies, while none are named */
+.tp-pend{border:1px solid var(--tp-line);padding:28px 32px;margin-top:8px;display:grid;grid-template-columns:auto 1fr;gap:24px;align-items:center}
+.tp-pend svg{width:44px;height:50px}
+.tp-pend h3{font-family:Montserrat,sans-serif;font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--tp-gold);margin:0 0 8px;font-weight:600}
+.tp-pend p{margin:0;color:var(--tp-muted);font-size:15px}
+
+.tp-foot{border-top:1px solid var(--tp-line);padding:28px 0 60px;display:flex;justify-content:space-between;flex-wrap:wrap;gap:12px;
+  color:var(--tp-muted);font-size:9.5px;letter-spacing:.16em}
+.tp-foot a{font-size:9.5px}
+
+@media (max-width:1100px){.tp-layout{grid-template-columns:1fr}.tp-bio{position:static}}
+@media (max-width:640px){
+  .tp-pend{padding:22px 20px;gap:18px}
+  .tp-head{padding:22px 0}
+}
+@media (prefers-reduced-motion:reduce){.tp-cell,.tp-tag{transition:none}}

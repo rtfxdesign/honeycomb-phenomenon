@@ -15,6 +15,7 @@ import {
 import { PEOPLE } from '../data/people';
 import { PAGES } from '../data/pages';
 import RecorderModal from './RecorderModal';
+import { useCombReveal } from './CombReveal';
 import { cellLabel, initialsOf } from '../lib/name';
 
 const TWEAK_DEFAULTS = {
@@ -50,6 +51,8 @@ const TWEAK_DEFAULTS = {
   faceGrade: 'bright',
   vignette: true,
   topbarTucks: false,
+  // the V5 reveal: a pulse traces each cell as the comb forms
+  combReveal: true,
 };
 
 /**
@@ -505,7 +508,9 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
       </button>
       <nav id="primary-navigation" className={navOpen ? 'nav-open' : ''} aria-label="Primary navigation">
         {/* no HOME here on purpose — the wordmark is the home link */}
-        {PAGES.map((p) => (
+        {PAGES.map((p) => (p.href
+          ? <a key={p.id} href={p.href}>{p.id.toUpperCase()}</a>
+          : (
           <button
             key={p.id} type="button"
             onClick={() => go(p.id)}
@@ -513,7 +518,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
           >
             {p.id.toUpperCase()}
           </button>
-        ))}
+          )))}
         {session && session.role && session.role !== 'visitor' && (
           <button
             className="member-chip" type="button"
@@ -699,7 +704,7 @@ function Gate({ onEnter, size }) {
 
 // ── archive field (design project, + person panel wiring + touch panning) ───
 
-function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences, faces, query, onMatchCount }) {
+function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experiences, faces, query, onMatchCount, ready }) {
   const [vp, setVp] = useState(() => (typeof window === 'undefined' ? [1280, 800] : [window.innerWidth, window.innerHeight]));
   useEffect(() => {
     const onR = () => setVp([window.innerWidth, window.innerHeight]);
@@ -905,6 +910,12 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     reach: size * ((t.lightReach ?? 260) / 100),
     cells: arranged,
   });
+  // the comb draws itself in once the stories are here, then keeps a quiet pulse
+  const revealCanvasRef = useRef(null);
+  const { revealing } = useCombReveal({
+    fieldRef, canvasRef: revealCanvasRef, base, cells: arranged, faceOf,
+    size, W, H, enabled: t.combReveal !== false, ready, run: t.revealRun || 0,
+  });
   // with the panel open, slide the field so the cell you clicked clears it
   useEffect(() => {
     const el = fieldRef.current, clip = clipRef.current;
@@ -951,7 +962,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
       {/* no dimming of the field while the panel is open: it muted the very
           cells that were gathering toward the one you clicked */}
       <div className="arch-clip arch-clip--scroll" ref={clipRef}>
-        <div className="arch-field arch-field--flow" ref={fieldRef}
+        <div className={'arch-field arch-field--flow' + (revealing ? ' arch-field--reveal' : '')} ref={fieldRef}
              style={{
                width: W, height: H,
                // phone: below the header, then the column. desktop: centred in
@@ -966,12 +977,13 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                '--glaze': (t.faceGlaze ?? 50) / 100,
              }}
              onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
+          <canvas ref={revealCanvasRef} className="comb-reveal" aria-hidden="true" />
           {arranged.map((b) => {
             const face = faceOf.get(b.k);
             const dimmed = matchKeys && !b.match;
             return (
             <div key={b.k} className={'cell' + (dimmed ? ' cell-unmatched' : '')}
-                 data-cx={b.x} data-cy={b.y} data-half={size / 2}
+                 data-k={b.k} data-cx={b.x} data-cy={b.y} data-half={size / 2}
                  style={{ left: b.x, top: b.y, width: size, '--cell-w': `${size}px`, zIndex: b.k === focusKey ? 3 : b.match ? 2 : b.kin ? 2 : 1 }}>
               {b.t === 'b'
                 ? (
@@ -1022,6 +1034,8 @@ export default function HoneycombApp() {
   const [focusKey, setFocusKey] = useState(null);
   const [recorderOpen, setRecorderOpen] = useState(false);
   const [experiences, setExperiences] = useState([]);
+  // the reveal waits for the stories, so the comb is drawn once at its full size
+  const [storiesSettled, setStoriesSettled] = useState(false);
   const [people, setPeople] = useState(PEOPLE);
   const [query, setQuery] = useState('');
   const [matchCount, setMatchCount] = useState(0);
@@ -1045,7 +1059,11 @@ export default function HoneycombApp() {
     fetch('/api/experiences')
       .then((r) => (r.ok ? r.json() : { experiences: [] }))
       .then((d) => setExperiences((d.experiences || []).filter((e) => e.privacy !== 'archive')))
-      .catch(() => undefined);
+      .catch(() => undefined)
+      .finally(() => setStoriesSettled(true));
+    // a slow archive never keeps the comb hidden for long
+    const fallback = setTimeout(() => setStoriesSettled(true), 2500);
+    return () => clearTimeout(fallback);
   }, []);
 
   // community-face info (name, about, video) is editable from /review;
@@ -1145,6 +1163,7 @@ export default function HoneycombApp() {
             setFocusKey={setFocusKey}
             onPersonSelect={onPersonSelect}
             experiences={experiences}
+            ready={storiesSettled}
             faces={faces}
             query={query}
             onMatchCount={setMatchCount}
@@ -1196,6 +1215,9 @@ export default function HoneycombApp() {
                     onChange={(v) => setTweak('faceGrade', v)} />
         <TweakToggle label="Vignette" value={t.vignette} onChange={(v) => setTweak('vignette', v)} />
         <TweakToggle label="Topbar hides until hover" value={t.topbarTucks === true} onChange={(v) => setTweak('topbarTucks', v)} />
+        <TweakSection label="Reveal" />
+        <TweakToggle label="Comb draws itself in" value={t.combReveal !== false} onChange={(v) => setTweak('combReveal', v)} />
+        <TweakButton label="Replay the reveal" onClick={() => setTweak('revealRun', (t.revealRun || 0) + 1)} />
         <TweakSection label="Session" />
         <TweakButton label="Reset all tweaks" secondary onClick={resetTweaks} />
       </TweaksPanel>

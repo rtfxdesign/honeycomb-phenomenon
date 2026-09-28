@@ -1,49 +1,6 @@
 // Slideout page content ported from the most recent projecthoneycomb.site deploy.
 
-const TEAM = [
-  {
-    name: 'Paul Werenko',
-    image: '/team/paul-werenko.png',
-    imagePosition: '50% 42%',
-    text: 'Paul Werenko is the visionary behind Honeycomb. Following a lifetime of personal anomalous experiences which he previously dismissed as coincidences, Paul’s comprehension of the phenomenon began to shift, thanks in no small part to Leslie Kean’s 2017 NYT article and subsequent disclosures from trusted individuals. He has since dedicated his time and effort to numerous projects and organizations to assist in the education of all in the phenomena and their impact on humanity. Honeycomb is just one of those projects that is today his life’s work but it has become his flagship vision. Alongside his handpicked team (below) and with the tireless support of well-known members of the UAP Community including journalists, pilots, and Experiencers, Paul and his team are committed to providing a platform where every individual in the world is able to share their story.',
-  },
-  {
-    name: 'Eavie Arntzen',
-    image: '/team/eavie-arntzen.png',
-    imagePosition: '58% 48%',
-    text: 'With a lifelong fascination in the question of consciousness and a background in psychology and writing, Eavie Arntzen is deeply invested in the exploration of consciousness and, thanks to the disclosure of brave individuals committed to telling and sharing the truth, the connections between what it means to be conscious and the profound experience of unexplained phenomena. The single most engaging, fundamental and philosophical questions about our species and our universe are being asked today, and through the work of Honeycomb she is excited to direct those questions through a deeply human lens by supporting experiencers in telling their stories.',
-  },
-  {
-    name: 'James Faulk',
-    image: '/team/james-faulk.png',
-    imagePosition: '50% 42%',
-    text: 'In late 2022, award-winning reporter, writer, producer, news anchor and podcaster James Faulk launched Neon Galactic podcast to help mainstream the vital conversation surrounding UAP, NHI, and government secrecy. His work there triggered a deep dive into esoteric philosophy and other forms of rejected knowledge, prompting an ontological flip that impacted every aspect of his life. The rather impromptu online side gig became his primary passion, an engine for self-discovery, and a means to foster connection. His newest venture with Honeycomb is a perfect crystallization of the values and perspective he has developed these past several years and he is thrilled to help uncover the truth about humankind, consciousness, and unity in the cosmos, all of which James believes can be found in people’s lived experience. The goal now is to help people tell their stories.',
-  },
-  {
-    name: 'Liz Perez',
-    image: '/team/liz-perez.png',
-    imagePosition: '50% 43%',
-    text: 'Liz Perez’s personal experiences with the anomalous span the breadth of her life but have been refocused with her more recent research into the phenomenon. As a project manager for a high-end, complex and demanding engineering and construction firm, Liz provides the scaffolding of the Honeycomb project, keeping an eye on the next step and jumping in by making new ideas tangible. Her involvement in various projects related to the phenomena led her to a central role in Honeycomb and a commitment to disclosure and realizing the goal of making the once-sidelined truth accessible.',
-  },
-  {
-    name: 'Dane Street',
-    image: '/team/dane-street.png',
-    imagePosition: '50% 42%',
-    text: 'Driven by the idea of aiding connection and expansion of the human story within the phenomenon, Dane Street brings to Honeycomb a passion for shifting the paradigm and creating a platform through which disclosure will happen, not by way of appeals to repeal government secrecy, but by the people and for the people. Analytical by nature, his skill set as a logic and process analyst directs Dane’s exploration into the unexplainable and the as-yet-unrealized possibilities of human knowledge and understanding. Through population-based disclosure, Dane intends to return the truth to humanity and open the door to our shared history.',
-  },
-];
-
-// Organisations that work alongside Honeycomb, and the people and groups who
-// stand with experiencers. Each entry: { name, role, url?, logo? }. An empty
-// list renders as a note that the names are still being confirmed.
-const PARTNERS = [];
-const ADVISORS = [
-  { name: 'Karin Austin', role: 'Director, Center for the Impossible, Rice University', url: 'https://profiles.rice.edu/staff/karin-austin' },
-  { name: 'Andrea Oddo', role: 'Technology and privacy advisor' },
-];
-const ALLIES = [];
-
-const ROSTER_EMAIL = 'contact@projecthoneycomb.site';
+import { TEAM, PARTNERS, ADVISORS, ALLIES, ROSTER_EMAIL, ADVISOR_NOTE } from './team';
 
 function Roster({ entries, empty }) {
   if (!entries.length) return <p className="roster-empty">{empty}</p>;
@@ -104,26 +61,8 @@ export const PAGES = [
       </>
     ),
   },
-  {
-    id: 'about',
-    eyebrow: 'ABOUT US',
-    title: 'About Us',
-    body: () => (
-      <div className="bios">
-        {TEAM.map((member, i) => (
-          <article className={i % 2 ? 'bio bio--reverse' : 'bio'} key={member.name}>
-            <div className="bio-portrait">
-              <img src={member.image} alt={member.name} style={{ objectPosition: member.imagePosition }} />
-            </div>
-            <div className="bio-copy">
-              <h2>{member.name}</h2>
-              <p>{member.text}</p>
-            </div>
-          </article>
-        ))}
-      </div>
-    ),
-  },
+  // the team, advisors and allies have a page of their own (app/about)
+  { id: 'about', href: '/about' },
   {
     id: 'partners',
     eyebrow: 'WORKING ALONGSIDE US',
@@ -150,7 +89,7 @@ export const PAGES = [
         <p>An ally is anyone who has lent Honeycomb a voice, a platform, or their time so that no one has to carry an encounter alone: journalists, pilots, researchers, podcasters, and experiencers who have chosen to speak.</p>
         <p>They do not run the archive and they do not see anything the public cannot. What they give is reach, credibility, and the simple fact of standing beside people who were once told to stay quiet.</p>
         <h2>Advisors</h2>
-        <p>People who advise Honeycomb on how an archive of lived experience should be kept: with consent, with care, and with the contributor in control.</p>
+        <p>{ADVISOR_NOTE}</p>
         <Roster entries={ADVISORS} empty="" />
         <h2>Allies</h2>
         <Roster entries={ALLIES} empty="Our allies are being gathered with their permission. They will be named here once they have agreed to it." />
@@ -169,13 +108,7 @@ export const PAGES = [
     body: () => (
       <>
         <div className="contact-list">
-          {[
-            ['Paul Werenko', 'paul@honeycomb-phenomenon.com'],
-            ['Eavie Arntzen', 'eavie@honeycomb-phenomenon.com'],
-            ['James Faulk', 'james@honeycomb-phenomenon.com'],
-            ['Liz Perez', 'liz@honeycomb-phenomenon.com'],
-            ['Dane Street', 'dane@honeycomb-phenomenon.com'],
-          ].map(([name, email]) => (
+          {TEAM.map(({ name, email }) => (
             <a href={`mailto:${email}`} key={email}>
               <strong>{name}</strong>
               <span>{email}</span>

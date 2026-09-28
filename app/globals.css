@@ -856,3 +856,13 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
    gold like a dormant one, not a gold ring around a hole. The hole is for a
    story without a photo, where the initials sit in it. */
 .arch--gold .hexcell:not(:has(.cell-face)):not(:has(.cell-initials)) > img{-webkit-mask-image:none;mask-image:none}
+
+/* ───────────── the comb draws itself in (V5) ─────────────
+   A canvas over the field carries the pulse; each cell waits hidden until its
+   rim has been traced, then settles in. Once the comb has formed the class
+   comes off and cells behave exactly as before. */
+.comb-reveal{position:absolute;left:0;top:0;pointer-events:none;z-index:5}
+.arch-field--reveal .cell{opacity:0;transform:scale(.9);
+  transition:opacity .55s ease-out,transform .6s var(--ease-quiet),left 640ms var(--ease-quiet),top 640ms var(--ease-quiet)}
+.arch-field--reveal .cell[data-shown]{opacity:1;transform:none}
+@media (prefers-reduced-motion:reduce){.comb-reveal{display:none}}
