@@ -117,11 +117,6 @@ button{font:inherit;color:inherit}
 .arch-clip--scroll::before{top:0;margin-bottom:-90px}
 .arch-clip--scroll::after{bottom:0;margin-top:-90px}
 .arch-field{position:relative;z-index:4;touch-action:pan-x pan-y;transition:transform 720ms var(--ease-quiet)}
-.vine-sprite{position:absolute;width:0;height:0;pointer-events:none}
-/* max-width:none defeats the Tailwind preflight img reset, which would collapse
-   the vine to 0px inside its zero-width anchor */
-.vine-sprite img{position:absolute;left:0;bottom:0;max-width:none;transform-origin:48% 100%;animation:vinegrow 2200ms var(--ease-quiet) both}
-@keyframes vinegrow{from{clip-path:inset(100% 0 0 0);opacity:0}to{clip-path:inset(0 0 0 0);opacity:0.9}}
 .cell{position:absolute;transition:left 640ms var(--ease-quiet),top 640ms var(--ease-quiet)}
 .cell img{width:100%;display:block}
 .cell-bright{cursor:pointer;transition:transform var(--dur-grow) var(--ease-quiet),filter var(--dur-grow) var(--ease-quiet);filter:drop-shadow(0 0 14px rgba(240,168,60,0.28));opacity:var(--cell-opacity,0.9)}
@@ -640,8 +635,8 @@ audio.story-media{max-height:none}
   background:rgba(18,9,5,.97)}
 /* the bar never hides on touch — there is no hover to bring it back */
 .site-header--tucked{transform:translateZ(0);opacity:1;pointer-events:auto}
-/* the comb is a column: vertical scroll only, and vines past the right edge
-   must not open a sideways scroll */
+/* the comb is a column: vertical scroll only, nothing past the right edge
+   may open a sideways scroll */
 .arch-clip--scroll{overflow-x:hidden}
 .arch-field{touch-action:pan-y}
 .topbar-peek{display:none}

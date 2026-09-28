@@ -5,7 +5,9 @@
 
 import React from 'react';
 
-const STORAGE_KEY = 'hc-tweaks';
+// v2: the reviewed defaults (black ground, gold leaf, no texture) replace
+// whatever a browser had saved under the old key.
+const STORAGE_KEY = 'hc-tweaks-v2';
 
 const __TWEAKS_STYLE = `
   .twk-tab{position:fixed;right:-1px;bottom:96px;z-index:2147483645;
