@@ -139,12 +139,19 @@ export default function TeamPage() {
   const roster = useMemo(() => buildRoster(), []);
   const { people, labels } = roster;
   const named = useMemo(() => people.filter((x) => x.g !== 'pend'), [people]);
-  const [sel, setSel] = useState(0);
+  // null: everyone shown; a number: that person isolated
+  const [sel, setSel] = useState(null);
   const [L, setL] = useState(null);
   const fieldRef = useRef(null), canvasRef = useRef(null), bioRef = useRef(null);
-  const live = useRef({ L: null, sel: 0 });
+  const live = useRef({ L: null, sel: null });
   const pingRef = useRef(() => undefined);
   useEffect(() => { live.current = { L, sel }; }, [L, sel]);
+  // Escape brings everyone back
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') setSel(null); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
 
   // the comb is sized from the width it is given
   useEffect(() => {
@@ -168,10 +175,15 @@ export default function TeamPage() {
     let frame = reduce ? 1000 : 0, lastIdle = frame, raf = 0, timer = 0, cw = 0, ch = 0, dpr = 0;
     const shown = new Set();
     const pings = [];
+    // outlines follow the isolation: the chosen one grows with its portrait,
+    // the rest fade back, both eased so it never snaps
+    const scale = new Map(), fade = new Map();
+    const ease = (m, k, target) => { const v = m.has(k) ? m.get(k) : target; const n = reduce ? target : v + (target - v) * 0.22; m.set(k, n); return n; };
     pingRef.current = (i, hover) => { if (!reduce && !pings.some((p) => p.i === i)) pings.push({ i, f0: frame, hover }); };
     const tick = () => {
       frame++;
       const { L: lay, sel: chosen } = live.current;
+      const iso = chosen !== null && chosen !== undefined;
       if (lay) {
         const DPR = Math.min(2, window.devicePixelRatio || 1);
         if (cw !== lay.width || ch !== lay.height || dpr !== DPR) {
@@ -184,24 +196,26 @@ export default function TeamPage() {
         for (const x of people) {
           const age = frame - x.t0;
           if (age < 0) continue;
-          const [cx, cy] = centre(lay, x.c, x.r), p = hexPts(cx, cy, lay.R - 1.5);
+          const sc = ease(scale, x.i, chosen === x.i ? 1.08 : 1);
+          const fa = ease(fade, x.i, iso && chosen !== x.i ? 0.12 : 1);
+          const [cx, cy] = centre(lay, x.c, x.r), p = hexPts(cx, cy, (lay.R - 1.5) * sc);
           const tr = eDraw(age / TR), settled = sm(TR, TR + 18, age);
           if (age >= TR * 0.8 && !shown.has(x.i)) {
             const el = field.querySelector(`.tp-cell[data-i="${x.i}"]`);
             if (el) { el.setAttribute('data-on', ''); shown.add(x.i); }
           }
           if (x.g === 'pend') {
-            ctx.setLineDash([5, 6]); ctx.globalAlpha = 0.35; ctx.strokeStyle = GOLD; ctx.lineWidth = 1.2;
+            ctx.setLineDash([5, 6]); ctx.globalAlpha = 0.35 * fa; ctx.strokeStyle = GOLD; ctx.lineWidth = 1.2;
             pathFrac(ctx, p, tr, x.start, x.dir); ctx.setLineDash([]);
             if (tr < 1) head(ctx, p, tr, x.start, x.dir, LIGHT);
             continue;
           }
           const isSel = chosen === x.i;
-          ctx.globalAlpha = 0.5 + 0.45 * settled; ctx.strokeStyle = isSel ? GOLD : CREAM; ctx.lineWidth = isSel ? 2.6 : 1.8;
+          ctx.globalAlpha = (0.5 + 0.45 * settled) * fa; ctx.strokeStyle = isSel ? GOLD : CREAM; ctx.lineWidth = isSel ? 2.6 : 1.8;
           pathFrac(ctx, p, tr, x.start, x.dir);
           const q2 = eDraw((age - TR * 0.35) / TR);
           if (q2 > 0) {
-            ctx.globalAlpha = 0.4; ctx.strokeStyle = GOLD; ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.4 * fa; ctx.strokeStyle = GOLD; ctx.lineWidth = 1;
             pathFrac(ctx, p.map(([px, py]) => [cx + (px - cx) * 0.9, cy + (py - cy) * 0.9]), q2, x.start, x.dir);
           }
           if (tr < 1) head(ctx, p, tr, x.start, x.dir, LIGHT);
@@ -214,7 +228,7 @@ export default function TeamPage() {
         // once formed, one face re-traces itself every few seconds
         if (!reduce && frame > 150 && frame - lastIdle > 84) {
           lastIdle = frame;
-          const liveOnes = people.filter((x) => x.g !== 'pend');
+          const liveOnes = iso ? [people[chosen]] : people.filter((x) => x.g !== 'pend');
           const pick = liveOnes[Math.floor(Math.random() * liveOnes.length)];
           if (pick) pingRef.current(pick.i, false);
         }
@@ -222,7 +236,7 @@ export default function TeamPage() {
         for (const pg of pings) {
           const x = people[pg.i], q = eDraw((frame - pg.f0) / TR);
           if (q >= 1) continue;
-          const [cx, cy] = centre(lay, x.c, x.r), p = hexPts(cx, cy, lay.R - 1.5);
+          const [cx, cy] = centre(lay, x.c, x.r), p = hexPts(cx, cy, (lay.R - 1.5) * (scale.get(x.i) || 1));
           ctx.globalAlpha = 1; ctx.strokeStyle = pg.hover ? GOLD : LIGHT; ctx.lineWidth = pg.hover ? 3 : 2;
           pathFrac(ctx, p, q, x.start, -x.dir);
           head(ctx, p, q, x.start, -x.dir, pg.hover ? GOLD : LIGHT);
@@ -235,7 +249,9 @@ export default function TeamPage() {
     return () => { cancelAnimationFrame(raf); clearTimeout(timer); pingRef.current = () => undefined; };
   }, [measured, people]);
 
+  const clear = () => setSel(null);
   const select = (i) => {
+    if (i === sel) { clear(); return; }
     setSel(i);
     pingRef.current(i, true);
     // stacked layout: the story is below the comb, so take the reader to it
@@ -244,8 +260,9 @@ export default function TeamPage() {
     }
   };
 
-  const x = people[sel];
-  const place = named.indexOf(x) + 1;
+  const x = sel === null ? null : people[sel];
+  const place = x ? named.indexOf(x) + 1 : 0;
+  const isolating = x !== null;
 
   return (
     <div className="tp">
@@ -263,19 +280,20 @@ export default function TeamPage() {
 
         <div className="tp-layout">
           <div>
-            <div className="tp-field" ref={fieldRef} style={L ? { height: L.height } : undefined}>
+            <div className="tp-field" ref={fieldRef} style={L ? { height: L.height } : undefined}
+                 onClick={(e) => { if (e.target === e.currentTarget) clear(); }}>
               <canvas ref={canvasRef} aria-hidden="true" />
               {L && people.map((p) => {
                 const [cx, cy] = centre(L, p.c, p.r);
                 const style = { left: cx - L.w / 2 + L.gap / 2, top: cy - L.R + L.gap / 2, width: L.w - L.gap, height: 2 * L.R - L.gap };
                 if (p.g === 'pend') {
-                  return <div key={p.i} className="tp-cell tp-cell--pend" data-i={p.i} style={style} aria-hidden="true"><div className="tp-hex" /></div>;
+                  return <div key={p.i} className={'tp-cell tp-cell--pend' + (isolating ? ' tp-cell--faded' : '')} data-i={p.i} style={style} aria-hidden="true"><div className="tp-hex" /></div>;
                 }
                 const isSel = sel === p.i;
                 return (
                   <button
                     key={p.i} type="button" data-i={p.i} style={style}
-                    className={'tp-cell' + (isSel ? ' tp-cell--sel' : ' tp-cell--dim')}
+                    className={'tp-cell' + (isSel ? ' tp-cell--sel' : isolating ? ' tp-cell--faded' : '')}
                     aria-label={`${p.name}, ${p.kind}`} aria-pressed={isSel}
                     onMouseEnter={() => pingRef.current(p.i, true)}
                     onClick={() => select(p.i)}
@@ -304,7 +322,8 @@ export default function TeamPage() {
             )}
           </div>
 
-          <aside className="tp-bio" ref={bioRef} aria-live="polite">
+          <aside className={'tp-bio' + (x ? '' : ' tp-bio--intro')} ref={bioRef} aria-live="polite">
+            {x ? (<>
             <p className="tp-ui tp-k">
               <span>{x.kind}</span>
               <span>{String(place).padStart(2, '0')} / {String(named.length).padStart(2, '0')}</span>
@@ -322,6 +341,21 @@ export default function TeamPage() {
                 <a className="tp-cta" href={`mailto:${ROSTER_EMAIL}?subject=Standing%20with%20Honeycomb`}>Become an ally <span aria-hidden="true">→</span></a>
               </div>
             )}
+            <button type="button" className="tp-all" onClick={clear}>← Everyone</button>
+            </>) : (<>
+            <p className="tp-ui tp-k"><span>The people</span><span>{String(named.length).padStart(2, '0')}</span></p>
+            <h2>Select anyone to read their story.</h2>
+            <ul className="tp-roll">
+              {named.map((p) => (
+                <li key={p.i}>
+                  <button type="button" onClick={() => select(p.i)} onMouseEnter={() => pingRef.current(p.i, true)}>
+                    <span className="tp-roll-nm">{p.name}</span>
+                    <span className="tp-roll-rl">{p.sub || p.kind}</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+            </>)}
           </aside>
         </div>
 
