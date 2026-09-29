@@ -108,7 +108,7 @@ export const PAGES = [
     body: () => (
       <>
         <div className="contact-list">
-          {TEAM.map(({ name, email }) => (
+          {TEAM.filter((m) => m.email).map(({ name, email }) => (
             <a href={`mailto:${email}`} key={email}>
               <strong>{name}</strong>
               <span>{email}</span>

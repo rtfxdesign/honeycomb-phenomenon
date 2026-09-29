@@ -3,7 +3,9 @@
 //
 // TEAM `slot` is [column, row] on the About page's comb (pointy-top cells,
 // odd rows shifted half a cell right). Leave it off a new member and the page
-// lays the team out in rows of three instead.
+// lays the team out in rows of three instead. `role` is an optional line under
+// the name; `email` is optional, and a member without one is left off the
+// Contact list.
 
 export const ROSTER_EMAIL = 'contact@projecthoneycomb.site';
 
@@ -61,6 +63,17 @@ export const TEAM = [
     bio: [
       'Driven by the idea of aiding connection and expansion of the human story within the phenomenon, Dane Street brings to Honeycomb a passion for shifting the paradigm and creating a platform through which disclosure will happen, not by way of appeals to repeal government secrecy, but by the people and for the people.',
       'Analytical by nature, his skill set as a logic and process analyst directs Dane’s exploration into the unexplainable and the as-yet-unrealized possibilities of human knowledge and understanding. Through population-based disclosure, Dane intends to return the truth to humanity and open the door to our shared history.',
+    ],
+  },
+  {
+    name: 'Allen Grabo',
+    role: 'Creative technologist · The archive’s builder',
+    image: '/team/allen-grabo.jpg',
+    imagePosition: '50% 38%',
+    slot: [0, 0],
+    bio: [
+      'Allen Grabo is a creative technologist based in Washington, DC, and the founder of rtfx design, a studio that builds visual systems for real spaces. The work lives where an idea has to survive contact with a room: projection-mapped environments, LED walls, generative visuals, and the show-control systems that keep them running live. Allen has built the systems that powered events at Porsche Studio Portland, Miami Art Week, Cape Canaveral, the Kennedy Center, Baltimore Ravens tailgates, and the Smithsonian.',
+      'At Honeycomb, Allen builds the archive itself: the comb where every voice appears as a point of light, the recorder that lets someone tell their story in their own words, and the quiet machinery that keeps each story in the hands of the person who lived it. The work is as much custody as design. It decides not only how an experience looks when it is shared, but who can see it, how long it stays, and how it can be taken back. For Allen, an archive of the unexplained earns trust the way a good live show does: everything complicated stays out of sight, and nothing is left to chance.',
     ],
   },
 ];

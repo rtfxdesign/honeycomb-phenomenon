@@ -9,15 +9,22 @@ import { TEAM, ADVISORS } from '../app/data/team.js';
 
 const FLYOUT = ['Paul Werenko', 'Eavie Arntzen', 'James Faulk', 'Liz Perez', 'Dane Street'];
 
-test('everyone from the old About flyout is on the About page', () => {
-  const names = TEAM.map((m) => m.name);
-  for (const n of FLYOUT) assert.ok(names.includes(n), `${n} is missing from TEAM`);
+test('everyone from the old About flyout is on the About page, with an email', () => {
+  for (const n of FLYOUT) {
+    const m = TEAM.find((t) => t.name === n);
+    assert.ok(m, `${n} is missing from TEAM`);
+    assert.ok(m.email, `${n} lost their email`);
+  }
 });
 
-test('each team member has a portrait on disk, an email and a bio', () => {
+test('Allen is on the team', () => {
+  assert.ok(TEAM.some((m) => m.name === 'Allen Grabo'));
+});
+
+test('each team member has a portrait on disk and a bio; an email, if given, is well formed', () => {
   for (const m of TEAM) {
     assert.ok(existsSync(new URL(`../public${m.image}`, import.meta.url)), `${m.name}: ${m.image} not in public/`);
-    assert.match(m.email, /^[^@\s]+@[^@\s]+$/, `${m.name}: email`);
+    if (m.email !== undefined) assert.match(m.email, /^[^@\s]+@[^@\s]+$/, `${m.name}: email`);
     assert.ok(Array.isArray(m.bio) && m.bio.length > 0 && m.bio.every((p) => p.length > 40), `${m.name}: bio`);
   }
 });

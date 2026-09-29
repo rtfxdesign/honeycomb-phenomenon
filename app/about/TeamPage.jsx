@@ -33,7 +33,7 @@ function placeRows(items, firstRow) {
 }
 
 function buildRoster() {
-  const team = TEAM.map((m) => ({ g: 'team', kind: 'The team', name: m.name, img: m.image, pos: m.imagePosition, mail: m.email, bio: m.bio, slot: m.slot }));
+  const team = TEAM.map((m) => ({ g: 'team', kind: 'The team', name: m.name, sub: m.role, img: m.image, pos: m.imagePosition, mail: m.email, bio: m.bio, slot: m.slot }));
   const adv = ADVISORS.map((a) => ({ g: 'adv', kind: 'Advisor', name: a.name, sub: a.role, url: a.url }));
   const allies = ALLIES.length
     ? ALLIES.map((a) => ({ g: 'ally', kind: 'Ally', name: a.name, sub: a.role, url: a.url, img: a.logo }))
