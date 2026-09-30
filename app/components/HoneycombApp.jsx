@@ -34,6 +34,8 @@ const TWEAK_DEFAULTS = {
   push: 251,
   dormantRespond: false,
   dormantLook: 'gold',  // 'gold' leaf interiors, or 'wax' for the cracked comb
+  cellBorder: 'gold',   // the frame round a bright cell: 'gold' | 'wax' | 'line' | 'none'
+  faceInset: 9,         // % of the cell's width the face stays in from the edge (9 = the gold frame's inner edge)
   showFaces: true,
   // the pointer as a lamp over the comb
   mouseLight: true,
@@ -958,7 +960,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     }
   };
   return (
-    <div className={(panelOpen ? 'arch arch--panel' : 'arch') + (t.dormantLook === 'wax' ? '' : ' arch--gold')}>
+    <div className={(panelOpen ? 'arch arch--panel' : 'arch') + (t.dormantLook === 'wax' ? '' : ' arch--gold') + ' arch--border-' + (t.cellBorder || 'gold')}>
       {/* no dimming of the field while the panel is open: it muted the very
           cells that were gathering toward the one you clicked */}
       <div className="arch-clip arch-clip--scroll" ref={clipRef}>
@@ -976,6 +978,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                '--glow-fade': `${t.lightAfterglow ?? 520}ms`,
                '--glow-strength': (t.lightStrength ?? 70) / 100,
                '--cell-center': (t.cellCenter ?? 14) / 100,
+               '--face-inset': `${t.faceInset ?? 9}%`,
                '--glaze': (t.faceGlaze ?? 50) / 100,
              }}
              onClick={(e) => { if (e.target === e.currentTarget) { setFocusKey(null); onPersonSelect(null); } }}>
@@ -993,7 +996,8 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                        aria-label={face ? face.name : 'Bright cell'}
                        onClick={() => toggleCell(b)}
                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCell(b); } }}>
-                    <img src={t.dormantLook === 'wax' ? '/assets/cell-bright.png' : '/assets/cell-gold.png'} alt="" />
+                    <img src={t.cellBorder === 'wax' ? '/assets/cell-bright.png' : '/assets/cell-gold.png'} alt="" />
+                    <span className="cell-line" aria-hidden="true" />
                     {face && face.src && (
                       <img
                         className={face.photo ? 'cell-face cell-face-photo' : 'cell-face'}
@@ -1195,6 +1199,10 @@ export default function HoneycombApp() {
         <TweakSlider label="Dormant brightness" value={t.dormantBright ?? 72} min={30} max={100} unit="%" onChange={(v) => setTweak('dormantBright', v)} />
         <TweakRadio label="Dormant cells" value={t.dormantLook || 'gold'} options={[{ value: 'gold', label: 'Gold leaf' }, { value: 'wax', label: 'Wax' }]} onChange={(v) => setTweak('dormantLook', v)} />
         <TweakSlider label="Cell centre" value={t.cellCenter ?? 14} min={0} max={45} unit="%" onChange={(v) => setTweak('cellCenter', v)} />
+        <TweakRadio label="Cell border" value={t.cellBorder || 'gold'}
+                    options={[{ value: 'gold', label: 'Gold leaf' }, { value: 'wax', label: 'Wax' }, { value: 'line', label: 'Line' }, { value: 'none', label: 'None' }]}
+                    onChange={(v) => setTweak('cellBorder', v)} />
+        <TweakSlider label="Face inset" value={t.faceInset ?? 9} min={0} max={20} step={0.5} unit="%" onChange={(v) => setTweak('faceInset', v)} />
         <TweakToggle label="Mouse light" value={t.mouseLight !== false} onChange={(v) => setTweak('mouseLight', v)} />
         <TweakSlider label="Light reach" value={t.lightReach ?? 260} min={100} max={600} step={10} unit="%" onChange={(v) => setTweak('lightReach', v)} />
         <TweakSlider label="Light strength" value={t.lightStrength ?? 70} min={0} max={100} unit="%" onChange={(v) => setTweak('lightStrength', v)} />
