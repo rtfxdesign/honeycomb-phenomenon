@@ -14,6 +14,8 @@ export const TEAM = [
   {
     name: 'Paul Werenko',
     image: '/team/paul-werenko.png',
+    fullImage: '/team/paul-werenko-full.jpg',
+    fullPosition: '58% 42%',
     imagePosition: '50% 42%',
     email: 'paul@honeycomb-phenomenon.com',
     slot: [1, 1],
@@ -25,6 +27,8 @@ export const TEAM = [
   {
     name: 'Eavie Arntzen',
     image: '/team/eavie-arntzen.png',
+    fullImage: '/team/eavie-arntzen-full.jpg',
+    fullPosition: '50% 45%',
     imagePosition: '58% 48%',
     email: 'eavie@honeycomb-phenomenon.com',
     slot: [0, 1],
@@ -36,6 +40,8 @@ export const TEAM = [
   {
     name: 'James Faulk',
     image: '/team/james-faulk.png',
+    fullImage: '/team/james-faulk-full.jpg',
+    fullPosition: '52% 42%',
     imagePosition: '50% 42%',
     email: 'james@honeycomb-phenomenon.com',
     slot: [2, 1],
@@ -58,6 +64,8 @@ export const TEAM = [
   {
     name: 'Dane Street',
     image: '/team/dane-street.png',
+    fullImage: '/team/dane-street-full.jpg',
+    fullPosition: '50% 40%',
     imagePosition: '50% 42%',
     email: 'dane@honeycomb-phenomenon.com',
     slot: [2, 0],

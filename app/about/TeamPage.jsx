@@ -79,11 +79,13 @@ function measure(width, { minX, span, rows }) {
   const gutter = narrow ? 0 : 150; // room for the group labels
   const R = Math.max(24, Math.min(118, (width - gutter) / (span * Math.sqrt(3))));
   const w = Math.sqrt(3) * R, top = 16;
-  // narrow: centred in the column; wide: left-aligned, labels to the right
-  const ox = narrow ? (width - span * w) / 2 : 0;
-  // how much a chosen cell grows
+  // the comb sits centred in the room it has (the labels' gutter excluded on
+  // wide layouts), so its first column never hugs the page edge
+  const ox = Math.max(0, (width - gutter - span * w) / 2);
+  // how much a chosen cell grows, and how far past the comb's box it may reach
   const big = narrow ? 2 : 2.2;
-  return { width, narrow, R, w, top, gap: 7, minX, ox, big, labelX: span * w + 12, height: Math.round((1.5 * (rows - 1) + 2) * R + top + 24) };
+  const slack = narrow ? 12 : 40;
+  return { width, narrow, R, w, top, gap: 7, minX, ox, big, slack, labelX: ox + span * w + 12, height: Math.round((1.5 * (rows - 1) + 2) * R + top + 24) };
 }
 const centre = (L, c, r) => [L.ox + L.w * (c + 0.5 * (Math.round(r) & 1) - L.minX) + L.w / 2, 1.5 * L.R * r + L.R + L.top];
 
@@ -137,13 +139,15 @@ export default function TeamPage() {
     const p = people[sel];
     const [cx, cy] = centre(L, p.c, p.r);
     const s = L.big, hw = (L.w - L.gap) * s / 2, hh = (2 * L.R - L.gap) * s / 2;
-    const fit = (c, half, max) => {
-      if (2 * half >= max) return max / 2 - c; // wider than the box: centre it
-      if (c - half < 0) return half - c;
-      if (c + half > max) return max - half - c;
+    // keep the grown cell within [lo, hi]; if it cannot fit, centre it there
+    const fit = (c, half, lo, hi) => {
+      if (2 * half >= hi - lo) return (lo + hi) / 2 - c;
+      if (c - half < lo) return lo + half - c;
+      if (c + half > hi) return hi - half - c;
       return 0;
     };
-    return { s, dx: fit(cx, hw, L.width), dy: fit(cy, hh, L.height) };
+    // sideways it may also use the page's own padding (measured with the layout)
+    return { s, dx: fit(cx, hw, -L.roomLeft, L.width + Math.min(L.roomRight, L.slack)), dy: fit(cy, hh, -12, L.height + 12) };
   }, [sel, L, people]);
   const live = useRef({ L: null, sel: null, bigT: null });
   const pingRef = useRef(() => undefined);
@@ -159,12 +163,19 @@ export default function TeamPage() {
   useEffect(() => {
     const el = fieldRef.current;
     if (!el) return undefined;
-    const ro = new ResizeObserver(() => {
+    const remeasure = () => {
       const next = measure(el.clientWidth, roster);
-      setL((prev) => (prev && prev.width === next.width ? prev : next));
-    });
+      // how far a grown cell may reach past the comb's box: the page's own
+      // side padding, to 8px from the viewport edge
+      const rect = el.getBoundingClientRect();
+      next.roomLeft = Math.max(next.slack, Math.round(rect.left) - 8);
+      next.roomRight = Math.max(next.slack, Math.round(window.innerWidth - rect.right) - 8);
+      setL((prev) => (prev && prev.width === next.width && prev.roomLeft === next.roomLeft && prev.roomRight === next.roomRight ? prev : next));
+    };
+    const ro = new ResizeObserver(remeasure);
     ro.observe(el);
-    return () => ro.disconnect();
+    window.addEventListener('resize', remeasure);
+    return () => { ro.disconnect(); window.removeEventListener('resize', remeasure); };
   }, [roster]);
 
   const measured = L !== null;
