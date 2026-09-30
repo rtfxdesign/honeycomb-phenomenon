@@ -293,7 +293,7 @@ export default function TeamPage() {
 
         <section className="tp-hero">
           <p className="tp-ui tp-eyebrow">Your experience. Our collective history.</p>
-          <h1>The people keeping the archive.</h1>
+          <h1>The people keeping the archive</h1>
           <p className="tp-lede">Honeycomb is built by a handpicked team and kept honest by the people who advise it. Each comb draws itself in as the network forms — select one to read their story.</p>
         </section>
 

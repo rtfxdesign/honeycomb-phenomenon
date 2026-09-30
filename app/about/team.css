@@ -15,11 +15,11 @@
 .tp .tp-back{color:var(--tp-muted);font-size:10px;letter-spacing:.14em}
 .tp .tp-back:hover{color:var(--tp-gold)}
 
-.tp-hero{padding:36px 0 8px;max-width:760px}
+.tp-hero{padding:36px 0 8px;width:fit-content;max-width:100%}
 .tp-eyebrow{color:var(--tp-gold);margin:0 0 18px}
-.tp h1{font-family:Inter,sans-serif;font-weight:600;font-size:clamp(38px,5.4vw,68px);letter-spacing:-.045em;line-height:1.01;
+.tp h1{font-family:Inter,sans-serif;font-weight:600;font-size:clamp(30px,4.6vw,64px);letter-spacing:-.045em;line-height:1.01;white-space:nowrap;
   margin:0 0 22px;color:#fff7e8;text-wrap:balance}
-.tp-lede{margin:0;color:var(--tp-muted);max-width:56ch}
+.tp-lede{margin:0;color:var(--tp-muted)}
 
 .tp-layout{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(0,.75fr);gap:clamp(24px,4vw,64px);align-items:start;margin:40px 0 72px}
 
@@ -106,3 +106,12 @@
   .tp-head{padding:22px 0}
 }
 @media (prefers-reduced-motion:reduce){.tp-cell,.tp-tag{transition:none}}
+
+/* until someone is chosen the panel is a roll of names: it keeps to the right
+   edge of the page at a reading width, and grows to the column when a story
+   opens; the comb's column is unchanged, so nothing under the pointer moves */
+@media (min-width:1101px){
+  .tp-bio--intro{justify-self:end;width:min(100%,400px)}
+}
+/* the title holds one line down to phone width, where it may wrap */
+@media (max-width:480px){.tp h1{white-space:normal}}
