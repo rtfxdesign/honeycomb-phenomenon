@@ -13,6 +13,7 @@ const clamp = (t) => Math.max(0, Math.min(1, t));
 const sm = (a, b, x) => { x = clamp((x - a) / (b - a)); return x * x * (3 - 2 * x); };
 const eDraw = (t) => 1 - Math.pow(1 - clamp(t), 3);
 const initialsOf = (n) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase();
+const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 
 // rows of three; a short first row sits to the right, as the team's two-over-three does
 function placeRows(items, firstRow) {
@@ -49,6 +50,11 @@ function buildRoster() {
     } else {
       placed = placeRows(grp.items, row);
     }
+    // every visit the faces take different cells within their group: the
+    // group's cells are dealt out in a shuffled order (the people's own order,
+    // and so the roll of names, is unchanged)
+    const coords = shuffled(placed.cells.map((x) => [x.c, x.r]));
+    placed.cells = placed.cells.map((x, j) => ({ ...x, c: coords[j][0], r: coords[j][1] }));
     const { cells, rows } = placed;
     labels.push({ text: grp.label, row: row + (rows - 1) / 2 });
     people.push(...cells);
@@ -58,9 +64,7 @@ function buildRoster() {
   // The comb draws itself in a different order on every visit: no group
   // first, no top to bottom. A shuffled order with a little jitter, each cell
   // traced from a random corner in a random direction.
-  const order = people.map((_, i) => i);
-  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
-  order.forEach((idx, pos) => {
+  shuffled(people.map((_, i) => i)).forEach((idx, pos) => {
     const x = people[idx];
     x.t0 = 6 + pos * TR * 0.5 + Math.random() * 8;
     x.dir = Math.random() < 0.5 ? -1 : 1;
