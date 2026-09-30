@@ -12,11 +12,6 @@ const GOLD = '#f2bf49', LIGHT = '#f7d27a', CREAM = '#f4e8d2', FPS = 30, TR = 22;
 const clamp = (t) => Math.max(0, Math.min(1, t));
 const sm = (a, b, x) => { x = clamp((x - a) / (b - a)); return x * x * (3 - 2 * x); };
 const eDraw = (t) => 1 - Math.pow(1 - clamp(t), 3);
-// pointy-top cells; odd rows sit half a cell to the right
-const NB = (r) => ((r & 1)
-  ? [[1, 0], [-1, 0], [0, -1], [1, -1], [0, 1], [1, 1]]
-  : [[1, 0], [-1, 0], [-1, -1], [0, -1], [-1, 1], [0, 1]]);
-const cellKey = (c, r) => c + ',' + r;
 const initialsOf = (n) => n.split(/\s+/).filter(Boolean).map((w) => w[0]).join('').slice(0, 3).toUpperCase();
 
 // rows of three; a short first row sits to the right, as the team's two-over-three does
@@ -33,15 +28,15 @@ function placeRows(items, firstRow) {
 }
 
 function buildRoster() {
-  const team = TEAM.map((m) => ({ g: 'team', kind: 'The team', name: m.name, sub: m.role, img: m.image, pos: m.imagePosition, mail: m.email, bio: m.bio, slot: m.slot }));
+  const team = TEAM.map((m) => ({ g: 'team', kind: 'The team', name: m.name, sub: m.role, img: m.image, pos: m.imagePosition, full: m.fullImage, fullPos: m.fullPosition, mail: m.email, bio: m.bio, slot: m.slot }));
   const adv = ADVISORS.map((a) => ({ g: 'adv', kind: 'Advisor', name: a.name, sub: a.role, url: a.url }));
   const allies = ALLIES.length
     ? ALLIES.map((a) => ({ g: 'ally', kind: 'Ally', name: a.name, sub: a.role, url: a.url, img: a.logo }))
     : [{ g: 'pend' }, { g: 'pend' }, { g: 'pend' }];
   const groups = [
-    { label: 'The team', items: team, delay: 0 },
-    { label: 'Advisors', items: adv, delay: 40 },
-    { label: ALLIES.length ? 'Allies' : 'Allies · pending', items: allies, delay: 70 },
+    { label: 'The team', items: team },
+    { label: 'Advisors', items: adv },
+    { label: ALLIES.length ? 'Allies' : 'Allies · pending', items: allies },
   ].filter((grp) => grp.items.length);
 
   const people = [], labels = [];
@@ -55,32 +50,22 @@ function buildRoster() {
       placed = placeRows(grp.items, row);
     }
     const { cells, rows } = placed;
-    // reveal order: breadth-first from the cell nearest the middle of the group
-    const byKey = new Map(cells.map((x) => [cellKey(x.c, x.r), x]));
-    const fx = (x) => x.c + 0.5 * (x.r & 1), fy = (x) => x.r * 0.866;
-    const mx = cells.reduce((s, x) => s + fx(x), 0) / cells.length;
-    const my = cells.reduce((s, x) => s + fy(x), 0) / cells.length;
-    let seed = cells[0], best = Infinity;
-    for (const x of cells) { const d = (fx(x) - mx) ** 2 + (fy(x) - my) ** 2; if (d < best - 1e-9) { best = d; seed = x; } }
-    const depth = new Map([[seed, 0]]), q = [seed];
-    while (q.length) {
-      const x = q.shift();
-      for (const [dc, dr] of NB(x.r)) {
-        const y = byKey.get(cellKey(x.c + dc, x.r + dr));
-        if (y && !depth.has(y)) { depth.set(y, depth.get(x) + 1); q.push(y); }
-      }
-    }
-    cells.forEach((x, j) => {
-      const d = depth.has(x) ? depth.get(x) : 4;
-      x.t0 = grp.delay + d * TR * 0.75;
-      x.dir = d % 2 ? -1 : 1;
-      x.start = ((people.length + j) * 5) % 6;
-    });
     labels.push({ text: grp.label, row: row + (rows - 1) / 2 });
     people.push(...cells);
     row += rows;
   }
   people.forEach((x, i) => { x.i = i; });
+  // The comb draws itself in a different order on every visit: no group
+  // first, no top to bottom. A shuffled order with a little jitter, each cell
+  // traced from a random corner in a random direction.
+  const order = people.map((_, i) => i);
+  for (let i = order.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [order[i], order[j]] = [order[j], order[i]]; }
+  order.forEach((idx, pos) => {
+    const x = people[idx];
+    x.t0 = 6 + pos * TR * 0.5 + Math.random() * 8;
+    x.dir = Math.random() < 0.5 ? -1 : 1;
+    x.start = Math.floor(Math.random() * 6);
+  });
   // horizontal extent in cell widths (odd rows sit half a cell right)
   const xs = people.map((x) => x.c + 0.5 * (x.r & 1));
   const minX = Math.min(...xs), span = Math.max(...xs) + 1 - minX;
@@ -96,7 +81,9 @@ function measure(width, { minX, span, rows }) {
   const w = Math.sqrt(3) * R, top = 16;
   // narrow: centred in the column; wide: left-aligned, labels to the right
   const ox = narrow ? (width - span * w) / 2 : 0;
-  return { width, narrow, R, w, top, gap: 7, minX, ox, labelX: span * w + 12, height: Math.round((1.5 * (rows - 1) + 2) * R + top + 24) };
+  // how much a chosen cell grows
+  const big = narrow ? 2 : 2.2;
+  return { width, narrow, R, w, top, gap: 7, minX, ox, big, labelX: span * w + 12, height: Math.round((1.5 * (rows - 1) + 2) * R + top + 24) };
 }
 const centre = (L, c, r) => [L.ox + L.w * (c + 0.5 * (Math.round(r) & 1) - L.minX) + L.w / 2, 1.5 * L.R * r + L.R + L.top];
 
@@ -143,9 +130,24 @@ export default function TeamPage() {
   const [sel, setSel] = useState(null);
   const [L, setL] = useState(null);
   const fieldRef = useRef(null), canvasRef = useRef(null), bioRef = useRef(null);
-  const live = useRef({ L: null, sel: null });
+  // the chosen cell grows to show more of the photo, shifted just enough to
+  // stay inside the comb's box
+  const bigT = useMemo(() => {
+    if (sel === null || !L) return null;
+    const p = people[sel];
+    const [cx, cy] = centre(L, p.c, p.r);
+    const s = L.big, hw = (L.w - L.gap) * s / 2, hh = (2 * L.R - L.gap) * s / 2;
+    const fit = (c, half, max) => {
+      if (2 * half >= max) return max / 2 - c; // wider than the box: centre it
+      if (c - half < 0) return half - c;
+      if (c + half > max) return max - half - c;
+      return 0;
+    };
+    return { s, dx: fit(cx, hw, L.width), dy: fit(cy, hh, L.height) };
+  }, [sel, L, people]);
+  const live = useRef({ L: null, sel: null, bigT: null });
   const pingRef = useRef(() => undefined);
-  useEffect(() => { live.current = { L, sel }; }, [L, sel]);
+  useEffect(() => { live.current = { L, sel, bigT }; }, [L, sel, bigT]);
   // Escape brings everyone back
   useEffect(() => {
     const onKey = (e) => { if (e.key === 'Escape') setSel(null); };
@@ -177,12 +179,15 @@ export default function TeamPage() {
     const pings = [];
     // outlines follow the isolation: the chosen one grows with its portrait,
     // the rest fade back, both eased so it never snaps
-    const scale = new Map(), fade = new Map();
+    const scale = new Map(), fade = new Map(), offs = new Map();
+    people.forEach((x) => { scale.set(x.i, 1); fade.set(x.i, 1); offs.set(x.i * 2, 0); offs.set(x.i * 2 + 1, 0); });
     const ease = (m, k, target) => { const v = m.has(k) ? m.get(k) : target; const n = reduce ? target : v + (target - v) * 0.22; m.set(k, n); return n; };
+    // where a cell's outline sits now: its lattice centre plus any growth shift
+    const where = (x) => { const [cx, cy] = centre(live.current.L, x.c, x.r); return [cx + (offs.get(x.i * 2) || 0), cy + (offs.get(x.i * 2 + 1) || 0)]; };
     pingRef.current = (i, hover) => { if (!reduce && !pings.some((p) => p.i === i)) pings.push({ i, f0: frame, hover }); };
     const tick = () => {
       frame++;
-      const { L: lay, sel: chosen } = live.current;
+      const { L: lay, sel: chosen, bigT: bt } = live.current;
       const iso = chosen !== null && chosen !== undefined;
       if (lay) {
         const DPR = Math.min(2, window.devicePixelRatio || 1);
@@ -196,9 +201,11 @@ export default function TeamPage() {
         for (const x of people) {
           const age = frame - x.t0;
           if (age < 0) continue;
-          const sc = ease(scale, x.i, chosen === x.i ? 1.08 : 1);
+          const big = chosen === x.i && bt;
+          const sc = ease(scale, x.i, big ? bt.s : 1);
           const fa = ease(fade, x.i, iso && chosen !== x.i ? 0.12 : 1);
-          const [cx, cy] = centre(lay, x.c, x.r), p = hexPts(cx, cy, (lay.R - 1.5) * sc);
+          ease(offs, x.i * 2, big ? bt.dx : 0); ease(offs, x.i * 2 + 1, big ? bt.dy : 0);
+          const [cx, cy] = where(x), p = hexPts(cx, cy, (lay.R - 1.5) * sc);
           const tr = eDraw(age / TR), settled = sm(TR, TR + 18, age);
           if (age >= TR * 0.8 && !shown.has(x.i)) {
             const el = field.querySelector(`.tp-cell[data-i="${x.i}"]`);
@@ -236,7 +243,7 @@ export default function TeamPage() {
         for (const pg of pings) {
           const x = people[pg.i], q = eDraw((frame - pg.f0) / TR);
           if (q >= 1) continue;
-          const [cx, cy] = centre(lay, x.c, x.r), p = hexPts(cx, cy, (lay.R - 1.5) * (scale.get(x.i) || 1));
+          const [cx, cy] = where(x), p = hexPts(cx, cy, (lay.R - 1.5) * (scale.get(x.i) || 1));
           ctx.globalAlpha = 1; ctx.strokeStyle = pg.hover ? GOLD : LIGHT; ctx.lineWidth = pg.hover ? 3 : 2;
           pathFrac(ctx, p, q, x.start, -x.dir);
           head(ctx, p, q, x.start, -x.dir, pg.hover ? GOLD : LIGHT);
@@ -254,9 +261,10 @@ export default function TeamPage() {
     if (i === sel) { clear(); return; }
     setSel(i);
     pingRef.current(i, true);
-    // stacked layout: the story is below the comb, so take the reader to it
-    if (window.matchMedia('(max-width: 1100px)').matches && bioRef.current) {
-      bioRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    // stacked layout: keep the grown cell in view; the story sits right below
+    if (window.matchMedia('(max-width: 1100px)').matches && fieldRef.current) {
+      const el = fieldRef.current.querySelector(`.tp-cell[data-i="${i}"]`);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
 
@@ -290,10 +298,11 @@ export default function TeamPage() {
                   return <div key={p.i} className={'tp-cell tp-cell--pend' + (isolating ? ' tp-cell--faded' : '')} data-i={p.i} style={style} aria-hidden="true"><div className="tp-hex" /></div>;
                 }
                 const isSel = sel === p.i;
+                const grow = isSel && bigT ? { '--tp-s': bigT.s, '--tp-dx': `${Math.round(bigT.dx)}px`, '--tp-dy': `${Math.round(bigT.dy)}px` } : null;
                 return (
                   <button
-                    key={p.i} type="button" data-i={p.i} style={style}
-                    className={'tp-cell' + (isSel ? ' tp-cell--sel' : isolating ? ' tp-cell--faded' : '')}
+                    key={p.i} type="button" data-i={p.i} style={grow ? { ...style, ...grow } : style}
+                    className={'tp-cell' + (isSel ? ' tp-cell--sel tp-cell--big' : isolating ? ' tp-cell--faded' : '')}
                     aria-label={`${p.name}, ${p.kind}`} aria-pressed={isSel}
                     onMouseEnter={() => pingRef.current(p.i, true)}
                     onClick={() => select(p.i)}
@@ -302,6 +311,7 @@ export default function TeamPage() {
                       {p.img
                         ? <img src={p.img} alt="" style={{ objectPosition: p.pos || '50% 45%' }} />
                         : <span className="tp-init">{initialsOf(p.name)}</span>}
+                      {p.full && <img className="tp-full" src={p.full} alt="" style={{ objectPosition: p.fullPos || '50% 50%' }} />}
                     </div>
                     <span className="tp-tag"><span className="tp-nm">{p.name}</span><span className="tp-rl">{p.kind}</span></span>
                   </button>

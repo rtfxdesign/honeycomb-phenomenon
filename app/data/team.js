@@ -5,7 +5,8 @@
 // odd rows shifted half a cell right). Leave it off a new member and the page
 // lays the team out in rows of three instead. `role` is an optional line under
 // the name; `email` is optional, and a member without one is left off the
-// Contact list.
+// Contact list. `fullImage` is an optional wider photo, shown when the cell is
+// clicked and grows; without it the portrait itself is shown larger.
 
 export const ROSTER_EMAIL = 'contact@projecthoneycomb.site';
 
@@ -70,6 +71,8 @@ export const TEAM = [
     role: 'Creative technologist · The archive’s builder',
     image: '/team/allen-grabo.jpg',
     imagePosition: '50% 38%',
+    fullImage: '/team/allen-grabo-full.jpg',
+    fullPosition: '50% 50%',
     slot: [0, 0],
     bio: [
       'Allen Grabo is a creative technologist based in Washington, DC, and the founder of rtfx design, a studio that builds visual systems for real spaces. The work lives where an idea has to survive contact with a room: projection-mapped environments, LED walls, generative visuals, and the show-control systems that keep them running live. Allen has built the systems that powered events at Porsche Studio Portland, Miami Art Week, Cape Canaveral, the Kennedy Center, Baltimore Ravens tailgates, and the Smithsonian.',

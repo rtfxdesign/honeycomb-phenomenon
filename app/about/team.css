@@ -29,8 +29,13 @@
 .tp-cell{position:absolute;opacity:0;transform:scale(.92);border:0;padding:0;margin:0;background:transparent;color:inherit;font:inherit;
   cursor:pointer;transition:opacity .5s ease-out,transform .5s cubic-bezier(.16,1,.3,1),filter .3s}
 .tp-cell[data-on]{opacity:1;transform:none}
-/* isolation: the chosen portrait lifts, everyone else falls back */
-.tp-cell[data-on].tp-cell--sel{transform:scale(1.08);z-index:1;filter:drop-shadow(0 0 24px rgba(242,191,73,.35))}
+/* isolation: the chosen cell grows to show more of the photo, shifted by the
+   page to stay inside the comb; everyone else falls back */
+.tp-cell[data-on].tp-cell--sel{z-index:3;filter:drop-shadow(0 0 24px rgba(242,191,73,.35))}
+.tp-cell[data-on].tp-cell--big{transform:translate(var(--tp-dx,0px),var(--tp-dy,0px)) scale(var(--tp-s,2.2))}
+.tp-cell.tp-cell--big .tp-tag{opacity:1;transform:scale(calc(1 / var(--tp-s,2.2)));transform-origin:50% 100%}
+.tp-full{position:absolute;inset:0;opacity:0;transition:opacity .45s ease}
+.tp-cell--big .tp-full{opacity:1}
 .tp-cell[data-on].tp-cell--faded{opacity:.14;filter:grayscale(1) brightness(.7)}
 .tp-cell[data-on].tp-cell--faded:hover,.tp-cell[data-on].tp-cell--faded:focus-visible{opacity:.45}
 .tp-cell:focus-visible{outline:none}
