@@ -5,9 +5,9 @@
 
 import React from 'react';
 
-// v2: the reviewed defaults (black ground, gold leaf, no texture) replace
-// whatever a browser had saved under the old key.
-const STORAGE_KEY = 'hc-tweaks-v2';
+// v3: Allen's 2026-09-29 defaults (150px cells, dimmer dormant leaf, wider
+// light) replace whatever a browser had saved under the old keys.
+const STORAGE_KEY = 'hc-tweaks-v3';
 
 const __TWEAKS_STYLE = `
   .twk-tab{position:fixed;right:-1px;bottom:96px;z-index:2147483645;

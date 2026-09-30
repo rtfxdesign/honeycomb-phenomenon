@@ -19,16 +19,16 @@ import { useCombReveal } from './CombReveal';
 import { cellLabel, initialsOf } from '../lib/name';
 
 const TWEAK_DEFAULTS = {
-  // the settings the review settled on, 2026-09-18
-  cellSize: 135,
+  // the settings the review settled on, 2026-09-18, revised by Allen 2026-09-29
+  cellSize: 150,
   cellCount: 50,
   brightShare: 70,
   distribution: 'clustered',
   seed: 1,
-  gaps: 7,
+  gaps: 8,
   fieldWidth: 1600,
   fieldHeight: 1000,
-  clusterShare: 74,
+  clusterShare: 76,
   clusterBy: 'tags',
   pull: 72,
   push: 251,
@@ -37,13 +37,13 @@ const TWEAK_DEFAULTS = {
   showFaces: true,
   // the pointer as a lamp over the comb
   mouseLight: true,
-  lightReach: 260,      // % of a cell's width — how far the pool carries
-  lightStrength: 70,    // %
-  lightAfterglow: 1460, // ms for a cell to let go of the light
-  cellCenter: 43,       // % of the middle given over to the ground behind
-  faceGlaze: 50,        // % — the film over a portrait for the light to catch
-  cellOpacity: 92,    // gold leaf wants more presence than the old wax did
-  dormantBright: 95,
+  lightReach: 430,      // % of a cell's width — how far the pool carries
+  lightStrength: 63,    // %
+  lightAfterglow: 1180, // ms for a cell to let go of the light
+  cellCenter: 0,        // % of the middle given over to the ground behind
+  faceGlaze: 72,        // % — the film over a portrait for the light to catch
+  cellOpacity: 70,
+  dormantBright: 45,
   ground: '#000000',
   backdrop: 'None',
   textureOpacity: 0,
@@ -968,9 +968,11 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                // phone: below the header, then the column. desktop: centred in
                // the frame when it fits, and scrollable from the middle when
                // it does not
+               // the bar is fixed over the top 74px of the frame, so the comb's
+               // first row starts below it, and stays reachable by scrolling up
                margin: phone
                  ? '84px auto 60px'
-                 : `${Math.max(12, Math.round((clipH - H) / 2))}px auto ${Math.max(12, Math.round((clipH - H) / 2))}px`,
+                 : `${Math.max(90, Math.round((clipH - H) / 2))}px auto ${Math.max(24, Math.round((clipH - H) / 2))}px`,
                '--glow-fade': `${t.lightAfterglow ?? 520}ms`,
                '--glow-strength': (t.lightStrength ?? 70) / 100,
                '--cell-center': (t.cellCenter ?? 14) / 100,
@@ -1183,7 +1185,7 @@ export default function HoneycombApp() {
         <TweakSection label="Cells" />
         <TweakSlider label="Cell size" value={t.cellSize} min={80} max={170} unit="px" onChange={(v) => setTweak('cellSize', v)} />
         <TweakSlider label="Cell count" value={t.cellCount} min={1} max={100} onChange={(v) => setTweak('cellCount', v)} />
-        <TweakSlider label="Gaps" value={t.gaps} min={0} max={8} onChange={(v) => setTweak('gaps', v)} />
+        <TweakSlider label="Gaps" value={t.gaps} min={0} max={30} onChange={(v) => setTweak('gaps', v)} />
         <TweakSlider label="Field width" value={t.fieldWidth} min={800} max={2400} step={20} unit="px" onChange={(v) => setTweak('fieldWidth', v)} />
         <TweakSlider label="Field height" value={t.fieldHeight} min={400} max={1600} step={20} unit="px" onChange={(v) => setTweak('fieldHeight', v)} />
         <TweakSlider label="Bright share" value={t.brightShare} min={10} max={90} unit="%" onChange={(v) => setTweak('brightShare', v)} />
