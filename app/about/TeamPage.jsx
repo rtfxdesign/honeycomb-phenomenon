@@ -222,6 +222,9 @@ export default function TeamPage() {
             const el = field.querySelector(`.tp-cell[data-i="${x.i}"]`);
             if (el) { el.setAttribute('data-on', ''); shown.add(x.i); }
           }
+          // a grown cell wears its own rim (CSS, scaled with the photo); the
+          // canvas outline would only fight it, so it is not drawn
+          if (sc > 1.02) continue;
           if (x.g === 'pend') {
             ctx.setLineDash([5, 6]); ctx.globalAlpha = 0.35 * fa; ctx.strokeStyle = GOLD; ctx.lineWidth = 1.2;
             pathFrac(ctx, p, tr, x.start, x.dir); ctx.setLineDash([]);
@@ -243,17 +246,18 @@ export default function TeamPage() {
             ctx.beginPath(); ctx.arc(v[0], v[1], 5 * (1 + 1.6 * (1 - k)), 0, 7); ctx.fill();
           }
         }
-        // once formed, one face re-traces itself every few seconds
-        if (!reduce && frame > 150 && frame - lastIdle > 84) {
+        // once formed, one face re-traces itself every few seconds (not while
+        // someone is isolated: the others are faded and the chosen one has its rim)
+        if (!reduce && !iso && frame > 150 && frame - lastIdle > 84) {
           lastIdle = frame;
-          const liveOnes = iso ? [people[chosen]] : people.filter((x) => x.g !== 'pend');
+          const liveOnes = people.filter((x) => x.g !== 'pend');
           const pick = liveOnes[Math.floor(Math.random() * liveOnes.length)];
           if (pick) pingRef.current(pick.i, false);
         }
         for (let i = pings.length - 1; i >= 0; i--) if (frame - pings[i].f0 >= TR + 6) pings.splice(i, 1);
         for (const pg of pings) {
           const x = people[pg.i], q = eDraw((frame - pg.f0) / TR);
-          if (q >= 1) continue;
+          if (q >= 1 || (scale.get(x.i) || 1) > 1.02) continue;
           const [cx, cy] = where(x), p = hexPts(cx, cy, (lay.R - 1.5) * (scale.get(x.i) || 1));
           ctx.globalAlpha = 1; ctx.strokeStyle = pg.hover ? GOLD : LIGHT; ctx.lineWidth = pg.hover ? 3 : 2;
           pathFrac(ctx, p, q, x.start, -x.dir);
@@ -318,6 +322,7 @@ export default function TeamPage() {
                     onMouseEnter={() => pingRef.current(p.i, true)}
                     onClick={() => select(p.i)}
                   >
+                    <span className="tp-rim" aria-hidden="true" />
                     <div className="tp-hex">
                       {p.img
                         ? <img src={p.img} alt="" style={{ objectPosition: p.pos || '50% 45%' }} />
