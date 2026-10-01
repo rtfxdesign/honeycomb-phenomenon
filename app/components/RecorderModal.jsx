@@ -447,8 +447,8 @@ export default function RecorderModal({ onClose }) {
                 </div>
                 <p>
                   Email <a href={`mailto:${REMOVAL_EMAIL}?subject=${encodeURIComponent(`Remove ${submissionId}`)}`}>{REMOVAL_EMAIL}</a> with
-                  this ID in the subject line and your submission will be removed automatically; otherwise we can remove it
-                  manually with whatever details you have.
+                  this ID in the subject line and we will remove it. Without the ID we can still find it from whatever
+                  details you have.
                 </p>
                 <RemovalNote id={submissionId} />
               </div>

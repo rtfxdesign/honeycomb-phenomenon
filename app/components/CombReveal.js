@@ -46,10 +46,13 @@ function pointAt(p, frac, s, d) {
   const n = 6 * clamp(frac), i = Math.min(5, Math.floor(n)), rem = n - i, a = at(p, s, d, i), b = at(p, s, d, i + 1);
   return [a[0] + (b[0] - a[0]) * rem, a[1] + (b[1] - a[1]) * rem];
 }
+// the glow behind the pulse's head is a shadow blur: handsome on a desktop
+// and the single most expensive thing on a phone, so phones go without it
+let GLOW = true;
 function head(ctx, p, tr, s, d, k) {
   const tail = Math.max(0, tr - 0.15);
   ctx.globalAlpha = 1; ctx.strokeStyle = LIGHT; ctx.lineWidth = 3.2 * k;
-  ctx.shadowColor = 'rgba(252,146,38,.9)'; ctx.shadowBlur = 18 * k;
+  ctx.shadowColor = 'rgba(252,146,38,.9)'; ctx.shadowBlur = GLOW ? 18 * k : 0;
   ctx.beginPath();
   const tp = pointAt(p, tail, s, d);
   ctx.moveTo(tp[0], tp[1]);
@@ -59,12 +62,14 @@ function head(ctx, p, tr, s, d, k) {
   ctx.fillStyle = LIGHT; ctx.beginPath(); ctx.arc(hp[0], hp[1], 4.5 * k, 0, 7); ctx.fill();
 }
 
-// reveal order: breadth-first from the cell nearest the middle of the field
-function schedule(base, W, H, size) {
+// reveal order: breadth-first from the cell nearest the middle of the field,
+// or, on a phone where the comb is a column read from the top, from the cell
+// nearest the top so it builds downward in view
+function schedule(base, W, H, size, fromTop) {
   const byKey = new Map(base.map((b) => [b.k, b]));
   let seed = base[0], best = Infinity;
   for (const b of base) {
-    const d = (b.x + size / 2 - W / 2) ** 2 + (b.y + size / 2 - H / 2) ** 2;
+    const d = (b.x + size / 2 - W / 2) ** 2 + (fromTop ? (b.y + size / 2) ** 2 : (b.y + size / 2 - H / 2) ** 2);
     if (d < best) { best = d; seed = b; }
   }
   const depth = new Map([[seed.k, 0]]), q = [seed];
@@ -94,9 +99,10 @@ const prefersLessMotion = () =>
  * @param faceOf     Map of cell key → face, read every frame
  * @param ready      false until the archive's stories have arrived
  * @param run        bump to replay the reveal
+ * @param phone      the comb is a column read from the top: build downward, draw light
  * @returns revealing — true while cells should start hidden
  */
-export function useCombReveal({ fieldRef, canvasRef, base, cells, faceOf, size, W, H, enabled = true, ready = true, run = 0 }) {
+export function useCombReveal({ fieldRef, canvasRef, base, cells, faceOf, size, W, H, enabled = true, ready = true, run = 0, phone = false }) {
   const [reduce] = useState(prefersLessMotion);
   const [done, setDone] = useState(null);
   const live = useRef({ cells, faceOf });
@@ -113,7 +119,8 @@ export function useCombReveal({ fieldRef, canvasRef, base, cells, faceOf, size, 
     cv.style.width = W + 'px'; cv.style.height = H + 'px';
     field.querySelectorAll('.cell[data-shown]').forEach((el) => el.removeAttribute('data-shown'));
 
-    const sched = schedule(base, W, H, size);
+    GLOW = !phone;
+    const sched = schedule(base, W, H, size, phone);
     const seen = new Set();
     const pings = [];
     const els = new Map();
@@ -205,7 +212,7 @@ export function useCombReveal({ fieldRef, canvasRef, base, cells, faceOf, size, 
       field.removeEventListener('mouseover', onOver);
       ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.clearRect(0, 0, cv.width, cv.height);
     };
-  }, [fieldRef, canvasRef, base, size, W, H, active, ready, run]);
+  }, [fieldRef, canvasRef, base, size, W, H, active, ready, run, phone]);
 
   const revealing = active && !(done && done.base === base && done.run === run);
   return { revealing };

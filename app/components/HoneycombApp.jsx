@@ -916,7 +916,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
   const revealCanvasRef = useRef(null);
   const { revealing } = useCombReveal({
     fieldRef, canvasRef: revealCanvasRef, base, cells: arranged, faceOf,
-    size, W, H, enabled: t.combReveal !== false, ready, run: t.revealRun || 0,
+    size, W, H, enabled: t.combReveal !== false, ready, run: t.revealRun || 0, phone,
   });
   // with the panel open, slide the field so the cell you clicked clears it
   useEffect(() => {
