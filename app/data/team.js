@@ -76,15 +76,15 @@ export const TEAM = [
   },
   {
     name: 'Allen Grabo',
-    role: 'Creative technologist · The archive’s builder',
+    role: 'Creative technologist',
     image: '/team/allen-grabo.jpg',
     imagePosition: '50% 38%',
     fullImage: '/team/allen-grabo-full.jpg',
     fullPosition: '50% 50%',
     slot: [0, 0],
     bio: [
-      'Allen Grabo is a creative technologist based in Washington, DC, and the founder of rtfx design, a studio that builds visual systems for real spaces. The work lives where an idea has to survive contact with a room: projection-mapped environments, LED walls, generative visuals, and the show-control systems that keep them running live. Allen has built the systems that powered events at Porsche Studio Portland, Miami Art Week, Cape Canaveral, the Kennedy Center, Baltimore Ravens tailgates, and the Smithsonian.',
-      'At Honeycomb, Allen builds the archive itself: the comb where every voice appears as a point of light, the recorder that lets someone tell their story in their own words, and the quiet machinery that keeps each story in the hands of the person who lived it. The work is as much custody as design. It decides not only how an experience looks when it is shared, but who can see it, how long it stays, and how it can be taken back. For Allen, an archive of the unexplained earns trust the way a good live show does: everything complicated stays out of sight, and nothing is left to chance.',
+      'Allen Grabo is a creative technologist in Washington, DC, and runs rtfx design, a small studio that builds visual systems for real spaces: projection, LED walls, generative visuals, and the show-control systems behind them. Over the years that work has included events at Porsche Studio Portland, Miami Art Week, Cape Canaveral, the Kennedy Center, Baltimore Ravens tailgates, and the Smithsonian.',
+      'At Honeycomb, Allen builds and looks after the archive: the comb itself, the recorder people use to tell their story, and the parts underneath that keep each story in the hands of the person who told it. Much of the job is making sure a story is shown the way its contributor intended, seen only by the people they intended, and can be taken back when they ask.',
     ],
   },
 ];
