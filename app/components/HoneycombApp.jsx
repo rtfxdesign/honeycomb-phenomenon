@@ -824,7 +824,13 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     if (!f) return base;
     const slots = [];
     for (let c = 0; c < cols; c++) for (let r = c % 2; r < rows; r += 2) slots.push([c, r]);
-    const movers = base.filter((b) => b.k !== focusKey && (b.t === 'b' || t.dormantRespond));
+    // The clicked cell grows (to 1.42x with the story panel open), which
+    // covers the six cells around it. Those six slots are kept empty as a
+    // moat: kin gather in the ring beyond, and anything sitting in the moat,
+    // dormant cells included, steps out of it.
+    const fc = f.k.split(',').map(Number);
+    const moat = new Set(neighbors(fc).map(key));
+    const movers = base.filter((b) => b.k !== focusKey && (b.t === 'b' || t.dormantRespond || moat.has(b.k)));
     const rng = mulberry32(((f.x * 31 + f.y * 7) | 0) + t.seed * 101);
     const shuffled = shuffle(movers.map((m) => m.k), rng);
     const kinCount = Math.round(movers.length * t.clusterShare / 100);
@@ -843,16 +849,22 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     });
     const kinSet = new Set(ranked.slice(0, kinCount));
     const occupied = new Set([focusKey]);
-    base.forEach((b) => { if (b.k !== focusKey && !(b.t === 'b' || t.dormantRespond)) occupied.add(b.k); });
+    base.forEach((b) => { if (b.k !== focusKey && !(b.t === 'b' || t.dormantRespond || moat.has(b.k))) occupied.add(b.k); });
     const taken = new Set();
     const result = new Map();
     const assign = (b, px, py) => {
+      // nearest free slot outside the moat; only if the field is completely
+      // full does a cell take a moat slot rather than be left where it was
+      // (which another cell may by now have claimed)
       let bestS = null, bestD = Infinity;
-      for (const s of slots) {
-        const kk = key(s);
-        if (occupied.has(kk) || taken.has(kk)) continue;
-        const d = (s[0] * cx - px) ** 2 + (s[1] * cy - py) ** 2;
-        if (d < bestD) { bestD = d; bestS = s; }
+      for (const pass of [0, 1]) {
+        for (const s of slots) {
+          const kk = key(s);
+          if (occupied.has(kk) || taken.has(kk) || (pass === 0 && moat.has(kk))) continue;
+          const d = (s[0] * cx - px) ** 2 + (s[1] * cy - py) ** 2;
+          if (d < bestD) { bestD = d; bestS = s; }
+        }
+        if (bestS) break;
       }
       if (!bestS) return;
       taken.add(key(bestS));
@@ -929,13 +941,25 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     }
     const b = arranged.find((x) => x.k === focusKey);
     if (!b) return undefined;
-    // where the cell should land on screen: centred in the room beside the panel
-    const targetScreenX = panelWidth + (vp[0] - panelWidth) / 2;
-    const targetScreenY = vp[1] / 2;
+    // The clicked cell moves only as far as it has to: if it is already in
+    // the room beside the panel, grown and with a margin, it stays where it
+    // is. Otherwise it comes just inside that room. (It used to be sent to the
+    // middle of the room every time, which on a wide screen is a long jump
+    // for a cell that was already in plain view.)
+    const half = (size * 1.42) / 2 + 24;
+    const room = { l: panelWidth + half, r: vp[0] - half, t: 74 + half, b: vp[1] - half };
     const cellCenterX = b.x + size / 2, cellCenterY = b.y + size * 0.43;
     const clipBox = clip.getBoundingClientRect();
     // the field's offset inside the scroll area (its centring margins)
     const offX = el.offsetLeft, offY = el.offsetTop;
+    // any shove already applied is part of where the cell is now
+    const m = /translateX\((-?[\d.]+)px\)/.exec(el.style.transform || '');
+    const shoveNow = m ? Number(m[1]) : 0;
+    const nowX = clipBox.left + offX + cellCenterX - clip.scrollLeft + shoveNow;
+    const nowY = clipBox.top + offY + cellCenterY - clip.scrollTop;
+    const clampTo = (v, lo, hi) => (lo > hi ? (lo + hi) / 2 : Math.min(hi, Math.max(lo, v)));
+    const targetScreenX = clampTo(nowX, room.l, room.r);
+    const targetScreenY = clampTo(nowY, room.t, room.b);
     // scroll as far toward the target as the scroll range allows...
     const wantLeft = offX + cellCenterX - (targetScreenX - clipBox.left);
     const wantTop = offY + cellCenterY - (targetScreenY - clipBox.top);
