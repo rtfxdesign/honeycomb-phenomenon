@@ -121,3 +121,9 @@
 }
 /* the title holds one line down to phone width, where it may wrap */
 @media (max-width:480px){.tp h1{white-space:normal}}
+
+/* the cell frame (rendered in Blender, scripts/frames): over the photo like a
+   mount, and scaled with the cell when it grows, so it replaces the CSS rim */
+.tp-frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:2}
+.tp-cell:has(.tp-frame) .tp-rim{display:none}
+.tp-cell--big .tp-frame{transform:none}

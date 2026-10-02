@@ -1,4 +1,5 @@
 'use client';
+import { frameForStory } from '../lib/source';
 
 // Honeycomb site — interactive archive field from the Claude Design project
 // (gravity clustering, tweakable field) merged with the topbar,
@@ -34,7 +35,11 @@ const TWEAK_DEFAULTS = {
   push: 251,
   dormantRespond: false,
   dormantLook: 'gold',  // 'gold' leaf interiors, or 'wax' for the cracked comb
-  cellBorder: 'gold',   // the frame round a bright cell: 'gold' | 'wax' | 'line' | 'none'
+  // the frame round a bright cell. 'auto' frames by type: the quieter gold for
+  // community faces and stories, Rice silver and navy for Archives of the
+  // Impossible. 'story' | 'rice' | 'team' force one frame on every face, to
+  // compare; 'gold' | 'wax' | 'line' | 'none' are the earlier unframed looks.
+  cellBorder: 'auto',
   faceInset: 9,         // % of the cell's width the face stays in from the edge (9 = the gold frame's inner edge)
   showFaces: true,
   // the pointer as a lamp over the comb
@@ -801,7 +806,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     for (const b of base) {
       if (b.t !== 'b') continue;
       if (i < faces.length) {
-        m.set(b.k, faces[i++]);
+        m.set(b.k, { ...faces[i++], frame: 'story' });
       } else if (e < experiences.length) {
         const exp = experiences[e++];
         // name as the contributor chose to show it, else place, else title
@@ -809,7 +814,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
         // a story with no photo still needs to be findable in the comb, so the
         // cell carries its initials instead of a portrait
         const initials = initialsOf(name) || '?';
-        m.set(b.k, { src: exp.photoUrl || null, photo: true, initials, name, person: { name, experience: exp } });
+        m.set(b.k, { src: exp.photoUrl || null, photo: true, initials, name, person: { name, experience: exp }, frame: frameForStory(exp) });
       }
     }
     return m;
@@ -1010,13 +1015,17 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
           {arranged.map((b) => {
             const face = faceOf.get(b.k);
             const dimmed = matchKeys && !b.match;
+            const mode = t.cellBorder || 'auto';
+            const frame = face && (face.src || face.initials)
+              ? (mode === 'auto' ? face.frame : ['story', 'rice', 'team'].includes(mode) ? mode : null)
+              : null;
             return (
             <div key={b.k} className={'cell' + (dimmed ? ' cell-unmatched' : '')}
                  data-k={b.k} data-cx={b.x} data-cy={b.y} data-half={size / 2}
                  style={{ left: b.x, top: b.y, width: size, '--cell-w': `${size}px`, zIndex: b.k === focusKey ? 3 : b.match ? 2 : b.kin ? 2 : 1 }}>
               {b.t === 'b'
                 ? (
-                  <div className={'hexcell' + (b.k === focusKey ? ' cell-focus' : '') + (b.match ? ' cell-match' : '')} tabIndex="0" role="button"
+                  <div className={'hexcell' + (frame ? ' has-frame' : '') + (b.k === focusKey ? ' cell-focus' : '') + (b.match ? ' cell-match' : '')} tabIndex="0" role="button"
                        aria-label={face ? face.name : 'Bright cell'}
                        onClick={() => toggleCell(b)}
                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleCell(b); } }}>
@@ -1036,6 +1045,9 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                         wax frame and portrait alike, so a face reads as sitting
                         under the comb rather than printed on top of it */}
                     <span className="cell-glaze" aria-hidden="true" />
+                    {/* the frame, rendered in Blender (scripts/frames): it sits
+                        over the face's edge like a mount */}
+                    {frame && <img className="cell-frame" src={`/assets/frames/frame-${frame}.png`} alt="" aria-hidden="true" />}
                   </div>
                 )
                 : (
@@ -1223,8 +1235,8 @@ export default function HoneycombApp() {
         <TweakSlider label="Dormant brightness" value={t.dormantBright ?? 72} min={30} max={100} unit="%" onChange={(v) => setTweak('dormantBright', v)} />
         <TweakRadio label="Dormant cells" value={t.dormantLook || 'gold'} options={[{ value: 'gold', label: 'Gold leaf' }, { value: 'wax', label: 'Wax' }]} onChange={(v) => setTweak('dormantLook', v)} />
         <TweakSlider label="Cell centre" value={t.cellCenter ?? 14} min={0} max={45} unit="%" onChange={(v) => setTweak('cellCenter', v)} />
-        <TweakRadio label="Cell border" value={t.cellBorder || 'gold'}
-                    options={[{ value: 'gold', label: 'Gold leaf' }, { value: 'wax', label: 'Wax' }, { value: 'line', label: 'Line' }, { value: 'none', label: 'None' }]}
+        <TweakRadio label="Cell border" value={t.cellBorder || 'auto'}
+                    options={[{ value: 'auto', label: 'Frames by type' }, { value: 'story', label: 'Gold frame on all' }, { value: 'rice', label: 'Rice frame on all' }, { value: 'team', label: 'Team frame on all' }, { value: 'gold', label: 'Gold leaf, no frame' }, { value: 'wax', label: 'Wax, no frame' }, { value: 'line', label: 'Line' }, { value: 'none', label: 'None' }]}
                     onChange={(v) => setTweak('cellBorder', v)} />
         <TweakSlider label="Face inset" value={t.faceInset ?? 9} min={0} max={20} step={0.5} unit="%" onChange={(v) => setTweak('faceInset', v)} />
         <TweakToggle label="Mouse light" value={t.mouseLight !== false} onChange={(v) => setTweak('mouseLight', v)} />

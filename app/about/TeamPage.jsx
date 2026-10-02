@@ -29,10 +29,10 @@ function placeRows(items, firstRow) {
 }
 
 function buildRoster() {
-  const team = TEAM.map((m) => ({ g: 'team', kind: 'The team', name: m.name, sub: m.role, img: m.image, pos: m.imagePosition, full: m.fullImage, fullPos: m.fullPosition, mail: m.email, bio: m.bio, slot: m.slot }));
-  const adv = ADVISORS.map((a) => ({ g: 'adv', kind: 'Advisor', name: a.name, sub: a.role, url: a.url }));
+  const team = TEAM.map((m) => ({ g: 'team', kind: 'The team', name: m.name, sub: m.role, img: m.image, pos: m.imagePosition, full: m.fullImage, fullPos: m.fullPosition, mail: m.email, bio: m.bio, slot: m.slot, frame: 'team' }));
+  const adv = ADVISORS.map((a) => ({ g: 'adv', kind: 'Advisor', name: a.name, sub: a.role, url: a.url, frame: a.frame || 'story' }));
   const allies = ALLIES.length
-    ? ALLIES.map((a) => ({ g: 'ally', kind: 'Ally', name: a.name, sub: a.role, url: a.url, img: a.logo }))
+    ? ALLIES.map((a) => ({ g: 'ally', kind: 'Ally', name: a.name, sub: a.role, url: a.url, img: a.logo, frame: a.frame || 'story' }))
     : [{ g: 'pend' }, { g: 'pend' }, { g: 'pend' }];
   const groups = [
     { label: 'The team', items: team },
@@ -236,11 +236,14 @@ export default function TeamPage() {
             continue;
           }
           const isSel = chosen === x.i;
-          ctx.globalAlpha = (0.5 + 0.45 * settled) * fa; ctx.strokeStyle = isSel ? GOLD : CREAM; ctx.lineWidth = isSel ? 2.6 : 1.8;
+          // a framed cell's outline traces it in and then hands over to the
+          // frame, rather than sitting on top of the frame's edge for good
+          const fr = x.frame ? 1 - settled : 1;
+          ctx.globalAlpha = (0.5 + 0.45 * settled) * fa * fr; ctx.strokeStyle = isSel ? GOLD : CREAM; ctx.lineWidth = isSel ? 2.6 : 1.8;
           pathFrac(ctx, p, tr, x.start, x.dir);
           const q2 = eDraw((age - TR * 0.35) / TR);
           if (q2 > 0) {
-            ctx.globalAlpha = 0.4 * fa; ctx.strokeStyle = GOLD; ctx.lineWidth = 1;
+            ctx.globalAlpha = 0.4 * fa * fr; ctx.strokeStyle = GOLD; ctx.lineWidth = 1;
             pathFrac(ctx, p.map(([px, py]) => [cx + (px - cx) * 0.9, cy + (py - cy) * 0.9]), q2, x.start, x.dir);
           }
           if (tr < 1) head(ctx, p, tr, x.start, x.dir, LIGHT);
@@ -333,6 +336,7 @@ export default function TeamPage() {
                         : <span className="tp-init">{initialsOf(p.name)}</span>}
                       {p.full && <img className="tp-full" src={p.full} alt="" style={{ objectPosition: p.fullPos || '50% 50%' }} />}
                     </div>
+                    {p.frame && <img className="tp-frame" src={`/assets/frames/frame-${p.frame}-pointy.png`} alt="" aria-hidden="true" />}
                     <span className="tp-tag"><span className="tp-nm">{p.name}</span><span className="tp-rl">{p.kind}</span></span>
                   </button>
                 );

@@ -876,3 +876,12 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
   transition:opacity .55s ease-out,transform .6s var(--ease-quiet),left 640ms var(--ease-quiet),top 640ms var(--ease-quiet)}
 .arch-field--reveal .cell[data-shown]{opacity:1;transform:none}
 @media (prefers-reduced-motion:reduce){.comb-reveal{display:none}}
+
+/* ───────────── cell frames (rendered in Blender, scripts/frames) ─────────────
+   A frame sits over the cell like a mount: above the face and the glaze, its
+   opening a little inside the face so the lip overlaps the photo. The gold-leaf
+   cell under it is kept for its size but not shown. Which frame a cell wears
+   is set by type (the Cell border tweak, "Frames by type"). */
+.arch .hexcell > img.cell-frame{position:absolute;left:0;top:0;width:100%;height:100%;z-index:5;pointer-events:none;
+  opacity:1;-webkit-mask-image:none;mask-image:none}
+.hexcell.has-frame > img:not(.cell-face):not(.cell-frame){opacity:0}

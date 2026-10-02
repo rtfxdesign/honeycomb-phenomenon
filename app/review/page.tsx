@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { formatDisplayName, NAME_DISPLAY_OPTIONS } from "../lib/name";
+import { SOURCES } from "../lib/source";
 
 interface SubmissionData {
   id: string;
@@ -17,6 +18,7 @@ interface SubmissionData {
   experienceType?: string;
   transcript: string;
   privacy?: string;
+  source?: string;
   hashtags?: string[];
   status?: string;
   // machine transcription
@@ -49,6 +51,7 @@ interface EditState {
   location: string;
   experienceYear: string;
   privacy: string;
+  source: string;
   transcript: string;
   hashtags: string;
 }
@@ -263,6 +266,7 @@ export default function ReviewDashboard() {
       location: submission.data.location || "",
       experienceYear: submission.data.experienceYear || "",
       privacy: submission.data.privacy || "public",
+      source: submission.data.source || "",
       transcript: submission.data.transcript || "",
       hashtags: (submission.data.hashtags || []).join(", "),
     });
@@ -281,6 +285,7 @@ export default function ReviewDashboard() {
         location: edit.location,
         experienceYear: edit.experienceYear,
         privacy: edit.privacy,
+        source: edit.source,
         transcript: edit.transcript,
         hashtags: edit.hashtags.split(",").map(t => t.trim().replace(/^#/, "")).filter(Boolean),
       };
@@ -489,7 +494,7 @@ export default function ReviewDashboard() {
 
   const renderCard = (submission: Submission) => {
     const isApproved = submission.submissionKey.startsWith("approved/");
-    const { title, displayName, location, experienceYear, transcript, hashtags, privacy } = submission.data;
+    const { title, displayName, location, experienceYear, transcript, hashtags, privacy, source } = submission.data;
     const isEditing = editingKey === submission.submissionKey && edit;
 
     return (
@@ -539,6 +544,13 @@ export default function ReviewDashboard() {
                     <option value="community">Community only</option>
                     <option value="archive">Strictly archived (hidden from site)</option>
                   </select>
+                  <span style={{ ...labelStyle, marginTop: "0.6rem" }}>Source</span>
+                  <select style={inputStyle} value={edit.source} onChange={e => setEdit({ ...edit, source: e.target.value })}>
+                    {SOURCES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                  <div style={{ fontSize: "0.75rem", opacity: 0.6, marginTop: "0.25rem" }}>
+                    Sets the frame on the story&rsquo;s cell: Rice silver and navy for Archives of the Impossible, gold otherwise.
+                  </div>
                 </div>
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
@@ -572,6 +584,7 @@ export default function ReviewDashboard() {
                 <span>⌖ {location || "Unknown"}</span>
                 <span>📅 {experienceYear || "Unknown"}</span>
                 {privacy && <span>🔒 {privacy}</span>}
+                {source && <span>◈ {SOURCES.find((o) => o.value === source)?.label || source}</span>}
               </div>
               <div style={{ fontSize: "0.8rem", opacity: 0.5, marginTop: "0.5rem" }}>
                 Submitted: {formatDate(submission.lastModified)}

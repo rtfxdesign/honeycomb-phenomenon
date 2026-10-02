@@ -7,7 +7,7 @@ import React from 'react';
 
 // v3: Allen's 2026-09-29 defaults (150px cells, dimmer dormant leaf, wider
 // light) replace whatever a browser had saved under the old keys.
-const STORAGE_KEY = 'hc-tweaks-v3';
+const STORAGE_KEY = 'hc-tweaks-v4'; // v4: cell frames by type are the default
 
 const __TWEAKS_STYLE = `
   .twk-tab{position:fixed;right:-1px;bottom:96px;z-index:2147483645;

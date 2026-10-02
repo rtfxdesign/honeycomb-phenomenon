@@ -95,11 +95,13 @@ export const TEAM = [
 ];
 
 // Organisations that work alongside Honeycomb, and the people and groups who
-// stand with experiencers. Each entry: { name, role, url?, logo? }. An empty
+// stand with experiencers. Each entry: { name, role, url?, logo?, frame? }.
+// `frame` picks the cell frame on the About page ('rice' for Rice University;
+// otherwise the quieter gold). The team always wears the fancy gold. An empty
 // list renders as a note that the names are still being confirmed.
 export const PARTNERS = [];
 export const ADVISORS = [
-  { name: 'Karin Austin', role: 'Director, Center for the Impossible, Rice University', url: 'https://profiles.rice.edu/staff/karin-austin' },
+  { name: 'Karin Austin', role: 'Director, Center for the Impossible, Rice University', url: 'https://profiles.rice.edu/staff/karin-austin', frame: 'rice' },
   { name: 'Andrea Oddo', role: 'Technology and privacy advisor' },
 ];
 export const ALLIES = [];

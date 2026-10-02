@@ -3,6 +3,7 @@ import { isModerator } from "../../lib/auth";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 import { formatDisplayName, NAME_DISPLAY_LEVELS } from "../../lib/name";
+import { SOURCE_VALUES } from "../../lib/source";
 
 // Fields the review dashboard may edit; everything else in the stored JSON
 // (media keys, ids, timestamps, status) is preserved as-is.
@@ -20,6 +21,9 @@ const EDITABLE_FIELDS = [
   "experienceType",
   "transcript",
   "privacy",
+  // where the story came from: "" (the site) or a partner archive; it picks
+  // the frame the story's cell wears in the comb
+  "source",
   "recordingMode",
   "hashtags",
   // Confirming a machine draft is an edit like any other: the moderator moves
@@ -69,6 +73,7 @@ export async function POST(request: NextRequest) {
       }
     }
     if (data.nameDisplay && !NAME_DISPLAY_LEVELS.includes(data.nameDisplay)) data.nameDisplay = "full";
+    if ("source" in data && !SOURCE_VALUES.includes(data.source)) data.source = "";
     const nameTouched = ["firstName", "lastName", "nameDisplay"].some((f) => f in updates);
     if (nameTouched && (data.firstName || data.lastName)) {
       data.displayName = formatDisplayName(data.firstName, data.lastName, data.nameDisplay);
