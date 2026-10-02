@@ -35,9 +35,11 @@ const TWEAK_DEFAULTS = {
   push: 251,
   dormantRespond: false,
   dormantLook: 'gold',  // 'gold' leaf interiors, or 'wax' for the cracked comb
-  // the frame round a bright cell. 'auto' frames by type: the quieter gold for
-  // community faces and stories, Rice silver and navy for Archives of the
-  // Impossible. 'story' | 'rice' | 'team' force one frame on every face, to
+  // the frame round a bright cell. 'auto' frames by type (app/lib/source.js):
+  // Rice silver and navy for Archives of the Impossible, oxidized bronze for
+  // community-only stories, otherwise the gold worn by the decade of the
+  // experience, and beeswax round the spare cells. 'story' | 'story3' |
+  // 'bronze' | 'beeswax' | 'rice' | 'team' put one frame on every cell, to
   // compare; 'gold' | 'wax' | 'line' | 'none' are the earlier unframed looks.
   cellBorder: 'auto',
   faceInset: 9,         // % of the cell's width the face stays in from the edge (9 = the gold frame's inner edge)
@@ -1016,9 +1018,13 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
             const face = faceOf.get(b.k);
             const dimmed = matchKeys && !b.match;
             const mode = t.cellBorder || 'auto';
-            const frame = face && (face.src || face.initials)
-              ? (mode === 'auto' ? face.frame : ['story', 'rice', 'team'].includes(mode) ? mode : null)
-              : null;
+            // 'wax' (no frame) is the older cracked-wax look; the beeswax frame is 'beeswax'
+            const forced = mode === 'beeswax' ? 'wax' : ['story', 'story3', 'bronze', 'rice', 'team'].includes(mode) ? mode : null;
+            const filled = face && (face.src || face.initials);
+            // a voice wears its frame; a spare bright cell, kept for a story
+            // still to come, shows its gold leaf in a frame of beeswax
+            const frame = filled ? (mode === 'auto' ? face.frame : forced) : null;
+            const spareFrame = !filled && b.t === 'b' ? (mode === 'auto' ? 'wax' : forced) : null;
             return (
             <div key={b.k} className={'cell' + (dimmed ? ' cell-unmatched' : '')}
                  data-k={b.k} data-cx={b.x} data-cy={b.y} data-half={size / 2}
@@ -1047,7 +1053,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                     <span className="cell-glaze" aria-hidden="true" />
                     {/* the frame, rendered in Blender (scripts/frames): it sits
                         over the face's edge like a mount */}
-                    {frame && <img className="cell-frame" src={`/assets/frames/frame-${frame}.png`} alt="" aria-hidden="true" />}
+                    {(frame || spareFrame) && <img className="cell-frame" src={`/assets/frames/frame-${frame || spareFrame}.png`} alt="" aria-hidden="true" />}
                   </div>
                 )
                 : (
@@ -1236,7 +1242,7 @@ export default function HoneycombApp() {
         <TweakRadio label="Dormant cells" value={t.dormantLook || 'gold'} options={[{ value: 'gold', label: 'Gold leaf' }, { value: 'wax', label: 'Wax' }]} onChange={(v) => setTweak('dormantLook', v)} />
         <TweakSlider label="Cell centre" value={t.cellCenter ?? 14} min={0} max={45} unit="%" onChange={(v) => setTweak('cellCenter', v)} />
         <TweakRadio label="Cell border" value={t.cellBorder || 'auto'}
-                    options={[{ value: 'auto', label: 'Frames by type' }, { value: 'story', label: 'Gold frame on all' }, { value: 'rice', label: 'Rice frame on all' }, { value: 'team', label: 'Team frame on all' }, { value: 'gold', label: 'Gold leaf, no frame' }, { value: 'wax', label: 'Wax, no frame' }, { value: 'line', label: 'Line' }, { value: 'none', label: 'None' }]}
+                    options={[{ value: 'auto', label: 'Frames by type' }, { value: 'story', label: 'Gold frame on all' }, { value: 'story3', label: 'Oldest gold (pre-1980) on all' }, { value: 'bronze', label: 'Bronze (community) on all' }, { value: 'beeswax', label: 'Beeswax on all' }, { value: 'rice', label: 'Rice frame on all' }, { value: 'team', label: 'Team frame on all' }, { value: 'gold', label: 'Gold leaf, no frame' }, { value: 'wax', label: 'Wax, no frame' }, { value: 'line', label: 'Line' }, { value: 'none', label: 'None' }]}
                     onChange={(v) => setTweak('cellBorder', v)} />
         <TweakSlider label="Face inset" value={t.faceInset ?? 9} min={0} max={20} step={0.5} unit="%" onChange={(v) => setTweak('faceInset', v)} />
         <TweakToggle label="Mouse light" value={t.mouseLight !== false} onChange={(v) => setTweak('mouseLight', v)} />

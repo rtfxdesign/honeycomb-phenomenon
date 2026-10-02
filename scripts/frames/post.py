@@ -11,7 +11,7 @@ from PIL import Image, ImageDraw
 
 src_dir, out_dir = sys.argv[1], sys.argv[2]
 os.makedirs(out_dir, exist_ok=True)
-for v in ('team', 'story', 'rice'):
+for v in sys.argv[3:] or ('team', 'story', 'rice', 'story1', 'story2', 'story3', 'bronze', 'wax'):
     im = Image.open(os.path.join(src_dir, f'raw-{v}.png')).convert('RGBA')
     w, h = im.size
     R = w / 2

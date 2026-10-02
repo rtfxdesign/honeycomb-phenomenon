@@ -11,7 +11,10 @@ The opening is 0.80 of that, a little inside the face (which starts at 9%
 inset, i.e. 0.82), so the frame's lip overlaps the photo like a mount.
 
 usage: python frame.py <variant> <out.png> [samples]
-variant: team | story | rice
+variant: team | story | story1 | story2 | story3 | bronze | wax | rice
+  story1-3: the story gold with one, two and three decades' wear
+  bronze: oxidized bronze, for community-only stories
+  wax: translucent beeswax
 """
 import sys, math
 import bpy, bmesh
@@ -59,6 +62,78 @@ def enamel(name, color):
     b.inputs['Roughness'].default_value = 0.5
     b.inputs['Coat Weight'].default_value = 0.45
     b.inputs['Coat Roughness'].default_value = 0.12
+    return m
+
+def aged(name, color, rough, age, grime=(0.09, 0.06, 0.03, 1)):
+    """Metal that has been handled for years: dirt settles in the recesses
+    (ambient occlusion), the high edges are rubbed brighter (pointiness), the
+    surface goes duller and blotchier as `age` (0..1) rises."""
+    m = bpy.data.materials.new(name); m.use_nodes = True
+    nt = m.node_tree; b = nt.nodes['Principled BSDF']; L = nt.links.new
+    b.inputs['Metallic'].default_value = 1.0
+    ao = nt.nodes.new('ShaderNodeAmbientOcclusion'); ao.inputs['Distance'].default_value = 7.0
+    geo = nt.nodes.new('ShaderNodeNewGeometry')
+    noise = nt.nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value = 34.0; noise.inputs['Detail'].default_value = 10; noise.inputs['Roughness'].default_value = 0.7
+    # dirt amount = (1 - AO) * 3 * age + blotches * age * 0.85
+    # (noise runs on the frame's 0..1 generated coordinates, so scale ~30 is
+    # about thirty blotches across the whole hexagon)
+    inv = nt.nodes.new('ShaderNodeMath'); inv.operation = 'SUBTRACT'; inv.inputs[0].default_value = 1.0
+    L(ao.outputs['AO'], inv.inputs[1])
+    dirt = nt.nodes.new('ShaderNodeMath'); dirt.operation = 'MULTIPLY'; dirt.inputs[1].default_value = 3.0 * age
+    L(inv.outputs[0], dirt.inputs[0])
+    con = nt.nodes.new('ShaderNodeMapRange'); con.inputs['From Min'].default_value = 0.42; con.inputs['From Max'].default_value = 0.68
+    L(noise.outputs['Fac'], con.inputs['Value'])
+    blot = nt.nodes.new('ShaderNodeMath'); blot.operation = 'MULTIPLY'; blot.inputs[1].default_value = 0.85 * age
+    L(con.outputs['Result'], blot.inputs[0])
+    add = nt.nodes.new('ShaderNodeMath'); add.operation = 'ADD'; add.use_clamp = True
+    L(dirt.outputs[0], add.inputs[0]); L(blot.outputs[0], add.inputs[1])
+    mix = nt.nodes.new('ShaderNodeMix'); mix.data_type = 'RGBA'
+    mix.inputs['A'].default_value = color; mix.inputs['B'].default_value = grime
+    L(add.outputs[0], mix.inputs['Factor']); L(mix.outputs['Result'], b.inputs['Base Color'])
+    # rubbed edges: rougher overall with age, polished where the edge is sharp
+    rr = nt.nodes.new('ShaderNodeMapRange')
+    rr.inputs['From Min'].default_value = 0.5; rr.inputs['From Max'].default_value = 0.56
+    rr.inputs['To Min'].default_value = rough + 0.28 * age; rr.inputs['To Max'].default_value = max(0.08, rough - 0.2)
+    L(geo.outputs['Pointiness'], rr.inputs['Value']); L(rr.outputs['Result'], b.inputs['Roughness'])
+    return m
+
+def patinated(name, metal_color, patina_color):
+    """Bronze with a verdigris-brown patina where it has been left alone and
+    bare metal where hands have polished it."""
+    m = bpy.data.materials.new(name); m.use_nodes = True
+    nt = m.node_tree; L = nt.links.new
+    out = nt.nodes['Material Output']; b = nt.nodes['Principled BSDF']
+    b.inputs['Base Color'].default_value = metal_color; b.inputs['Metallic'].default_value = 1.0; b.inputs['Roughness'].default_value = 0.3
+    p = nt.nodes.new('ShaderNodeBsdfPrincipled'); p.inputs['Base Color'].default_value = patina_color
+    p.inputs['Metallic'].default_value = 0.0; p.inputs['Roughness'].default_value = 0.85
+    ao = nt.nodes.new('ShaderNodeAmbientOcclusion'); ao.inputs['Distance'].default_value = 9.0
+    noise = nt.nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value = 28.0; noise.inputs['Detail'].default_value = 10; noise.inputs['Roughness'].default_value = 0.65
+    inv = nt.nodes.new('ShaderNodeMath'); inv.operation = 'SUBTRACT'; inv.inputs[0].default_value = 1.0
+    L(ao.outputs['AO'], inv.inputs[1])
+    k = nt.nodes.new('ShaderNodeMath'); k.operation = 'MULTIPLY_ADD'
+    L(inv.outputs[0], k.inputs[0]); k.inputs[1].default_value = 4.0
+    nf = nt.nodes.new('ShaderNodeMath'); nf.operation = 'MULTIPLY'; nf.inputs[1].default_value = 1.9
+    L(noise.outputs['Fac'], nf.inputs[0]); L(nf.outputs[0], k.inputs[2])
+    sub = nt.nodes.new('ShaderNodeMath'); sub.operation = 'SUBTRACT'; sub.use_clamp = True; sub.inputs[1].default_value = 0.62
+    L(k.outputs[0], sub.inputs[0])
+    mix = nt.nodes.new('ShaderNodeMixShader')
+    L(sub.outputs[0], mix.inputs['Fac']); L(b.outputs[0], mix.inputs[1]); L(p.outputs[0], mix.inputs[2])
+    L(mix.outputs[0], out.inputs['Surface'])
+    return m
+
+def beeswax(name, color):
+    """Wax: light goes into it and comes back out warmer (subsurface)."""
+    m = bpy.data.materials.new(name); m.use_nodes = True
+    nt = m.node_tree; b = nt.nodes['Principled BSDF']
+    b.inputs['Base Color'].default_value = color
+    b.inputs['Subsurface Weight'].default_value = 1.0
+    b.inputs['Subsurface Radius'].default_value = (1.0, 0.45, 0.12)
+    b.inputs['Subsurface Scale'].default_value = 18.0
+    b.inputs['Roughness'].default_value = 0.55
+    b.inputs['Coat Weight'].default_value = 0.12; b.inputs['Coat Roughness'].default_value = 0.3
+    noise = nt.nodes.new('ShaderNodeTexNoise'); noise.inputs['Scale'].default_value = 60.0; noise.inputs['Detail'].default_value = 4
+    bp = nt.nodes.new('ShaderNodeBump'); bp.inputs['Strength'].default_value = 0.35; bp.inputs['Distance'].default_value = 1.2
+    nt.links.new(noise.outputs['Fac'], bp.inputs['Height']); nt.links.new(bp.outputs['Normal'], b.inputs['Normal'])
     return m
 
 GOLD = srgb('#F4C25A')
@@ -132,6 +207,28 @@ elif variant == 'story':
     prof = [(0, 0, 0), (1.2, 4, 0), (3.5, 7, 0), (7, 8.4, 0), (10, 8.8, 0), (37, 8.8, 0),
             (40, 8.2, 0), (43.5, 5.5, 0), (B - 0.8, 1.6, 0), (B, 0, 0)]
     sweep('frame', prof, [gold_satin])
+elif variant in ('story1', 'story2', 'story3'):
+    # the story gold, worn: one level per two decades back
+    age = {'story1': 0.33, 'story2': 0.62, 'story3': 0.9}[variant]
+    tone = {'story1': '#C2924A', 'story2': '#B08544', 'story3': '#9A733C'}[variant]
+    prof = [(0, 0, 0), (1.2, 4, 0), (3.5, 7, 0), (7, 8.4, 0), (10, 8.8, 0), (37, 8.8, 0),
+            (40, 8.2, 0), (43.5, 5.5, 0), (B - 0.8, 1.6, 0), (B, 0, 0)]
+    sweep('frame', prof, [aged('gold_aged', srgb(tone), 0.42, age)])
+elif variant == 'bronze':
+    # a rounded outer roll, a flat band a step down, a rounded inner lip
+    prof = [(0, 0, 0), (0.8, 4, 0), (2.5, 8, 0), (5, 10.5, 0), (8, 11.4, 0), (11, 10.5, 0), (13, 8.4, 0),
+            (14, 6.6, 0), (15, 6.2, 0), (33, 6.2, 0), (34, 6.6, 0), (35.5, 8.6, 0), (38, 9.4, 0),
+            (40.5, 8.6, 0), (43, 6, 0), (B - 0.8, 1.6, 0), (B, 0, 0)]
+    sweep('frame', prof, [patinated('bronze', srgb('#8E5E33'), srgb('#5E8068'))])
+elif variant == 'wax':
+    # one soft, swollen bead of wax with a smaller one at the opening, as if
+    # the comb had been built up by hand
+    prof = [(0, 0, 0)]
+    for k in range(1, 15):
+        t = k / 14; prof.append((34 * t, 16 * math.sin(math.pi * t) ** 0.8, 0))
+    for k in range(1, 9):
+        t = k / 8; prof.append((34 + (B - 34) * t, 8 * math.sin(math.pi * t) ** 0.9, 0))
+    sweep('frame', prof, [beeswax('wax', srgb('#E5A332'))])
 elif variant == 'rice':
     # polished silver rim, a recessed band of navy enamel, a silver inner lip
     prof = [(0, 0, 0), (0.7, 4.5, 0), (2.2, 8.5, 0), (4.5, 11, 0), (7.5, 11.8, 0), (10.5, 11, 0),
@@ -139,7 +236,7 @@ elif variant == 'rice':
             (38.5, 10.4, 0), (41, 9.4, 0), (43.5, 6.5, 0), (B - 0.7, 1.6, 0), (B, 0, 0)]
     sweep('frame', prof, [silver, navy])
 else:
-    raise SystemExit('variant: team | story | rice')
+    raise SystemExit('variant: team | story | story1 | story2 | story3 | bronze | wax | rice')
 
 # ── the face plane: catches the frame's shadow, invisible otherwise ──────────
 # only inside the opening (and a hair under the lip): a shadow thrown outside
