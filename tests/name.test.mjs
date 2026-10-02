@@ -21,16 +21,16 @@ test('a partial name never produces a dangling initial', () => {
 });
 
 test('cell label falls back name → location → title', () => {
-  assert.equal(cellLabel({ displayName: 'Jane D.', location: 'Tulsa, OK', title: 'Lights' }), 'Jane D.');
-  assert.equal(cellLabel({ firstName: 'Jane', lastName: 'Doe', nameDisplay: 'initials', location: 'Tulsa, OK' }), 'J.D.');
-  assert.equal(cellLabel({ location: 'Tulsa, OK', title: 'Lights' }), 'Tulsa, OK');
+  assert.equal(cellLabel({ displayName: 'Jane D.', location: 'Tucson, AZ', title: 'Lights' }), 'Jane D.');
+  assert.equal(cellLabel({ firstName: 'Jane', lastName: 'Doe', nameDisplay: 'initials', location: 'Tucson, AZ' }), 'J.D.');
+  assert.equal(cellLabel({ location: 'Tucson, AZ', title: 'Lights' }), 'Tucson, AZ');
   assert.equal(cellLabel({ title: 'The light above the pines' }), 'The light above the pines');
   assert.equal(cellLabel({}), '');
 });
 
 test('the display level governs how the name renders, not which field is used', () => {
   // initials-only with no name still shows the place, not initials of the place
-  assert.equal(cellLabel({ nameDisplay: 'initials', location: 'Tulsa, OK' }), 'Tulsa, OK');
+  assert.equal(cellLabel({ nameDisplay: 'initials', location: 'Tucson, AZ' }), 'Tucson, AZ');
 });
 
 test('initials come from the label, whatever it is', () => {

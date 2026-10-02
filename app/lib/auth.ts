@@ -31,7 +31,8 @@ export interface Session {
   exp: number;
 }
 
-const VISITOR_PASSWORD = process.env.HONEYCOMB_PASSWORD || "tulsa";
+// No fallback: with HONEYCOMB_PASSWORD unset, no password opens the site.
+const VISITOR_PASSWORD = process.env.HONEYCOMB_PASSWORD || "";
 const MODERATOR_PASSWORD = process.env.HONEYCOMB_MODERATOR_PASSWORD || "";
 
 export const AUTH_COOKIE = "hc_auth";
