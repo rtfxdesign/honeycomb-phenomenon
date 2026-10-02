@@ -13,6 +13,7 @@ export const ROSTER_EMAIL = 'contact@projecthoneycomb.site';
 export const TEAM = [
   {
     name: 'Paul Werenko',
+    role: 'Founder',
     image: '/team/paul-werenko.png',
     fullImage: '/team/paul-werenko-full.jpg',
     fullPosition: '58% 42%',
@@ -26,6 +27,7 @@ export const TEAM = [
   },
   {
     name: 'Eavie Arntzen',
+    role: 'Writer and researcher',
     image: '/team/eavie-arntzen.png',
     fullImage: '/team/eavie-arntzen-full.jpg',
     fullPosition: '50% 45%',
@@ -39,6 +41,7 @@ export const TEAM = [
   },
   {
     name: 'James Faulk',
+    role: 'Journalist and podcaster',
     image: '/team/james-faulk.png',
     fullImage: '/team/james-faulk-full.jpg',
     fullPosition: '52% 42%',
@@ -52,6 +55,7 @@ export const TEAM = [
   },
   {
     name: 'Liz Perez',
+    role: 'Project manager',
     image: '/team/liz-perez.png',
     imagePosition: '50% 43%',
     email: 'liz@honeycomb-phenomenon.com',
@@ -63,6 +67,7 @@ export const TEAM = [
   },
   {
     name: 'Dane Street',
+    role: 'Logic and process analyst',
     image: '/team/dane-street.png',
     fullImage: '/team/dane-street-full.jpg',
     fullPosition: '50% 40%',
