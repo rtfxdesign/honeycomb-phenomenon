@@ -13,10 +13,11 @@ import { NextRequest } from "next/server";
  * the moderator password, the visitor password, or a member's access code.
  *
  * Env:
- *   HONEYCOMB_PASSWORD            visitor password (the existing one)
- *   HONEYCOMB_MODERATOR_PASSWORD  optional; when unset the visitor password
- *                                 also grants moderator, which is how the site
- *                                 behaved before members existed
+ *   HONEYCOMB_PASSWORD            visitor password(s); several may be given,
+ *                                 comma-separated, and any of them opens the site
+ *   HONEYCOMB_MODERATOR_PASSWORD  optional, same form; when unset the visitor
+ *                                 password also grants moderator, which is how
+ *                                 the site behaved before members existed
  *   HONEYCOMB_SESSION_SECRET      optional; signs session cookies
  */
 
@@ -34,6 +35,13 @@ export interface Session {
 // No fallback: with HONEYCOMB_PASSWORD unset, no password opens the site.
 const VISITOR_PASSWORD = process.env.HONEYCOMB_PASSWORD || "";
 const MODERATOR_PASSWORD = process.env.HONEYCOMB_MODERATOR_PASSWORD || "";
+// "tulsa, Merida" → ["tulsa", "Merida"]; a password cannot itself contain a comma
+const list = (v: string) => v.split(",").map((p) => p.trim()).filter(Boolean);
+const VISITOR_PASSWORDS = list(VISITOR_PASSWORD);
+const MODERATOR_PASSWORDS = list(MODERATOR_PASSWORD);
+// every candidate is compared, so timing does not reveal which one matched
+const matchesAny = (password: string, candidates: string[]) =>
+  candidates.reduce((hit, c) => safeEqual(password, c) || hit, false);
 
 export const AUTH_COOKIE = "hc_auth";
 export const AUTH_MAX_AGE = 30 * 24 * 60 * 60; // 30 days, matching the gate copy
@@ -97,12 +105,12 @@ export const canSeeCommunity = (session: Session | null) =>
  */
 export function roleForPassword(password: unknown): Role | null {
   if (typeof password !== "string" || !password) return null;
-  if (MODERATOR_PASSWORD) {
-    if (safeEqual(password, MODERATOR_PASSWORD)) return "moderator";
-    if (safeEqual(password, VISITOR_PASSWORD)) return "visitor";
+  if (MODERATOR_PASSWORDS.length) {
+    if (matchesAny(password, MODERATOR_PASSWORDS)) return "moderator";
+    if (matchesAny(password, VISITOR_PASSWORDS)) return "visitor";
     return null;
   }
   // No separate moderator password configured: the one password still does
   // everything, exactly as before members existed.
-  return safeEqual(password, VISITOR_PASSWORD) ? "moderator" : null;
+  return matchesAny(password, VISITOR_PASSWORDS) ? "moderator" : null;
 }
