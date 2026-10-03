@@ -17,10 +17,6 @@ test('everyone from the old About flyout is on the About page, with an email', (
   }
 });
 
-test('Allen is on the team', () => {
-  assert.ok(TEAM.some((m) => m.name === 'Allen Grabo'));
-});
-
 test('each team member has a portrait on disk and a bio; an email, if given, is well formed', () => {
   for (const m of TEAM) {
     assert.ok(existsSync(new URL(`../public${m.image}`, import.meta.url)), `${m.name}: ${m.image} not in public/`);

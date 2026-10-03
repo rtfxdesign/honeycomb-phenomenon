@@ -79,19 +79,6 @@ export const TEAM = [
       'Analytical by nature, his skill set as a logic and process analyst directs Dane’s exploration into the unexplainable and the as-yet-unrealized possibilities of human knowledge and understanding. Through population-based disclosure, Dane intends to return the truth to humanity and open the door to our shared history.',
     ],
   },
-  {
-    name: 'Allen Grabo',
-    role: 'Creative technologist',
-    image: '/team/allen-grabo.jpg',
-    imagePosition: '50% 38%',
-    fullImage: '/team/allen-grabo-full.jpg',
-    fullPosition: '50% 50%',
-    slot: [0, 0],
-    bio: [
-      'Allen Grabo is a creative technologist in Washington, DC, and runs rtfx design, a small studio that builds visual systems for real spaces: projection, LED walls, generative visuals, and the show-control systems behind them. Over the years that work has included events at Porsche Studio Portland, Miami Art Week, Cape Canaveral, the Kennedy Center, Baltimore Ravens tailgates, and the Smithsonian.',
-      'At Honeycomb, Allen builds and looks after the archive: the comb itself, the recorder people use to tell their story, and the parts underneath that keep each story in the hands of the person who told it. Much of the job is making sure a story is shown the way its contributor intended, seen only by the people they intended, and can be taken back when they ask.',
-    ],
-  },
 ];
 
 // Organisations that work alongside Honeycomb, and the people and groups who
