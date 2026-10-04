@@ -291,17 +291,21 @@ button{font:inherit;color:inherit}
   to{-webkit-mask-position:100% 100%;mask-position:100% 100%}
 }
 
-/* The photograph itself now barely moves — the glaze carries the light, and
-   doubling the two made faces look blown out as the pointer went by. */
+/* The photograph itself does not move — the glaze carries the light, and
+   doubling the two made faces look blown out as the pointer went by. (It used
+   to lift 5% with --lit; that re-filtered every lit portrait on every frame
+   for a change nobody could see, so it went, 2026-10-04.) */
 .hexcell .cell-face{
-  filter:var(--face-grade,saturate(1)) brightness(calc(1 + var(--lit) * 0.05));
-  transition:opacity var(--dur-grow) var(--ease-quiet),filter var(--glow-fade,520ms) var(--ease-quiet);
+  filter:var(--face-grade,saturate(1));
+  transition:opacity var(--dur-grow) var(--ease-quiet);
 }
 
-/* Dormant cells are bare wax and take the light full on. */
+/* Dormant cells are bare wax and take the light full on. The lift follows
+   --lit directly, without a filter transition: animating a filter repaints the
+   image every frame, and the afterglow is still carried by the pool above it
+   (.cell-dormant-wrap::before), which fades on opacity. */
 .cell-dormant{
   filter:brightness(calc(var(--dormant-brightness,0.72) + var(--lit) * 0.30)) saturate(0.85);
-  transition:filter var(--glow-fade,520ms) var(--ease-quiet);
 }
 
 /* A hint of the ground through the middle of each cell, so the comb reads as

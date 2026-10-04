@@ -39,7 +39,7 @@ const TWEAK_DEFAULTS = {
   showFaces: true,
   // the pointer as a lamp over the comb
   mouseLight: true,
-  lightReach: 430,      // % of a cell's width — how far the pool carries
+  lightReach: 260,      // % of a cell's width — how far the pool carries (430 lit nearly the whole comb, 2026-10-04)
   lightStrength: 63,    // %
   lightAfterglow: 1180, // ms for a cell to let go of the light
   cellCenter: 0,        // % of the middle given over to the ground behind
@@ -90,6 +90,10 @@ function useFieldLight(fieldRef, { enabled, reach, cells }) {
     const collect = () => {
       nodes = Array.from(field.querySelectorAll('.cell[data-cx]')).map((el) => ({
         el,
+        // last values written, so a cell whose light has not changed is left
+        // alone: every write restarts its opacity transitions
+        lit: -1,
+        lx: '',
         cx: Number(el.dataset.cx),
         cy: Number(el.dataset.cy),
         half: Number(el.dataset.half) || 0,
@@ -112,11 +116,23 @@ function useFieldLight(fieldRef, { enabled, reach, cells }) {
         // Smooth falloff rather than a hard edge: squared so the centre of the
         // pool is clearly brighter than its rim, the way a lamp behaves.
         const t = Math.max(0, 1 - d / reach);
-        const lit = t * t;
-        n.el.style.setProperty('--lit', lit.toFixed(3));
+        // Quantised to 1/50ths: finer steps are invisible, and skipping cells
+        // whose value has not moved is what keeps the cells outside the pool
+        // (most of them, most of the time) from being touched at all.
+        const lit = Math.round(t * t * 50) / 50;
+        if (lit !== n.lit) {
+          n.lit = lit;
+          n.el.style.setProperty('--lit', String(lit));
+        }
         // Which way the highlight leans. Only meaningful while lit, so it is
-        // clamped to the cell's own width.
-        n.el.style.setProperty('--lx', Math.max(-1, Math.min(1, dx / (n.half * 2 || 1))).toFixed(3));
+        // clamped to the cell's own width, and not written at all while dark.
+        if (lit > 0) {
+          const lx = Math.max(-1, Math.min(1, dx / (n.half * 2 || 1))).toFixed(2);
+          if (lx !== n.lx) {
+            n.lx = lx;
+            n.el.style.setProperty('--lx', lx);
+          }
+        }
       }
     };
 
@@ -831,9 +847,13 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     const fc = f.k.split(',').map(Number);
     const moat = new Set(neighbors(fc).map(key));
     const movers = base.filter((b) => b.k !== focusKey && (b.t === 'b' || t.dormantRespond || moat.has(b.k)));
+    // Dormant cells that move only to clear the moat are never kin: they step
+    // aside with the pushed cells rather than taking ring slots from voices
+    // that are actually related.
+    const kinPool = movers.filter((b) => b.t === 'b' || t.dormantRespond);
     const rng = mulberry32(((f.x * 31 + f.y * 7) | 0) + t.seed * 101);
-    const shuffled = shuffle(movers.map((m) => m.k), rng);
-    const kinCount = Math.round(movers.length * t.clusterShare / 100);
+    const shuffled = shuffle(kinPool.map((m) => m.k), rng);
+    const kinCount = Math.round(kinPool.length * t.clusterShare / 100);
     // Kin by shared tags: rank every other voice by how much it has in common
     // with this one. Ties — and they are common, since most pairs share
     // nothing — fall back to the shuffled order, so a field with no tags yet
@@ -841,9 +861,9 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
     const tie = new Map(shuffled.map((k, i) => [k, i]));
     const score = new Map();
     if (t.clusterBy === 'tags') {
-      for (const m of movers) score.set(m.k, relatedness(focusKey, m.k, tagIndex));
+      for (const m of kinPool) score.set(m.k, relatedness(focusKey, m.k, tagIndex));
     }
-    const ranked = movers.map((m) => m.k).sort((a, b2) => {
+    const ranked = kinPool.map((m) => m.k).sort((a, b2) => {
       const d = (score.get(b2) || 0) - (score.get(a) || 0);
       return d !== 0 ? d : tie.get(a) - tie.get(b2);
     });
