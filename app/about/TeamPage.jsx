@@ -135,6 +135,11 @@ export default function TeamPage() {
   // null: everyone shown; a number: that person isolated
   const [sel, setSel] = useState(null);
   const [L, setL] = useState(null);
+  // Full-size portraits are fetched only for cells someone has pointed at or
+  // chosen, and kept once fetched. Loading all of them up front cost every
+  // visit about 870KB that most visitors never look at.
+  const [wantFull, setWantFull] = useState(() => new Set());
+  const loadFull = (i) => setWantFull((prev) => (prev.has(i) ? prev : new Set(prev).add(i)));
   const fieldRef = useRef(null), canvasRef = useRef(null), bioRef = useRef(null);
   // the chosen cell grows to show more of the photo, shifted just enough to
   // stay inside the comb's box
@@ -196,7 +201,19 @@ export default function TeamPage() {
     // the rest fade back, both eased so it never snaps
     const scale = new Map(), fade = new Map(), offs = new Map();
     people.forEach((x) => { scale.set(x.i, 1); fade.set(x.i, 1); offs.set(x.i * 2, 0); offs.set(x.i * 2 + 1, 0); });
-    const ease = (m, k, target) => { const v = m.has(k) ? m.get(k) : target; const n = reduce ? target : v + (target - v) * 0.22; m.set(k, n); return n; };
+    // `moving` records whether any eased value is still travelling this frame;
+    // close enough snaps to the target so the easing actually finishes
+    let moving = false;
+    const ease = (m, k, target) => {
+      const v = m.has(k) ? m.get(k) : target;
+      let n = reduce ? target : v + (target - v) * 0.22;
+      if (Math.abs(target - n) < 0.002) n = target; else moving = true;
+      m.set(k, n); return n;
+    };
+    // what the last full draw showed; once nothing is forming, easing or
+    // pinging and none of this has changed, the canvas is left as it is
+    // rather than cleared and redrawn identically thirty times a second
+    let drawn = null;
     // where a cell's outline sits now: its lattice centre plus any growth shift
     const where = (x) => { const [cx, cy] = centre(live.current.L, x.c, x.r); return [cx + (offs.get(x.i * 2) || 0), cy + (offs.get(x.i * 2 + 1) || 0)]; };
     pingRef.current = (i, hover) => { if (!reduce && !pings.some((p) => p.i === i)) pings.push({ i, f0: frame, hover }); };
@@ -204,8 +221,19 @@ export default function TeamPage() {
       frame++;
       const { L: lay, sel: chosen, bigT: bt } = live.current;
       const iso = chosen !== null && chosen !== undefined;
-      if (lay) {
-        const DPR = Math.min(2, window.devicePixelRatio || 1);
+      // once formed, one face re-traces itself every few seconds (not while
+      // someone is isolated: the others are faded and the chosen one has its rim)
+      if (lay && !reduce && !iso && frame > 150 && frame - lastIdle > 84) {
+        lastIdle = frame;
+        const liveOnes = people.filter((x) => x.g !== 'pend');
+        const pick = liveOnes[Math.floor(Math.random() * liveOnes.length)];
+        if (pick) pingRef.current(pick.i, false);
+      }
+      const DPR = Math.min(2, window.devicePixelRatio || 1);
+      const forming = people.some((x) => frame - x.t0 < TR + 18);
+      const still = drawn && !forming && !pings.length && drawn.lay === lay && drawn.chosen === chosen && drawn.bt === bt && drawn.dpr === DPR;
+      if (lay && !still) {
+        moving = false;
         if (cw !== lay.width || ch !== lay.height || dpr !== DPR) {
           cw = lay.width; ch = lay.height; dpr = DPR;
           cv.width = Math.round(cw * DPR); cv.height = Math.round(ch * DPR);
@@ -250,14 +278,6 @@ export default function TeamPage() {
             ctx.beginPath(); ctx.arc(v[0], v[1], 5 * (1 + 1.6 * (1 - k)), 0, 7); ctx.fill();
           }
         }
-        // once formed, one face re-traces itself every few seconds (not while
-        // someone is isolated: the others are faded and the chosen one has its rim)
-        if (!reduce && !iso && frame > 150 && frame - lastIdle > 84) {
-          lastIdle = frame;
-          const liveOnes = people.filter((x) => x.g !== 'pend');
-          const pick = liveOnes[Math.floor(Math.random() * liveOnes.length)];
-          if (pick) pingRef.current(pick.i, false);
-        }
         for (let i = pings.length - 1; i >= 0; i--) if (frame - pings[i].f0 >= TR + 6) pings.splice(i, 1);
         for (const pg of pings) {
           const x = people[pg.i], q = eDraw((frame - pg.f0) / TR);
@@ -268,6 +288,8 @@ export default function TeamPage() {
           head(ctx, p, q, x.start, -x.dir, pg.hover ? GOLD : LIGHT);
         }
         ctx.globalAlpha = 1;
+        // a frame that moved nothing is the last one needed until something changes
+        drawn = moving ? null : { lay, chosen, bt, dpr: DPR };
       }
       timer = setTimeout(() => { raf = requestAnimationFrame(tick); }, 1000 / FPS);
     };
@@ -323,15 +345,16 @@ export default function TeamPage() {
                     key={p.i} type="button" data-i={p.i} style={grow ? { ...style, ...grow } : style}
                     className={'tp-cell' + (isSel ? ' tp-cell--sel tp-cell--big' : isolating ? ' tp-cell--faded' : '')}
                     aria-label={`${p.name}, ${p.kind}`} aria-pressed={isSel}
-                    onMouseEnter={() => pingRef.current(p.i, true)}
-                    onClick={() => select(p.i)}
+                    onMouseEnter={() => { pingRef.current(p.i, true); loadFull(p.i); }}
+                    onFocus={() => loadFull(p.i)}
+                    onClick={() => { loadFull(p.i); select(p.i); }}
                   >
                     <span className="tp-rim" aria-hidden="true" />
                     <div className="tp-hex">
                       {p.img
                         ? <img src={p.img} alt="" style={{ objectPosition: p.pos || '50% 45%' }} />
                         : <span className="tp-init">{initialsOf(p.name)}</span>}
-                      {p.full && <img className="tp-full" src={p.full} alt="" style={{ objectPosition: p.fullPos || '50% 50%' }} />}
+                      {p.full && wantFull.has(p.i) && <img decoding="async" className="tp-full" src={p.full} alt="" style={{ objectPosition: p.fullPos || '50% 50%' }} />}
                     </div>
                     <span className="tp-tag"><span className="tp-nm">{p.name}</span><span className="tp-rl">{p.kind}</span></span>
                   </button>
