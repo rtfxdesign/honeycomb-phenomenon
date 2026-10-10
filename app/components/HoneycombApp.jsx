@@ -574,7 +574,7 @@ function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
       {page && (
         <>
           <div className="story-content">
-            <p className="record-label">{page.eyebrow}</p>
+            {page.eyebrow ? <p className="record-label">{page.eyebrow}</p> : null}
             <h1>{page.title}</h1>
             <div className="panel-copy">{page.body({ openRecorder, focusSearch })}</div>
           </div>

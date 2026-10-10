@@ -1,6 +1,6 @@
 // Slideout page content ported from the most recent projecthoneycomb.site deploy.
 
-import { TEAM, PARTNERS, ADVISORS, ALLIES, ROSTER_EMAIL, ADVISOR_NOTE } from './team';
+import { TEAM, PARTNERS, ROSTER_EMAIL } from './team';
 
 function Roster({ entries, empty }) {
   if (!entries.length) return <p className="roster-empty">{empty}</p>;
@@ -36,10 +36,10 @@ export const PAGES = [
         <button className="story-action" type="button" onClick={focusSearch}>
           SEARCH THE ARCHIVE <span aria-hidden="true">→</span>
         </button>
-        <p style={{ marginTop: 18 }}>Search by place, year, encounter type, or any detail you remember — matching voices gather together in the comb and the rest give way.</p>
+        <p style={{ marginTop: 18 }}>Search by place, year, encounter type, or any other details or key terms. Stories matching your search information will gather and those not relevant to your query will move away.</p>
         <h2>Your Experience. Our Collective History.</h2>
-        <p>Honeycomb&rsquo;s mission is to support and empower those who have experienced or witnessed a UFO, UAP, or anything related to the Phenomenon, through the building of community, and the curation of shared experiences.</p>
-        <p>We have built an ever-evolving platform to share anomalous experiences with others, one that fosters a new understanding that your experience was unique but not isolated. You are not alone.</p>
+        <p>Honeycomb is an archive, a compendium of encounters built as a searchable database to facilitate learning, community, and growth. We understand that inexplicable does not mean impossible, and we want to create a trusted space for sharing these extraordinary events.</p>
+        <p>Our platform will evolve over time, as contributions are made by you. By providing the platform, we hope to encourage the formation of a trusted community, where together we can work to untangle the meaning behind contact.</p>
         <p>For too long stigma and secrecy have caused us to keep these profound encounters to ourselves, often hiding them from even our closest loved ones.</p>
         <p className="declaration">We are here to change that.</p>
       </>
@@ -47,11 +47,11 @@ export const PAGES = [
   },
   {
     id: 'stories',
-    eyebrow: 'EVERY EXPERIENCE IS A POINT OF LIGHT',
+    eyebrow: '',
     title: 'Your story belongs here',
     body: ({ openRecorder }) => (
       <>
-        <p>Over the past decade, we have been documenting these interactions to build a visual, searchable database. Here, you can safely record your story, archive your encounter, search and view other encounters, and connect with a global community of people with similar yet personal experiences.</p>
+        <p>At Honeycomb, we are documenting these interactions to build a visual, searchable database. Here, you can safely record your story, archive your encounter, search and view other encounters, and connect with a global community of people with similar yet personal experiences.</p>
         <p>This is our path to disclosure. This information belongs to all of us. No one can classify or hide your story&mdash;and your experience might just be another key, unlocking humanity&rsquo;s understanding of our place in the universe.</p>
         <h2>Join the Journey</h2>
         <p>We are building this archive with you. One person at a time. One experience at a time.</p>
@@ -61,7 +61,7 @@ export const PAGES = [
       </>
     ),
   },
-  // the team, advisors and allies have a page of their own (app/about)
+  // the team and advisors have a page of their own (app/about)
   { id: 'about', href: '/about' },
   {
     id: 'partners',
@@ -76,27 +76,6 @@ export const PAGES = [
         <p>If your organization records, studies, or supports anomalous experience and wants to work with us, we would like to hear from you.</p>
         <a className="story-action" href={`mailto:${ROSTER_EMAIL}?subject=Partnering%20with%20Honeycomb`}>
           PARTNER WITH HONEYCOMB <span aria-hidden="true">→</span>
-        </a>
-      </>
-    ),
-  },
-  {
-    id: 'allies',
-    eyebrow: 'STANDING WITH EXPERIENCERS',
-    title: 'Allies',
-    body: () => (
-      <>
-        <p>An ally is anyone who has lent Honeycomb a voice, a platform, or their time so that no one has to carry an encounter alone: journalists, pilots, researchers, podcasters, and experiencers who have chosen to speak.</p>
-        <p>They do not run the archive and they do not see anything the public cannot. What they give is reach, credibility, and the simple fact of standing beside people who were once told to stay quiet.</p>
-        <h2>Advisors</h2>
-        <p>{ADVISOR_NOTE}</p>
-        <Roster entries={ADVISORS} empty="" />
-        <h2>Allies</h2>
-        <Roster entries={ALLIES} empty="Our allies are being gathered with their permission. They will be named here once they have agreed to it." />
-        <h2>Stand with us</h2>
-        <p>If you want to add your name, your show, or your community to this list, write to us.</p>
-        <a className="story-action" href={`mailto:${ROSTER_EMAIL}?subject=Standing%20with%20Honeycomb`}>
-          BECOME AN ALLY <span aria-hidden="true">→</span>
         </a>
       </>
     ),

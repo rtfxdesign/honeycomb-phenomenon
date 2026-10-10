@@ -79,6 +79,17 @@ export const TEAM = [
       'Analytical by nature, his skill set as a logic and process analyst directs Dane’s exploration into the unexplainable and the as-yet-unrealized possibilities of human knowledge and understanding. Through population-based disclosure, Dane intends to return the truth to humanity and open the door to our shared history.',
     ],
   },
+  {
+    name: 'Allen Grabo',
+    image: '/team/allen-grabo.jpg',
+    imagePosition: '50% 38%',
+    fullImage: '/team/allen-grabo-full.jpg',
+    fullPosition: '50% 50%',
+    slot: [0, 0],
+    bio: [
+      'A lifelong fascination with the unknown led Allen Grabo to a doctorate in social psychology and a career-long effort to understand consciousness and the mind. With his experience as a creative technologist running his own design company, Allen uses this expansive background to create the various interfaces of Honeycomb, from the website and the recorder people use to share experience, to the security infrastructure used to protect our submissions. For Allen, this work comes down to trust. He is committed to keeping each experiencer’s story in their own hands.',
+    ],
+  },
 ];
 
 // Organisations that work alongside Honeycomb, and the people and groups who

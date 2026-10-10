@@ -24,7 +24,7 @@ function formatBytes(bytes) {
 function HandlingLink({ children }) {
   return (
     <a href={PRIVACY_PATH} target="_blank" rel="noopener">
-      {children || 'How we handle your story and files'} <span aria-hidden="true">↗</span>
+      {children || 'Privacy and Security Statement (full details)'} <span aria-hidden="true">↗</span>
     </a>
   );
 }
@@ -64,6 +64,8 @@ export default function RecorderModal({ onClose }) {
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
   const [consent, setConsent] = useState(false);
+  // optional: willing to have the story or photo used in Honeycomb's advertising
+  const [adsOk, setAdsOk] = useState(false);
   const [submissionId, setSubmissionId] = useState('');
   const [copied, setCopied] = useState(false);
   const recorderRef = useRef(null);
@@ -266,6 +268,7 @@ export default function RecorderModal({ onClose }) {
       photoKey: photoKey || undefined,
       hashtags: tags,
       consent: true,
+      adsOk,
     };
 
     try {
@@ -417,6 +420,10 @@ export default function RecorderModal({ onClose }) {
                 </div>
               )}
             </div>
+            <label className="consent-row consent-row--optional">
+              <input type="checkbox" checked={adsOk} onChange={(event) => setAdsOk(event.target.checked)} />
+              <span>Optional: I would be willing to have my story or profile photo shared in Honeycomb&rsquo;s advertisements.</span>
+            </label>
             <label className="consent-row">
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} required />
               <span>
@@ -446,9 +453,14 @@ export default function RecorderModal({ onClose }) {
                   <button type="button" className="copy-id" onClick={copyId} aria-live="polite">{copied ? 'Copied ✓' : 'Copy'}</button>
                 </div>
                 <p>
-                  Email <a href={`mailto:${REMOVAL_EMAIL}?subject=${encodeURIComponent(`Remove ${submissionId}`)}`}>{REMOVAL_EMAIL}</a> with
-                  this ID in the subject line and we will remove it. Without the ID we can still find it from whatever
-                  details you have.
+                  This ID was generated at random for your submission. Please note it for your records: it is the
+                  easiest way to have your submission removed. Email <a href={`mailto:${REMOVAL_EMAIL}?subject=${encodeURIComponent(`Remove ${submissionId}`)}`}>{REMOVAL_EMAIL}</a> with
+                  the subject line &ldquo;Remove {submissionId}&rdquo; and it will be removed. Automatic removal is being
+                  connected; until it is live, a person on the team does it within five business days.
+                </p>
+                <p>
+                  If you do not have the ID, send us an email with as much detail as you can to find it and we will
+                  remove it manually within five business days.
                 </p>
                 <RemovalNote id={submissionId} />
               </div>

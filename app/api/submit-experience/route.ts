@@ -94,6 +94,8 @@ export async function POST(request: NextRequest) {
       photoKey: mediaKey(data.photoKey),
       hashtags,
       consentAt: now,
+      // optional: willing to have the story or photo used in Honeycomb's advertising
+      adsOk: data.adsOk === true,
       submittedAt: now,
       status: "pending",
       // Where the words came from, and whether a machine still owes us any.

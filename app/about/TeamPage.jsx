@@ -6,7 +6,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { TEAM, ADVISORS, ALLIES, ROSTER_EMAIL, ADVISOR_NOTE } from '../data/team';
+import { TEAM, ADVISORS, ADVISOR_NOTE } from '../data/team';
 
 const GOLD = '#f2bf49', LIGHT = '#f7d27a', CREAM = '#f4e8d2', FPS = 30, TR = 22;
 const clamp = (t) => Math.max(0, Math.min(1, t));
@@ -31,13 +31,9 @@ function placeRows(items, firstRow) {
 function buildRoster() {
   const team = TEAM.map((m) => ({ g: 'team', kind: 'The team', name: m.name, sub: m.role, img: m.image, pos: m.imagePosition, full: m.fullImage, fullPos: m.fullPosition, mail: m.email, bio: m.bio, slot: m.slot }));
   const adv = ADVISORS.map((a) => ({ g: 'adv', kind: 'Advisor', name: a.name, sub: a.role, url: a.url }));
-  const allies = ALLIES.length
-    ? ALLIES.map((a) => ({ g: 'ally', kind: 'Ally', name: a.name, sub: a.role, url: a.url, img: a.logo }))
-    : [{ g: 'pend' }, { g: 'pend' }, { g: 'pend' }];
   const groups = [
     { label: 'The team', items: team },
     { label: 'Advisors', items: adv },
-    { label: ALLIES.length ? 'Allies' : 'Allies · pending', items: allies },
   ].filter((grp) => grp.items.length);
 
   const people = [], labels = [];
@@ -288,7 +284,6 @@ export default function TeamPage() {
   };
 
   const x = sel === null ? null : people[sel];
-  const place = x ? named.indexOf(x) + 1 : 0;
   const isolating = x !== null;
 
   return (
@@ -296,13 +291,13 @@ export default function TeamPage() {
       <div className="tp-wrap">
         <header className="tp-head">
           <Link className="tp-brand" href="/">HONEYCOMB</Link>
-          <Link className="tp-ui tp-back" href="/">← Back to the comb</Link>
+          <Link className="tp-ui tp-back" href="/">← Back to home</Link>
         </header>
 
         <section className="tp-hero">
           <p className="tp-ui tp-eyebrow">Your experience. Our collective history.</p>
-          <h1>The people keeping the archive</h1>
-          <p className="tp-lede">Honeycomb is built by a handpicked team and kept honest by the people who advise it. Each comb draws itself in as the network forms — select one to read their story.</p>
+          <h1>The Honeycomb Team</h1>
+          <p className="tp-lede">Behind Honeycomb is a dedicated team, all with a shared commitment to population-based disclosure.</p>
         </section>
 
         <div className="tp-layout">
@@ -341,23 +336,11 @@ export default function TeamPage() {
                 <span key={l.text} className="tp-ui tp-glabel" style={{ left: L.labelX, top: centre(L, 0, l.row)[1] - 7 }}>{l.text}</span>
               ))}
             </div>
-            {!ALLIES.length && (
-              <div className="tp-pend">
-                <svg viewBox="0 0 44 50" fill="none" stroke="#d89126" strokeWidth="1.5" strokeDasharray="4 4" aria-hidden="true"><polygon points="22,1 43,13 43,37 22,49 1,37 1,13" /></svg>
-                <div>
-                  <h3>Allies</h3>
-                  <p>Our allies are being gathered with their permission. They will be named here once they have agreed to it.</p>
-                </div>
-              </div>
-            )}
           </div>
 
           <aside className={'tp-bio' + (x ? '' : ' tp-bio--intro')} ref={bioRef} aria-live="polite">
             {x ? (<>
-            <p className="tp-ui tp-k">
-              <span>{x.kind}</span>
-              <span>{String(place).padStart(2, '0')} / {String(named.length).padStart(2, '0')}</span>
-            </p>
+            <p className="tp-ui tp-k"><span>{x.kind}</span></p>
             <h2>{x.name}</h2>
             <p className="tp-role">{x.sub || x.kind}</p>
             {x.bio
@@ -366,15 +349,9 @@ export default function TeamPage() {
             {x.mail
               ? <a className="tp-mail" href={`mailto:${x.mail}`}>{x.mail}</a>
               : x.url ? <a className="tp-mail" href={x.url} target="_blank" rel="noreferrer">Profile ↗</a> : null}
-            {x.g === 'adv' && (
-              <div>
-                <a className="tp-cta" href={`mailto:${ROSTER_EMAIL}?subject=Standing%20with%20Honeycomb`}>Become an ally <span aria-hidden="true">→</span></a>
-              </div>
-            )}
             <button type="button" className="tp-all" onClick={clear}>← Everyone</button>
             </>) : (<>
-            <p className="tp-ui tp-k"><span>The people</span><span>{String(named.length).padStart(2, '0')}</span></p>
-            <h2>Select anyone to read their story.</h2>
+            <h2>Select any member of the team to read their story.</h2>
             <ul className="tp-roll">
               {named.map((p) => (
                 <li key={p.i}>
@@ -391,7 +368,7 @@ export default function TeamPage() {
 
         <footer className="tp-foot">
           <span className="tp-ui">Honeycomb</span>
-          <a className="tp-ui" href={`mailto:${ROSTER_EMAIL}`}>{ROSTER_EMAIL}</a>
+          <a className="tp-ui" href="mailto:liz@honeycomb-phenomenon.com">liz@honeycomb-phenomenon.com</a>
           <Link className="tp-ui" href="/privacy">How we handle your story</Link>
         </footer>
       </div>

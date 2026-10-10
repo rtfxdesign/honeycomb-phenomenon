@@ -12,6 +12,7 @@ interface SubmissionData {
   lastName?: string;
   nameDisplay?: string;
   consentAt?: string;
+  adsOk?: boolean;
   location: string;
   experienceYear: string;
   experienceType?: string;
@@ -569,6 +570,7 @@ export default function ReviewDashboard() {
                   </span>
                 )}
                 {displayName && <span>👤 {displayName}</span>}
+                {submission.data.adsOk && <span title="The contributor is willing to have this story or photo used in Honeycomb advertising">📣 OK for advertising</span>}
                 <span>⌖ {location || "Unknown"}</span>
                 <span>📅 {experienceYear || "Unknown"}</span>
                 {privacy && <span>🔒 {privacy}</span>}
