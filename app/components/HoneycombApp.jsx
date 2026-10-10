@@ -6,7 +6,7 @@
 // projecthoneycomb.site deploy. Submissions go through this repo's backend
 // (R2 presigned upload + /api/submit-experience).
 
-import React, { useState, useRef, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useMemo, useCallback, useSyncExternalStore } from 'react';
 import { HoneycombMark, Input, Button } from './ds';
 import {
   useTweaks, TweaksPanel, TweakSection, TweakSlider, TweakToggle,
@@ -20,9 +20,10 @@ import { cellLabel, initialsOf } from '../lib/name';
 
 const TWEAK_DEFAULTS = {
   // the settings the review settled on, 2026-09-18, revised by Allen 2026-09-29
-  cellSize: 150,
-  cellCount: 50,
-  brightShare: 70,
+  // and locked in 2026-10-10
+  cellSize: 155,
+  cellCount: 60,
+  brightShare: 79,
   distribution: 'clustered',
   seed: 1,
   gaps: 8,
@@ -42,10 +43,10 @@ const TWEAK_DEFAULTS = {
   lightReach: 430,      // % of a cell's width — how far the pool carries
   lightStrength: 63,    // %
   lightAfterglow: 1180, // ms for a cell to let go of the light
-  cellCenter: 0,        // % of the middle given over to the ground behind
+  cellCenter: 40,       // % of the middle given over to the ground behind
   faceGlaze: 72,        // % — the film over a portrait for the light to catch
-  cellOpacity: 70,
-  dormantBright: 45,
+  cellOpacity: 100,
+  dormantBright: 100,
   ground: '#000000',
   backdrop: 'None',
   textureOpacity: 0,
@@ -1058,7 +1059,14 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
 
 export default function HoneycombApp() {
   const [view, setView] = useState('gate');
-  const [t, setTweak, resetTweaks] = useTweaks(TWEAK_DEFAULTS);
+  // the tweaks panel is a working tool: it exists on the preview site and on a
+  // local build, never on the live site, where every visitor sees the defaults
+  const tweaksAllowed = useSyncExternalStore(
+    () => () => {},
+    () => { const h = window.location.hostname; return h === 'localhost' || h === '127.0.0.1' || h.startsWith('preview.') || h.endsWith('.netlify.app'); },
+    () => false,
+  );
+  const [t, setTweak, resetTweaks] = useTweaks(TWEAK_DEFAULTS, tweaksAllowed);
   const [pageId, setPageId] = useState(null);
   const [person, setPerson] = useState(null);
   const [focusKey, setFocusKey] = useState(null);
@@ -1209,7 +1217,7 @@ export default function HoneycombApp() {
       />
       <StoryPanel page={page} person={person} onClose={closePanel} openRecorder={openRecorder} focusSearch={focusSearch} />
       {recorderOpen && <RecorderModal onClose={() => setRecorderOpen(false)} />}
-      <TweaksPanel>
+      {tweaksAllowed && <TweaksPanel>
         <TweakSection label="Cells" />
         <TweakSlider label="Cell size" value={t.cellSize} min={80} max={170} unit="px" onChange={(v) => setTweak('cellSize', v)} />
         <TweakSlider label="Cell count" value={t.cellCount} min={1} max={100} onChange={(v) => setTweak('cellCount', v)} />
@@ -1254,7 +1262,7 @@ export default function HoneycombApp() {
         <TweakButton label="Replay the reveal" onClick={() => setTweak('revealRun', (t.revealRun || 0) + 1)} />
         <TweakSection label="Session" />
         <TweakButton label="Reset all tweaks" secondary onClick={resetTweaks} />
-      </TweaksPanel>
+      </TweaksPanel>}
     </div>
   );
 }

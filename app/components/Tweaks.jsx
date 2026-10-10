@@ -5,9 +5,9 @@
 
 import React from 'react';
 
-// v3: Allen's 2026-09-29 defaults (150px cells, dimmer dormant leaf, wider
-// light) replace whatever a browser had saved under the old keys.
-const STORAGE_KEY = 'hc-tweaks-v3';
+// v4: the 2026-10-10 lock-in (155px cells, 60 of them, full-strength leaf)
+// replaces whatever a browser had saved under the old keys.
+const STORAGE_KEY = 'hc-tweaks-v4';
 
 const __TWEAKS_STYLE = `
   .twk-tab{position:fixed;right:-1px;bottom:96px;z-index:2147483645;
@@ -97,18 +97,21 @@ const __TWEAKS_STYLE = `
     filter:drop-shadow(0 1px 1px rgba(0,0,0,.3))}
 `;
 
-export function useTweaks(defaults) {
+// `enabled` false = the defaults, always: nothing saved is read or written.
+export function useTweaks(defaults, enabled = true) {
   // first render matches the server (defaults); saved values apply after
   // hydration so SSR markup never disagrees with the client
   const [values, setValues] = React.useState(defaults);
   React.useEffect(() => {
+    if (!enabled) return;
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
       if (Object.keys(saved).length) setValues((prev) => ({ ...prev, ...saved }));
     } catch { /* private mode */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [enabled]);
   const setTweak = React.useCallback((keyOrEdits, val) => {
+    if (!enabled) return;
     const edits = typeof keyOrEdits === 'object' && keyOrEdits !== null
       ? keyOrEdits : { [keyOrEdits]: val };
     setValues((prev) => {
@@ -117,7 +120,7 @@ export function useTweaks(defaults) {
       return next;
     });
     window.dispatchEvent(new CustomEvent('tweakchange', { detail: edits }));
-  }, []);
+  }, [enabled]);
   const resetTweaks = React.useCallback(() => {
     try { localStorage.removeItem(STORAGE_KEY); } catch { /* private mode */ }
     setValues(defaults);
