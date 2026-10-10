@@ -76,6 +76,7 @@ export const TEAM = [
   },
   {
     name: 'Allen Grabo',
+    role: 'Creative Technologist / Web Developer',
     image: '/team/allen-grabo.jpg',
     imagePosition: '50% 38%',
     fullImage: '/team/allen-grabo-full.jpg',
