@@ -512,14 +512,14 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
       <nav id="primary-navigation" className={navOpen ? 'nav-open' : ''} aria-label="Primary navigation">
         {/* no HOME here on purpose — the wordmark is the home link */}
         {PAGES.map((p) => (p.href
-          ? <a key={p.id} href={p.href}>{p.id.toUpperCase()}</a>
+          ? <a key={p.id} href={p.href}>{p.label || p.id.toUpperCase()}</a>
           : (
           <button
             key={p.id} type="button"
             onClick={() => go(p.id)}
             style={activePage === p.id ? { color: 'var(--gold)' } : undefined}
           >
-            {p.id.toUpperCase()}
+            {p.label || p.id.toUpperCase()}
           </button>
           )))}
         {session && session.role && session.role !== 'visitor' && (

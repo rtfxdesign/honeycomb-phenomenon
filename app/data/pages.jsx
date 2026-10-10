@@ -62,7 +62,7 @@ export const PAGES = [
     ),
   },
   // the team and advisors have a page of their own (app/about)
-  { id: 'about', href: '/about' },
+  { id: 'about', href: '/about', label: 'ABOUT THE TEAM' },
   {
     id: 'partners',
     eyebrow: 'WORKING ALONGSIDE US',
