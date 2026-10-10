@@ -494,7 +494,7 @@ button{font:inherit;color:inherit}
 .brand{padding:0;border:0;background:transparent;color:var(--gold);text-decoration:none;font-family:Montserrat,sans-serif;font-size:clamp(15px,1.2vw,20px);font-weight:600;letter-spacing:.16em}
 .brand .comb-mark{width:76px;height:42px}
 .site-header nav{margin-left:auto;display:flex;align-items:center;gap:clamp(14px,1.7vw,26px)}
-.site-header nav a,.site-header nav button{border:0;padding:0;color:var(--cream);background:transparent;text-decoration:none;font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.11em;cursor:pointer;transition:color .2s ease}
+.site-header nav a,.site-header nav button{border:0;padding:0;color:var(--cream);background:transparent;text-decoration:none;font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.11em;white-space:nowrap;cursor:pointer;transition:color .2s ease}
 .site-header nav a:focus-visible,.site-header nav a:hover,.site-header nav button:focus-visible,.site-header nav button:hover{color:var(--gold)}
 .site-header nav .share-button{padding:13px 16px;border:1px solid rgba(242,191,73,.82);border-radius:3px;color:var(--gold);transition:color .2s ease,background .2s ease}
 .site-header nav .share-button:focus-visible,.site-header nav .share-button:hover{color:var(--ink);background:var(--gold)}
