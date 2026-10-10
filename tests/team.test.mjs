@@ -17,9 +17,9 @@ test('everyone from the old About flyout is on the About page, with an email', (
   }
 });
 
-test('each team member has a portrait on disk and a bio; an email, if given, is well formed', () => {
+test('each team member has a bio; a portrait or email, if given, is real', () => {
   for (const m of TEAM) {
-    assert.ok(existsSync(new URL(`../public${m.image}`, import.meta.url)), `${m.name}: ${m.image} not in public/`);
+    if (m.image) assert.ok(existsSync(new URL(`../public${m.image}`, import.meta.url)), `${m.name}: ${m.image} not in public/`);
     if (m.email !== undefined) assert.match(m.email, /^[^@\s]+@[^@\s]+$/, `${m.name}: email`);
     assert.ok(Array.isArray(m.bio) && m.bio.length > 0 && m.bio.every((p) => p.length > 40), `${m.name}: bio`);
   }
@@ -32,6 +32,9 @@ test('team slots on the comb never collide', () => {
 
 test('the advisors are named', () => {
   const names = ADVISORS.map((a) => a.name);
-  assert.ok(names.includes('Karin Austin'));
-  assert.ok(names.includes('Andrea Oddo'));
+  for (const n of ['Karin Austin', 'Leslie Kean', 'Andrea Oddo', 'Matthew Roberts']) assert.ok(names.includes(n), n);
+});
+
+test('DJ Stange is on the team', () => {
+  assert.ok(TEAM.some((m) => m.name === 'DJ Stange' && m.role === 'Graphic Designer'));
 });
