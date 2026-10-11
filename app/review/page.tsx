@@ -31,6 +31,11 @@ interface SubmissionData {
   privacy?: string;
   hashtags?: string[];
   status?: string;
+  // the file the archive plays; after approval the encoder swaps in a
+  // streaming copy (<name>-web.mp4) and keeps the original's key beside it
+  mediaKey?: string;
+  originalMediaKey?: string;
+  mediaEncodedAt?: string;
   // machine transcription
   audioKey?: string;
   recordingMode?: string;
@@ -620,6 +625,9 @@ export default function ReviewDashboard() {
               {d.id && <code title="Submission ID — what a contributor quotes to have this removed">{d.id}</code>}
               {d.privacy === "community" && <span className="rv-badge">Community only</span>}
               {d.adsOk && <span className="rv-badge" title="The contributor is willing to have this story or photo used in Honeycomb advertising">OK for advertising</span>}
+              {d.recordingMode === "video" && d.mediaKey && (/-web\.mp4$/i.test(d.mediaKey)
+                ? <span className="rv-badge" title="A copy encoded for streaming plays on the site; the original is kept">Streaming copy</span>
+                : <span className="rv-badge" style={{ color: "var(--muted)", borderColor: "rgba(198,169,130,.35)" }} title={live ? "The encoder picks this up within about fifteen minutes of approval" : "A streaming copy is made after approval"}>{live ? "Original file · copy pending" : "Original file"}</span>)}
             </p>
             <span className="rv-ui rv-submitted">Submitted {formatDate(s.lastModified)}</span>
           </div>
