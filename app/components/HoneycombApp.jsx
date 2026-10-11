@@ -552,6 +552,39 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
 
 // ── story panel slideout (from the projecthoneycomb.site deploy) ────────────
 
+// "Download video and transcript": the transcript as a small text file made
+// here, then the recording from storage as an attachment (the API presigns it
+// with a content-disposition header, since a cross-origin link cannot force a
+// download by itself). Two files from one click; a browser may ask once to
+// allow multiple downloads.
+function downloadStory(exp) {
+  const stem = String(exp.title || exp.id || 'honeycomb-story').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'honeycomb-story';
+  const who = cellLabel(exp);
+  const lines = [
+    exp.title || 'Untitled',
+    '',
+    who ? `Submitted by: ${who}` : null,
+    `Where: ${exp.location || 'Location withheld'}`,
+    `When: ${exp.experienceYear || '—'}`,
+    exp.id ? `Submission ID: ${exp.id}` : null,
+    '',
+    exp.transcript ? String(exp.transcript) : '(No written account. The recording stands in for it.)',
+    '',
+    'From Project Honeycomb — projecthoneycomb.site',
+  ].filter((l) => l !== null);
+  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = `${stem}-transcript.txt`;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  if (exp.downloadUrl) {
+    const b = document.createElement('a');
+    b.href = exp.downloadUrl; b.download = '';
+    document.body.appendChild(b); b.click(); b.remove();
+  }
+}
+
 function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
   const open = Boolean(page || person);
   const asideRef = useRef(null);
@@ -604,7 +637,12 @@ function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
                 <div><dt>WHEN</dt><dd>{person.experience.experienceYear || '—'}</dd></div>
               </dl>
               {person.experience.mediaUrl && person.experience.recordingMode === 'video' && (
-                <video className="story-media" src={person.experience.mediaUrl} controls playsInline preload="metadata" />
+                <>
+                  <video className="story-media" src={person.experience.mediaUrl} controls playsInline preload="metadata" />
+                  <button className="story-download" type="button" onClick={() => downloadStory(person.experience)}>
+                    Download video and transcript <span aria-hidden="true">↓</span>
+                  </button>
+                </>
               )}
               {person.experience.mediaUrl && person.experience.recordingMode === 'audio' && (
                 <audio className="story-media" src={person.experience.mediaUrl} controls preload="metadata" />
