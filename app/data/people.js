@@ -2,6 +2,11 @@
 // `about` renders in the story panel today; drop a video file into
 // /public/videos and set `video: '/videos/<file>.mp4'` to replace it
 // with that person's submission recording.
+//
+// These people did not come through the recorder, so no consent record
+// exists for them in the archive. Their video plays in the panel but is not
+// offered as a download until a signed release is filed (design-handoff/
+// legal/releases/) and `downloadOk: true` is added to their entry here.
 
 const PLACEHOLDER = [
   'This cell holds a member of the Honeycomb community. Their recorded experience is being prepared for the archive.',

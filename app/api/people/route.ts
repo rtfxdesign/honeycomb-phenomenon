@@ -11,6 +11,8 @@ interface PersonRecord {
   name: string;
   about: string[];
   video: string | null;
+  /** true only once a signed release is on file — see app/data/people.js */
+  downloadOk?: boolean;
 }
 
 const staticPeople: PersonRecord[] = PEOPLE.map((p: PersonRecord) => ({
@@ -18,6 +20,9 @@ const staticPeople: PersonRecord[] = PEOPLE.map((p: PersonRecord) => ({
   name: p.name,
   about: p.about,
   video: p.video || null,
+  // Deliberately from the code, never from an R2 override: a release is a
+  // piece of paper, and the flag that says it exists is set in a commit.
+  downloadOk: p.downloadOk === true,
 }));
 
 const validKeys = new Set(staticPeople.map((p) => p.key));
@@ -63,6 +68,7 @@ export async function GET() {
         name: typeof o.name === "string" && o.name.trim() ? o.name : p.name,
         about: Array.isArray(o.about) && o.about.length ? o.about.map(String) : p.about,
         video: typeof o.video === "string" && o.video.trim() ? o.video : (o.video === null ? null : p.video),
+        downloadOk: p.downloadOk,
       };
     });
     return NextResponse.json({ people });
