@@ -17,6 +17,7 @@ import { PAGES } from '../data/pages';
 import RecorderModal from './RecorderModal';
 import { useCombReveal } from './CombReveal';
 import { cellLabel, initialsOf } from '../lib/name';
+import { PRIVACY_PATH, TERMS_PATH, ACCESSIBILITY_PATH } from '../lib/contact';
 
 const TWEAK_DEFAULTS = {
   // the settings the review settled on, 2026-09-18, revised by Allen 2026-09-29
@@ -652,20 +653,27 @@ function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
                 <div><dt>WHERE</dt><dd>{person.experience.location || 'Location withheld'}</dd></div>
                 <div><dt>WHEN</dt><dd>{person.experience.experienceYear || '—'}</dd></div>
               </dl>
+              {/* The download button appears only when the API issued a
+                  download link, which it does for public stories alone — a
+                  community-only recording is watched here, not taken away. */}
               {person.experience.mediaUrl && person.experience.recordingMode === 'video' && (
                 <>
                   <video className="story-media" src={person.experience.mediaUrl} controls playsInline preload="metadata" />
-                  <button className="story-download" type="button" onClick={() => downloadStory(person.experience)}>
-                    Download video and transcript <span aria-hidden="true">↓</span>
-                  </button>
+                  {person.experience.downloadUrl && (
+                    <button className="story-download" type="button" onClick={() => downloadStory(person.experience)}>
+                      Download video and transcript <span aria-hidden="true">↓</span>
+                    </button>
+                  )}
                 </>
               )}
               {person.experience.mediaUrl && person.experience.recordingMode === 'audio' && (
                 <>
                   <audio className="story-media" src={person.experience.mediaUrl} controls preload="metadata" />
-                  <button className="story-download" type="button" onClick={() => downloadStory(person.experience)}>
-                    Download audio and transcript <span aria-hidden="true">↓</span>
-                  </button>
+                  {person.experience.downloadUrl && (
+                    <button className="story-download" type="button" onClick={() => downloadStory(person.experience)}>
+                      Download audio and transcript <span aria-hidden="true">↓</span>
+                    </button>
+                  )}
                 </>
               )}
               {person.experience.transcript && (
@@ -700,9 +708,16 @@ function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
               {person.video ? (
                 <>
                   <video className="story-media" src={person.video} controls playsInline preload="metadata" />
-                  <button className="story-download" type="button" onClick={() => downloadPerson(person)}>
-                    Download video and transcript <span aria-hidden="true">↓</span>
-                  </button>
+                  {/* A community face's video came in by hand, not through the
+                      recorder, so there is no consent record behind it. The
+                      file is offered for download only once a signed release
+                      is on file and `downloadOk: true` is set on that person
+                      in app/data/people.js. */}
+                  {person.downloadOk === true && (
+                    <button className="story-download" type="button" onClick={() => downloadPerson(person)}>
+                      Download video and transcript <span aria-hidden="true">↓</span>
+                    </button>
+                  )}
                 </>
               ) : null}
               {person.about.map((p, i) => <p key={i}>{p}</p>)}
@@ -727,6 +742,11 @@ function PanelFooter() {
         <span>OUR COLLECTIVE HISTORY</span>
       </div>
       <small>HONEYCOMB</small>
+      <nav className="story-footer-links" aria-label="Site policies">
+        <a href={PRIVACY_PATH}>Privacy</a>
+        <a href={TERMS_PATH}>Terms</a>
+        <a href={ACCESSIBILITY_PATH}>Accessibility</a>
+      </nav>
     </footer>
   );
 }
@@ -805,6 +825,9 @@ function Gate({ onEnter, size }) {
             <Button type="submit" disabled={checking}>{checking ? 'Checking…' : 'Enter'}</Button>
           </form>
           <p className="gate-note"><span>✦</span> The session stays unlocked for 30 days on this device.</p>
+          <p className="gate-note gate-terms">
+            By entering you agree to the <a href={TERMS_PATH}>terms of use</a>: the stories here are their contributors&rsquo; own, and are not to be copied or shared elsewhere.
+          </p>
           <div className="gate-request">
             <button
               type="button" className="hc-btn hc-btn-outline hc-btn-md"

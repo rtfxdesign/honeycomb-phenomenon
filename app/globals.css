@@ -143,6 +143,8 @@ button{font:inherit;color:inherit}
 .gate-form{display:flex;flex-direction:column;gap:16px;width:340px;max-width:86vw;text-align:left}
 .gate-note{font-family:var(--font-story);font-size:var(--type-body-sm);color:var(--text-muted);margin:28px 0 0}
 .gate-note span{color:var(--text-gold)}
+.gate-terms{margin-top:10px;max-width:42ch}
+.gate-terms a{color:var(--text-gold);text-decoration:underline;text-underline-offset:3px}
 .arch-tag{position:absolute;bottom:44px;left:0;right:0;text-align:center;font-family:var(--font-display);font-size:14px;color:var(--text-muted);margin:0;z-index:5;pointer-events:none}
 .arch-clip{position:absolute;inset:0;border-radius:0;overflow:hidden;z-index:4;
   transition:filter 480ms var(--ease-quiet),left .72s cubic-bezier(.2,.78,.2,1)}
@@ -627,6 +629,9 @@ button{font:inherit;color:inherit}
 audio.story-media{max-height:none}
 .story-footer{display:flex;align-items:center;gap:13px;padding:23px clamp(42px,5.8vw,92px) 26px;background:rgba(78,42,14,.22)}
 .story-footer img{width:58px;height:30px;object-fit:contain;opacity:.88}
+.story-footer-links{margin-left:14px;display:flex;gap:14px;font-family:Montserrat;font-size:8px;letter-spacing:.12em;text-transform:uppercase}
+.story-footer-links a{color:var(--muted);text-decoration:none}
+.story-footer-links a:hover,.story-footer-links a:focus-visible{color:var(--text-gold);text-decoration:underline;text-underline-offset:3px}
 .story-footer div{display:flex;flex-direction:column;gap:2px;font-family:Montserrat;font-size:8px;letter-spacing:.12em}
 .story-footer strong{color:var(--cream)}
 .story-footer span{color:var(--muted)}
