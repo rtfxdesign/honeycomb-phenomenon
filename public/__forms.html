@@ -25,5 +25,49 @@
       <input name="site">
       <input name="review">
     </form>
+    <!-- Contributor release (/release) and advisor/team listing consent
+         (/listing-consent). Netlify stores each submission and emails it;
+         export the CSV to design-handoff/legal/releases/ and /approvals/. -->
+    <form name="contributor-release" method="POST" data-netlify="true" netlify-honeypot="bot-field" hidden>
+      <input type="hidden" name="form-name" value="contributor-release">
+      <input name="bot-field">
+      <input name="personKey">
+      <input name="fullName">
+      <input name="contact">
+      <input name="ownAccount">
+      <input name="adult">
+      <input name="visibility">
+      <input name="nameDisplay">
+      <input name="download">
+      <input name="advertising">
+      <input name="readPrivacy">
+      <input name="recordedBy">
+      <input name="recordedWhere">
+      <input name="recordedOn">
+      <input name="signature">
+      <input name="esign">
+      <input name="signedAt">
+      <input name="releaseVersion">
+      <input name="site">
+    </form>
+    <form name="listing-consent" method="POST" data-netlify="true" netlify-honeypot="bot-field" hidden>
+      <input type="hidden" name="form-name" value="listing-consent">
+      <input name="bot-field">
+      <input name="kind">
+      <input name="fullName">
+      <input name="roleAsListed">
+      <input name="answer">
+      <input name="correctedRole">
+      <textarea name="correctedBio"></textarea>
+      <input name="institutionApproval">
+      <input name="linkOk">
+      <input name="photoOk">
+      <input name="email">
+      <input name="signature">
+      <input name="esign">
+      <input name="signedAt">
+      <input name="consentVersion">
+      <input name="site">
+    </form>
   </body>
 </html>
