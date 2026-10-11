@@ -108,17 +108,16 @@ button{font:inherit;color:inherit}
   84%{stroke-dashoffset:0;opacity:.22}
   100%{stroke-dashoffset:1;opacity:.22}
 }
-.gate-mark .comb-mark{animation:gate-mark-glow 7s ease-in-out 1.2s infinite}
-@keyframes gate-mark-glow{
-  0%,100%{filter:drop-shadow(0 0 10px rgba(242,191,73,.18))}
-  45%{filter:drop-shadow(0 0 26px rgba(242,191,73,.5))}
-}
+/* no filter animation here: iOS Safari re-rasterises a filtered layer every
+   frame and has been seen to drop the fixed bar while it does; the glow is
+   static and the trace carries the motion */
 .gate-mark .cm-glass{display:none}
-/* the gold cells either side breathe, each on its own beat */
-.gate-hexes .cell{animation:gate-hex-breathe 8s ease-in-out calc(var(--i,0) * -1.15s) infinite}
+/* the gold cells either side breathe, each on its own beat — opacity and
+   transform only, which the compositor animates without repainting */
+.gate-hexes .cell{animation:gate-hex-breathe 8s ease-in-out calc(var(--i,0) * -1.15s) infinite;will-change:opacity,transform}
 @keyframes gate-hex-breathe{
-  0%,100%{opacity:.55;transform:translateY(0);filter:brightness(.95)}
-  50%{opacity:1;transform:translateY(-6px);filter:brightness(1.22)}
+  0%,100%{opacity:.5;transform:translateY(0)}
+  50%{opacity:1;transform:translateY(-6px)}
 }
 @media (prefers-reduced-motion:reduce){
   .gate-hexes .cell,.gate-mark .cm-cell,.gate-mark .comb-mark{animation:none!important}
