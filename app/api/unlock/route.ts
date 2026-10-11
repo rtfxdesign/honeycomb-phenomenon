@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  roleForPassword, createSessionToken, AUTH_COOKIE, AUTH_MAX_AGE,
+  roleForPassword, createSessionToken, AUTH_COOKIE, maxAgeFor, Role,
 } from "../../lib/auth";
 import { memberForCode, touchLastSeen } from "../../lib/members";
 
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     }
 
     let token: string | null = null;
-    let role: string | null = null;
+    let role: Role | null = null;
     let name: string | undefined;
 
     const passwordRole = roleForPassword(password);
@@ -26,14 +26,20 @@ export async function POST(request: NextRequest) {
     } else {
       const member = await memberForCode(password);
       if (member) {
-        role = "member";
+        // A member whose record carries the moderator role gets a moderator
+        // session under their own name — that name is what the audit log records.
+        role = member.role === "moderator" ? "moderator" : "member";
         name = member.name;
-        token = createSessionToken({ role: "member", id: member.id, name: member.name });
+        token = createSessionToken({ role, id: member.id, name: member.name });
         await touchLastSeen(member);
       }
     }
 
     if (!token || !role) {
+      // A wrong guess waits a second before it hears so. Not a rate limit —
+      // there is no shared counter on a serverless host — but it makes a
+      // dictionary run against the gate slow and loud in the function logs.
+      await new Promise((r) => setTimeout(r, 1000));
       return NextResponse.json({ error: "Not recognized" }, { status: 401 });
     }
 
@@ -42,7 +48,7 @@ export async function POST(request: NextRequest) {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: AUTH_MAX_AGE,
+      maxAge: maxAgeFor(role),
       path: "/",
     });
     return response;

@@ -45,6 +45,10 @@ const matchesAny = (password: string, candidates: string[]) =>
 
 export const AUTH_COOKIE = "hc_auth";
 export const AUTH_MAX_AGE = 30 * 24 * 60 * 60; // 30 days, matching the gate copy
+// A moderator session reaches every record at every visibility level, so it
+// does not get the visitor's month: twelve hours, then the password again.
+export const MODERATOR_MAX_AGE = 12 * 60 * 60;
+export const maxAgeFor = (role: Role) => (role === "moderator" ? MODERATOR_MAX_AGE : AUTH_MAX_AGE);
 
 const secret = () =>
   process.env.HONEYCOMB_SESSION_SECRET ||
@@ -69,7 +73,7 @@ export function safeEqual(a: string, b: string) {
 }
 
 export function createSessionToken(session: Omit<Session, "exp">): string {
-  const payload: Session = { ...session, exp: Date.now() + AUTH_MAX_AGE * 1000 };
+  const payload: Session = { ...session, exp: Date.now() + maxAgeFor(session.role) * 1000 };
   const body = b64url(Buffer.from(JSON.stringify(payload)));
   return `${body}.${sign(body)}`;
 }

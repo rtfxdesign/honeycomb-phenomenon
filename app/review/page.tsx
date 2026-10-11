@@ -86,6 +86,7 @@ interface PersonEditState {
 interface MemberRecord {
   id: string;
   name: string;
+  role?: "member" | "moderator";
   email?: string;
   note?: string;
   createdAt: string;
@@ -163,7 +164,7 @@ export default function ReviewDashboard() {
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [members, setMembers] = useState<MemberRecord[]>([]);
-  const [newMember, setNewMember] = useState({ name: "", email: "", note: "" });
+  const [newMember, setNewMember] = useState({ name: "", email: "", note: "", moderator: false });
   // which submission is being transcribed right now, and anything it came back with
   const [transcribingKey, setTranscribingKey] = useState<string | null>(null);
   const [transcribeNote, setTranscribeNote] = useState<Record<string, string>>({});
@@ -187,7 +188,7 @@ export default function ReviewDashboard() {
       const member = q.get("member") || "";
       const email = q.get("email") || "";
       if (member || email) {
-        setNewMember({ name: member, email, note: "Requested access from the gate" });
+        setNewMember({ name: member, email, note: "Requested access from the gate", moderator: false });
         setTab("members");
         return;
       }
@@ -253,7 +254,7 @@ export default function ReviewDashboard() {
       if (!res.ok) throw new Error("Failed to add member");
       const data = await res.json();
       setIssuedCode({ name: data.member.name, code: data.code, email: data.member.email });
-      setNewMember({ name: "", email: "", note: "" });
+      setNewMember({ name: "", email: "", note: "", moderator: false });
       loadMembers();
     } catch (err) {
       console.error(err);
@@ -801,7 +802,7 @@ export default function ReviewDashboard() {
               {memberRows.map((m) => (
                 <tr key={m.id} style={{ opacity: m.disabledAt ? 0.6 : 1 }}>
                   <td>
-                    <div className="rv-member-name">{m.name}{m.disabledAt && <span className="rv-ui rv-pill">disabled</span>}</div>
+                    <div className="rv-member-name">{m.name}{m.role === "moderator" && <span className="rv-ui rv-pill">moderator</span>}{m.disabledAt && <span className="rv-ui rv-pill">disabled</span>}</div>
                     <div className="rv-member-mail">{m.email || "—"}</div>
                   </td>
                   <td className="rv-dim">{m.note || "—"}</td>
@@ -811,6 +812,7 @@ export default function ReviewDashboard() {
                     <span className="rv-actions">
                       <button type="button" className="rv-quiet rv-quiet--sm" disabled={memberBusy} onClick={() => patchMember(m.id, { action: "regenerate" })}>New code</button>
                       <button type="button" className="rv-quiet rv-quiet--sm" disabled={memberBusy} onClick={() => patchMember(m.id, { disabled: !m.disabledAt })}>{m.disabledAt ? "Enable" : "Disable"}</button>
+                      <button type="button" className="rv-quiet rv-quiet--sm" disabled={memberBusy} onClick={() => patchMember(m.id, { moderator: m.role !== "moderator" })}>{m.role === "moderator" ? "Make member" : "Make moderator"}</button>
                       <button type="button" className="rv-quiet rv-quiet--sm rv-quiet--danger" disabled={memberBusy} onClick={() => removeMember(m.id, m.name)}>Remove</button>
                     </span>
                   </td>
@@ -844,6 +846,10 @@ export default function ReviewDashboard() {
           <Field label="Note (optional)">
             <input value={newMember.note} onChange={(e) => setNewMember({ ...newMember, note: e.target.value })} placeholder="Why they have access" />
           </Field>
+          <label className="rv-check">
+            <input type="checkbox" checked={newMember.moderator} onChange={(e) => setNewMember({ ...newMember, moderator: e.target.checked })} />
+            <span>Moderator &mdash; this code opens /review as this person, and the audit log records their name</span>
+          </label>
           <div>
             <button type="submit" className="rv-cta" disabled={memberBusy}>Issue a code<span aria-hidden="true">↗</span></button>
           </div>

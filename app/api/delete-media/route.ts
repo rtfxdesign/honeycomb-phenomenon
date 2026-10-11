@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isModerator } from "../../lib/auth";
 import { DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
+import { recordAudit } from "../../lib/audit";
 
 export async function POST(request: NextRequest) {
   if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const client = getR2Client();
+    let deleted: string[] = [];
 
     // 1. Fetch the JSON submission to find its media keys
     const getCmd = new GetObjectCommand({
@@ -31,8 +33,10 @@ export async function POST(request: NextRequest) {
 
         // 2. Delete every object the record points at. "Removed" has to mean
         // the recording, its audio track and the photo, not just the JSON —
-        // the audio track was previously left behind.
-        const keys = new Set([data.mediaKey, data.audioKey, data.photoKey].filter(Boolean));
+        // the audio track was previously left behind, and so was the
+        // streaming copy the encoder makes (webKey / originalMediaKey).
+        const keys = new Set([data.mediaKey, data.audioKey, data.photoKey, data.webKey, data.originalMediaKey].filter(Boolean));
+        deleted = [...keys] as string[];
         for (const k of keys) {
           await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: phys(k) }));
         }
@@ -46,6 +50,11 @@ export async function POST(request: NextRequest) {
       Bucket: BUCKET,
       Key: phys(submissionKey),
     }));
+
+    // A delete from the pending queue is a decline; from approved/ it is a
+    // removal. Both are logged, with the media keys that went with the record.
+    const action = submissionKey.startsWith("approved/") ? "delete" : "decline";
+    await recordAudit(request, action, submissionKey, { media: deleted });
 
     return NextResponse.json({ success: true });
   } catch (error) {

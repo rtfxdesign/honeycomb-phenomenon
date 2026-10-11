@@ -17,6 +17,12 @@ export interface Member {
   name: string;
   email?: string;
   note?: string;
+  /**
+   * "moderator" gives this person's code the moderator role at the gate, so
+   * each moderator signs in as themselves and the audit log can say who
+   * approved what. Absent or "member" is an ordinary member.
+   */
+  role?: "member" | "moderator";
   codeHash: string;
   createdAt: string;
   disabledAt?: string | null;
@@ -78,13 +84,14 @@ export async function listMembers(): Promise<Member[]> {
 export const listMembersPublic = async (): Promise<PublicMember[]> =>
   (await listMembers()).map(strip);
 
-export async function createMember(input: { name: string; email?: string; note?: string }) {
+export async function createMember(input: { name: string; email?: string; note?: string; role?: Member["role"] }) {
   const code = generateCode();
   const member: Member = {
     id: `mem_${Date.now().toString(36)}_${randomBytes(3).toString("hex")}`,
     name: String(input.name).trim(),
     email: input.email ? String(input.email).trim() : undefined,
     note: input.note ? String(input.note).trim() : undefined,
+    role: input.role === "moderator" ? "moderator" : "member",
     codeHash: hashCode(code),
     createdAt: new Date().toISOString(),
     disabledAt: null,
@@ -105,7 +112,7 @@ async function save(member: Member) {
   }));
 }
 
-export async function updateMember(id: string, changes: Partial<Pick<Member, "name" | "email" | "note" | "disabledAt">>) {
+export async function updateMember(id: string, changes: Partial<Pick<Member, "name" | "email" | "note" | "disabledAt" | "role">>) {
   const existing = await readMember(phys(keyFor(id)));
   if (!existing) return null;
   const next: Member = { ...existing, ...changes };

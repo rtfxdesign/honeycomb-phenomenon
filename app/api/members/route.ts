@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isModerator } from "../../lib/auth";
 import { r2Configured } from "../../lib/r2";
+import { recordAudit } from "../../lib/audit";
 import {
   listMembersPublic, createMember, updateMember, regenerateCode, deleteMember,
 } from "../../lib/members";
@@ -28,11 +29,12 @@ export async function POST(request: NextRequest) {
   const blocked = guard(request);
   if (blocked) return blocked;
   try {
-    const { name, email, note } = await request.json();
+    const { name, email, note, moderator } = await request.json();
     if (!name || !String(name).trim()) {
       return NextResponse.json({ error: "A name is required" }, { status: 400 });
     }
-    const created = await createMember({ name, email, note });
+    const created = await createMember({ name, email, note, role: moderator === true ? "moderator" : "member" });
+    await recordAudit(request, "member.create", created.member.id, { role: created.member.role });
     return NextResponse.json({ success: true, ...created });
   } catch (error) {
     console.error("Failed to create member:", error);
@@ -45,12 +47,13 @@ export async function PATCH(request: NextRequest) {
   const blocked = guard(request);
   if (blocked) return blocked;
   try {
-    const { id, action, name, email, note, disabled } = await request.json();
+    const { id, action, name, email, note, disabled, moderator } = await request.json();
     if (!id) return NextResponse.json({ error: "Member id is required" }, { status: 400 });
 
     if (action === "regenerate") {
       const result = await regenerateCode(id);
       if (!result) return NextResponse.json({ error: "Unknown member" }, { status: 404 });
+      await recordAudit(request, "member.regenerate", id);
       return NextResponse.json({ success: true, ...result });
     }
 
@@ -59,9 +62,11 @@ export async function PATCH(request: NextRequest) {
     if (email !== undefined) changes.email = String(email).trim();
     if (note !== undefined) changes.note = String(note).trim();
     if (disabled !== undefined) changes.disabledAt = disabled ? new Date().toISOString() : null;
+    if (moderator !== undefined) changes.role = moderator ? "moderator" : "member";
 
     const member = await updateMember(id, changes);
     if (!member) return NextResponse.json({ error: "Unknown member" }, { status: 404 });
+    await recordAudit(request, "member.update", id, { fields: Object.keys(changes) });
     return NextResponse.json({ success: true, member });
   } catch (error) {
     console.error("Failed to update member:", error);
@@ -76,6 +81,7 @@ export async function DELETE(request: NextRequest) {
     const { id } = await request.json();
     if (!id) return NextResponse.json({ error: "Member id is required" }, { status: 400 });
     await deleteMember(id);
+    await recordAudit(request, "member.delete", id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("Failed to delete member:", error);

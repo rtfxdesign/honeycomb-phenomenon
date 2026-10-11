@@ -3,6 +3,7 @@ import { isModerator } from "../../lib/auth";
 import { GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 import { formatDisplayName, NAME_DISPLAY_LEVELS } from "../../lib/name";
+import { recordAudit } from "../../lib/audit";
 
 // Fields the review dashboard may edit; everything else in the stored JSON
 // (media keys, ids, timestamps, status) is preserved as-is.
@@ -74,6 +75,9 @@ export async function POST(request: NextRequest) {
       data.displayName = formatDisplayName(data.firstName, data.lastName, data.nameDisplay);
     }
     data.editedAt = new Date().toISOString();
+    // Field names only. A transcript edit is logged as "transcript changed";
+    // the machine transcript stays on the record as the before-text.
+    const changed = EDITABLE_FIELDS.filter((f) => f in updates);
 
     await client.send(new PutObjectCommand({
       Bucket: BUCKET,
@@ -81,6 +85,8 @@ export async function POST(request: NextRequest) {
       Body: JSON.stringify(data, null, 2),
       ContentType: "application/json",
     }));
+
+    await recordAudit(request, "update", submissionKey, { fields: changed });
 
     return NextResponse.json({ success: true, data });
   } catch (error) {

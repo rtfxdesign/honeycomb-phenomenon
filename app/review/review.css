@@ -199,3 +199,7 @@
   .rv-aside{border-left:0;border-top:1px solid var(--line-soft)}
   .rv-members{grid-template-columns:1fr;padding:20px}
 }
+
+/* member form: the moderator toggle */
+.rv-check{display:flex;gap:.5rem;align-items:flex-start;font-size:.85rem;line-height:1.35}
+.rv-check input{margin-top:.2rem}
