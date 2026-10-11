@@ -216,7 +216,7 @@ function genField(cols, rows, count, mode, brightShare, gaps, rng) {
   return picked.map((s) => [s[0], s[1], brightSet.has(key(s)) ? 'b' : 'd']);
 }
 
-const GATE_CELLS = [[0, 2, 'd'], [1, 1, 'd'], [1, 5, 'd'], [2, 6, 'd'], [12, 1, 'd'], [12, 5, 'd'], [13, 2, 'b'], [13, 4, 'd'], [14, 3, 'd'], [0, 4, 'b']];
+const GATE_CELLS = [[0, 2, 'd'], [1, 1, 'd'], [1, 5, 'd'], [2, 6, 'd'], [8, 1, 'd'], [8, 5, 'd'], [9, 2, 'b'], [9, 4, 'd'], [10, 3, 'd'], [0, 4, 'b']];
 
 // Everything a cell can be found by. Community faces search their name and
 // panel text; archive submissions search their whole record.
@@ -342,8 +342,8 @@ function gatherMatches(base, matchKeys, cols, rows, cx, cy, size, W, H, push) {
 
 function Cells({ list, size }) {
   const cx = size * 0.751, cy = size * 0.428;
-  return list.map(([c, r, t]) => (
-    <div key={c + ',' + r} className="cell" style={{ left: c * cx, top: r * cy, width: size }}>
+  return list.map(([c, r, t], i) => (
+    <div key={c + ',' + r} className="cell" style={{ left: c * cx, top: r * cy, width: size, '--i': i }}>
       <img src="/assets/cell-gold.png" alt="" className={t === 'b' ? 'cell-bright' : 'cell-dormant'} style={{ width: '100%' }} />
     </div>
   ));
@@ -387,7 +387,7 @@ function CombMark() {
       <g className="cm-cells" fill="none" stroke="#E3A444" strokeWidth="11" strokeLinejoin="round">
         {COMB_CELLS.map(([cx, cy], i) => (
           <polygon
-            key={i} className="cm-cell" points={hexPoints(cx, cy, 90)}
+            key={i} className="cm-cell" points={hexPoints(cx, cy, 90)} pathLength="1"
             style={{ '--dx': `${COMB_TARGETS[i].dx.toFixed(1)}px`, '--dy': `${COMB_TARGETS[i].dy.toFixed(1)}px`, '--d': `${COMB_TARGETS[i].delay}ms` }}
           />
         ))}
@@ -412,14 +412,11 @@ const FACE_GRADES = {
 
 // ── topbar (from the projecthoneycomb.site deploy) ──────────────────────────
 
-// Before the archive is open the bar is a calling card, not a toolbar: the
-// wordmark, the team, the partners and a way to write. Search, Explore,
-// Stories and Submit all need the archive, so they wait behind the gate; the
-// comb mark leaves the bar and sits large in the middle of the gate instead.
-const GATE_NAV = new Set(['about', 'partners', 'contact']);
-
+// Before the archive is open the bar holds the wordmark alone, centred.
+// Everything else in it — search, the pages, Submit — needs the archive, so
+// it waits behind the gate; the comb mark leaves the bar and sits large in
+// the middle of the gate instead.
 function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autohide, keepVisible, session, onSignOut, gate }) {
-  const items = gate ? PAGES.filter((p) => GATE_NAV.has(p.id)) : PAGES;
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -511,6 +508,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
         )}
       </div>
       </>)}
+      {!gate && (<>
       <button
         className="menu-button" type="button"
         aria-expanded={navOpen} aria-controls="primary-navigation"
@@ -520,7 +518,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
       </button>
       <nav id="primary-navigation" className={navOpen ? 'nav-open' : ''} aria-label="Primary navigation">
         {/* no HOME here on purpose — the wordmark is the home link */}
-        {items.map((p) => (p.href
+        {PAGES.map((p) => (p.href
           ? <a key={p.id} href={p.href}>{p.label || p.id.toUpperCase()}</a>
           : (
           <button
@@ -541,13 +539,12 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
             {session.role === 'moderator' ? 'MODERATOR' : (session.name || 'MEMBER').toUpperCase()}
           </button>
         )}
-        {!gate && (
-          <button className="share-button" type="button" aria-label="Share your experience"
-                  onClick={() => { setNavOpen(false); onSubmit(); }}>
-            SUBMIT
-          </button>
-        )}
+        <button className="share-button" type="button" aria-label="Share your experience"
+                onClick={() => { setNavOpen(false); onSubmit(); }}>
+          SUBMIT
+        </button>
       </nav>
+      </>)}
       </header>
     </>
   );
@@ -730,7 +727,7 @@ function Gate({ onEnter, size }) {
   };
   return (
     <div>
-      <div style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 14 * size * 0.751 + size, height: 6 * size * 0.428 + size, opacity: 0.5, zIndex: 2 }}>
+      <div className="gate-hexes" aria-hidden="true" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 10 * size * 0.751 + size, height: 6 * size * 0.428 + size, opacity: 0.72, zIndex: 2 }}>
         <Cells list={GATE_CELLS} size={size} />
       </div>
       <div className="gate-center">
