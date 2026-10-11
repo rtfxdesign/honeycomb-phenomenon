@@ -202,7 +202,7 @@ export default function RecorderModal({ onClose }) {
       return;
     }
     if (!consent) {
-      setStatus('Please confirm the account is yours to share.');
+      setStatus('Please confirm the account is yours to share and that you are 18 or older.');
       return;
     }
     setSubmitting(true);
@@ -427,8 +427,10 @@ export default function RecorderModal({ onClose }) {
             <label className="consent-row">
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} required />
               <span>
-                This account is mine to share. I authorize Honeycomb to keep it under the privacy setting I chose,
-                and I have read <HandlingLink>how my story and files are handled</HandlingLink>.
+                This account is mine to share, and I am 18 or older. I give Honeycomb permission to keep, transcribe,
+                show and play it &mdash; on this site and in Honeycomb exhibitions &mdash; under the privacy setting I chose.
+                This permission is non-exclusive, and I can withdraw it at any time by asking for removal.
+                I have read <HandlingLink>how my story and files are handled</HandlingLink>.
               </span>
             </label>
             {status && <p className="form-status" role="status">{status}</p>}

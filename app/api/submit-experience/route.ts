@@ -3,6 +3,7 @@ import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 import { formatDisplayName, NAME_DISPLAY_LEVELS } from "../../lib/name";
 import { generateSubmissionId } from "../../lib/submission-id";
+import { POLICY_VERSION, CONSENT_VERSION } from "../../lib/contact";
 
 const PRIVACY_LEVELS = ["public", "community", "archive"];
 const RECORDING_MODES = ["video", "audio", "text"];
@@ -40,7 +41,7 @@ export async function POST(request: NextRequest) {
     }
     if (data.consent !== true) {
       return NextResponse.json(
-        { error: "Please confirm the account is yours to share before submitting" },
+        { error: "Please confirm the account is yours to share and that you are 18 or older" },
         { status: 400 }
       );
     }
@@ -94,6 +95,14 @@ export async function POST(request: NextRequest) {
       photoKey: mediaKey(data.photoKey),
       hashtags,
       consentAt: now,
+      // One required checkbox carries three statements: the account is theirs,
+      // they are 18 or older, and they grant the (non-exclusive, revocable)
+      // permission in CONSENT_VERSION's wording. The versions are stamped by
+      // the server, not taken from the client, so the record says which text
+      // was on screen when the box was ticked.
+      ageConfirmed: true,
+      consentVersion: CONSENT_VERSION,
+      policyVersion: POLICY_VERSION,
       // optional: willing to have the story or photo used in Honeycomb's advertising
       adsOk: data.adsOk === true,
       submittedAt: now,
