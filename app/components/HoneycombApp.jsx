@@ -474,7 +474,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
           into a magnifying glass every few seconds so nobody has to hover to
           find that out. */}
       <button className="brand-word" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
-        HONEYCOMB
+        {gate ? 'PROJECT HONEYCOMB' : 'HONEYCOMB'}
       </button>
       {!gate && (<>
       <div className={`brand${searchFocused || query ? ' brand--searching' : ''}`}>
@@ -733,7 +733,6 @@ function Gate({ onEnter, size }) {
       <div className="gate-center">
         <div className="gate-stack">
           <div className="gate-mark" aria-hidden="true"><CombMark /></div>
-          <p className="gate-eyebrow">Private archive</p>
           <h1 className="gate-title">Enter the <em>Honeycomb.</em></h1>
           <p className="gate-body">This living archive is shared by invitation. Enter the password, or your member access code, to continue.</p>
           <form className="gate-form" onSubmit={submit}>
