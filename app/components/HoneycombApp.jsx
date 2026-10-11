@@ -344,7 +344,7 @@ function Cells({ list, size }) {
   const cx = size * 0.751, cy = size * 0.428;
   return list.map(([c, r, t]) => (
     <div key={c + ',' + r} className="cell" style={{ left: c * cx, top: r * cy, width: size }}>
-      <img src="/assets/cell-bright.png" alt="" className={t === 'b' ? 'cell-bright' : 'cell-dormant'} style={{ width: '100%' }} />
+      <img src="/assets/cell-gold.png" alt="" className={t === 'b' ? 'cell-bright' : 'cell-dormant'} style={{ width: '100%' }} />
     </div>
   ));
 }
@@ -412,7 +412,14 @@ const FACE_GRADES = {
 
 // ── topbar (from the projecthoneycomb.site deploy) ──────────────────────────
 
-function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autohide, keepVisible, session, onSignOut }) {
+// Before the archive is open the bar is a calling card, not a toolbar: the
+// wordmark, the team, the partners and a way to write. Search, Explore,
+// Stories and Submit all need the archive, so they wait behind the gate; the
+// comb mark leaves the bar and sits large in the middle of the gate instead.
+const GATE_NAV = new Set(['about', 'partners', 'contact']);
+
+function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autohide, keepVisible, session, onSignOut, gate }) {
+  const items = gate ? PAGES.filter((p) => GATE_NAV.has(p.id)) : PAGES;
   const [navOpen, setNavOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchFocused, setSearchFocused] = useState(false);
@@ -462,7 +469,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
   return (
     <>
       {hidden && <div className="topbar-peek" aria-hidden="true" />}
-      <header className={`site-header${hidden ? ' site-header--tucked' : ''}${searchFocused || query ? ' site-header--searching' : ''}`}>
+      <header className={`site-header${gate ? ' site-header--gate' : ''}${hidden ? ' site-header--tucked' : ''}${searchFocused || query ? ' site-header--searching' : ''}`}>
       {/* The wordmark on the left is the home link, which is why HOME is no
           longer a nav item. The comb sits in the middle of the bar on its own
           and is the way into search — it is the main thing the site does, so
@@ -472,6 +479,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
       <button className="brand-word" type="button" aria-label="Honeycomb home" onClick={() => go('home')}>
         HONEYCOMB
       </button>
+      {!gate && (<>
       <div className={`brand${searchFocused || query ? ' brand--searching' : ''}`}>
         <button
           className="search-orb" type="button"
@@ -502,6 +510,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
           </>
         )}
       </div>
+      </>)}
       <button
         className="menu-button" type="button"
         aria-expanded={navOpen} aria-controls="primary-navigation"
@@ -511,7 +520,7 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
       </button>
       <nav id="primary-navigation" className={navOpen ? 'nav-open' : ''} aria-label="Primary navigation">
         {/* no HOME here on purpose — the wordmark is the home link */}
-        {PAGES.map((p) => (p.href
+        {items.map((p) => (p.href
           ? <a key={p.id} href={p.href}>{p.label || p.id.toUpperCase()}</a>
           : (
           <button
@@ -532,10 +541,12 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
             {session.role === 'moderator' ? 'MODERATOR' : (session.name || 'MEMBER').toUpperCase()}
           </button>
         )}
-        <button className="share-button" type="button" aria-label="Share your experience"
-                onClick={() => { setNavOpen(false); onSubmit(); }}>
-          SUBMIT
-        </button>
+        {!gate && (
+          <button className="share-button" type="button" aria-label="Share your experience"
+                  onClick={() => { setNavOpen(false); onSubmit(); }}>
+            SUBMIT
+          </button>
+        )}
       </nav>
       </header>
     </>
@@ -662,6 +673,38 @@ function PanelFooter() {
 // ── gate (from the design project) ──────────────────────────────────────────
 
 function Gate({ onEnter, size }) {
+  // Request Access: a short form under the password field. It goes to the
+  // Netlify form "request-access" (defined in public/__forms.html), whose
+  // notification reaches Paul with a link that opens /review with the name
+  // and email filled in, one click from issuing a code.
+  const [reqOpen, setReqOpen] = useState(false);
+  const [rq, setRq] = useState({ name: '', email: '' });
+  const [sending, setSending] = useState(false);
+  const [sent, setSent] = useState(false);
+  const [reqErr, setReqErr] = useState('');
+  // the form opens below the fold on a short screen; bring it up
+  useEffect(() => {
+    if (reqOpen) document.getElementById('request-access')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, [reqOpen]);
+  const sendRequest = async (e) => {
+    e.preventDefault();
+    const name = rq.name.trim(), email = rq.email.trim();
+    if (!name || !email) return;
+    setSending(true);
+    setReqErr('');
+    try {
+      const origin = window.location.origin;
+      const review = `${origin}/review?member=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
+      const body = new URLSearchParams({ 'form-name': 'request-access', 'bot-field': '', name, email, site: origin, review });
+      const res = await fetch('/__forms.html', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
+      if (!res.ok) throw new Error(String(res.status));
+      setSent(true);
+    } catch {
+      setReqErr('The request did not send. Try again, or email paul@honeycomb-phenomenon.com.');
+    } finally {
+      setSending(false);
+    }
+  };
   const [pw, setPw] = useState('');
   const [checking, setChecking] = useState(false);
   const [wrong, setWrong] = useState(false);
@@ -691,15 +734,40 @@ function Gate({ onEnter, size }) {
         <Cells list={GATE_CELLS} size={size} />
       </div>
       <div className="gate-center">
-        <p className="gate-eyebrow">Private archive</p>
-        <h1 className="gate-title">Enter the <em>Honeycomb.</em></h1>
-        <p className="gate-body">This living archive is shared by invitation. Enter the password, or your member access code, to continue.</p>
-        <form className="gate-form" onSubmit={submit}>
-          <Input label="Password or access code" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
-                 hint={wrong ? 'That password or code was not recognized.' : undefined} invalid={wrong} autoFocus />
-          <Button type="submit" disabled={checking}>{checking ? 'Checking…' : 'Enter'}</Button>
-        </form>
-        <p className="gate-note"><span>✦</span> The session stays unlocked for 30 days on this device.</p>
+        <div className="gate-stack">
+          <div className="gate-mark" aria-hidden="true"><CombMark /></div>
+          <p className="gate-eyebrow">Private archive</p>
+          <h1 className="gate-title">Enter the <em>Honeycomb.</em></h1>
+          <p className="gate-body">This living archive is shared by invitation. Enter the password, or your member access code, to continue.</p>
+          <form className="gate-form" onSubmit={submit}>
+            <Input label="Password or access code" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
+                   hint={wrong ? 'That password or code was not recognized.' : undefined} invalid={wrong} autoFocus />
+            <Button type="submit" disabled={checking}>{checking ? 'Checking…' : 'Enter'}</Button>
+          </form>
+          <p className="gate-note"><span>✦</span> The session stays unlocked for 30 days on this device.</p>
+          <div className="gate-request">
+            <button
+              type="button" className="hc-btn hc-btn-outline hc-btn-md"
+              aria-expanded={reqOpen} aria-controls="request-access"
+              onClick={() => setReqOpen((o) => !o)}
+            >
+              Request Access
+            </button>
+            {reqOpen && (sent ? (
+              <p className="gate-request-sent" id="request-access" role="status">
+                Thank you. Your request has gone to the Honeycomb team. Your access code will come to {rq.email} by email.
+              </p>
+            ) : (
+              <form className="gate-form gate-request-form" id="request-access" onSubmit={sendRequest}>
+                <p className="gate-request-lead">Leave your name and email. The team sends access codes by reply.</p>
+                <Input label="Your name" name="name" value={rq.name} onChange={(e) => setRq({ ...rq, name: e.target.value })} required autoComplete="name" />
+                <Input label="Email" name="email" type="email" value={rq.email} onChange={(e) => setRq({ ...rq, email: e.target.value })} required autoComplete="email"
+                       hint={reqErr || undefined} invalid={Boolean(reqErr)} />
+                <Button type="submit" disabled={sending}>{sending ? 'Sending…' : 'Send request'}</Button>
+              </form>
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1213,7 +1281,7 @@ export default function HoneycombApp() {
         onNav={onNav} onSubmit={openRecorder} activePage={pageId}
         query={query} onQuery={onQuery} matchCount={matchCount}
         autohide={t.topbarTucks === true} keepVisible={panelOpen || recorderOpen}
-        session={session} onSignOut={signOut}
+        session={session} onSignOut={signOut} gate={view === 'gate'}
       />
       <StoryPanel page={page} person={person} onClose={closePanel} openRecorder={openRecorder} focusSearch={focusSearch} />
       {recorderOpen && <RecorderModal onClose={() => setRecorderOpen(false)} />}

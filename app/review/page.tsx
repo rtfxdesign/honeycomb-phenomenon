@@ -96,8 +96,27 @@ export default function ReviewDashboard() {
   // which submission is being transcribed right now, and anything it came back with
   const [transcribingKey, setTranscribingKey] = useState<string | null>(null);
   const [transcribeNote, setTranscribeNote] = useState<Record<string, string>>({});
-  const [issuedCode, setIssuedCode] = useState<{ name: string; code: string } | null>(null);
+  const [issuedCode, setIssuedCode] = useState<{ name: string; code: string; email?: string } | null>(null);
   const [memberBusy, setMemberBusy] = useState(false);
+  // Opened from the "request-access" notification email: ?member=&email= fill
+  // the new-member form and the page scrolls to it once it has loaded.
+  const [jumpToMembers, setJumpToMembers] = useState(false);
+  useEffect(() => {
+    // the URL is read after mount so the server and client render the same empty form
+    const t = setTimeout(() => {
+      const q = new URLSearchParams(window.location.search);
+      const member = q.get("member") || "";
+      const email = q.get("email") || "";
+      if (!member && !email) return;
+      setNewMember({ name: member, email, note: "Requested access from the gate" });
+      setJumpToMembers(true);
+    }, 0);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    if (!jumpToMembers || loading || authRequired) return;
+    document.getElementById("members")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, [jumpToMembers, loading, authRequired]);
 
   const loadAll = () => {
     setLoading(true);
@@ -149,7 +168,7 @@ export default function ReviewDashboard() {
       });
       if (!res.ok) throw new Error("Failed to add member");
       const data = await res.json();
-      setIssuedCode({ name: data.member.name, code: data.code });
+      setIssuedCode({ name: data.member.name, code: data.code, email: data.member.email });
       setNewMember({ name: "", email: "", note: "" });
       loadMembers();
     } catch (err) {
@@ -835,7 +854,7 @@ export default function ReviewDashboard() {
             </div>
           )}
 
-          <h2 style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0 0 0.4rem" }}>Members ({members.length})</h2>
+          <h2 id="members" style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0 0 0.4rem", scrollMarginTop: "1.5rem" }}>Members ({members.length})</h2>
           <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", opacity: 0.6 }}>
             Approved members sign in at the gate with their own access code and can see stories marked &ldquo;Community only&rdquo;.
             A code is shown once, here, when you create it &mdash; pass it on however you like. Lost codes are replaced, not looked up.
@@ -852,6 +871,14 @@ export default function ReviewDashboard() {
                   onClick={() => navigator.clipboard?.writeText(issuedCode.code)}
                   style={{ padding: "0.45rem 0.9rem", border: "1px solid var(--line)", borderRadius: "4px", background: "transparent", color: "inherit", cursor: "pointer" }}
                 >Copy</button>
+                {issuedCode.email && (
+                  <a
+                    href={`mailto:${issuedCode.email}?subject=${encodeURIComponent("Your Honeycomb access code")}&body=${encodeURIComponent(
+                      `Hello ${issuedCode.name},\n\nHere is your access code for Project Honeycomb: ${issuedCode.code}\n\nGo to ${window.location.origin} and enter it where the gate asks for a password or access code. The code is yours alone; please keep it to yourself.\n\nThe Honeycomb team`,
+                    )}`}
+                    style={{ padding: "0.45rem 0.9rem", border: "1px solid #007067", borderRadius: "4px", color: "inherit", textDecoration: "none" }}
+                  >Email the code to {issuedCode.name}</a>
+                )}
                 <button
                   onClick={() => setIssuedCode(null)}
                   style={{ padding: "0.45rem 0.9rem", border: "0", borderRadius: "4px", background: "#007067", color: "#fff", cursor: "pointer" }}

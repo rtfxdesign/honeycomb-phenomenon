@@ -89,7 +89,25 @@ button{font:inherit;color:inherit}
 .hc-warm{position:absolute;inset:0;pointer-events:none;mix-blend-mode:soft-light;
   background:radial-gradient(115% 85% at 50% 32%,rgba(255,196,96,0.95),rgba(255,158,46,0.42) 45%,rgba(255,140,30,0.12) 70%,transparent 88%)}
 .hc-view{position:absolute;inset:0;transition:opacity 480ms var(--ease-quiet)}
-.gate-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;text-align:center;z-index:5;padding:0 24px}
+/* The centre column scrolls when the request form is open on a short screen;
+   the stack's auto margins centre it when there is room, and nothing is
+   clipped when there is not (a centred flex child overflows both ends). */
+.gate-center{position:absolute;inset:0;display:flex;overflow-y:auto;z-index:5;padding:0 24px}
+.gate-stack{margin:auto;display:flex;flex-direction:column;align-items:center;text-align:center;padding:96px 0 44px;max-width:100%}
+.gate-mark{width:min(300px,56vw);margin:0}
+.gate-mark .comb-mark{width:100%;height:auto;filter:drop-shadow(0 0 18px rgba(242,191,73,.28))}
+.gate-mark .cm-cell{animation:none;transform:none;opacity:1;stroke-width:11}
+.gate-mark .cm-glass{display:none}
+.gate-mark+.gate-eyebrow{margin-top:22px}
+.gate-request{margin:22px 0 0;display:flex;flex-direction:column;align-items:center;gap:18px;width:340px;max-width:86vw}
+.gate-request-form{width:100%}
+.gate-request-lead{font-family:var(--font-story);font-size:var(--type-body-sm);line-height:var(--leading-body);color:var(--text-muted);margin:0}
+.gate-request-sent{font-family:var(--font-display);font-size:16px;line-height:var(--leading-body);color:var(--text-body);margin:0;max-width:380px}
+/* the bar on the gate has two things in it, not three */
+@media (min-width:881px){
+  .site-header--gate{grid-template-columns:1fr 1fr}
+  .site-header--gate nav{grid-column:2}
+}
 .gate-eyebrow{font-family:var(--font-ui);font-weight:var(--weight-label);font-size:var(--type-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--text-gold);margin:36px 0 20px}
 .gate-title{font-family:var(--font-display);font-weight:var(--weight-display);font-size:56px;line-height:var(--leading-display);color:var(--text-display);margin:0 0 20px;text-wrap:balance}
 .gate-title em{font-style:italic;color:var(--hc-gold)}
@@ -350,7 +368,8 @@ button{font:inherit;color:inherit}
 .arch--border-line .cell-line{display:block}
 .arch--border-line .hexcell > img:not(.cell-face),
 .arch--border-none .hexcell > img:not(.cell-face){opacity:0}
-@media (max-height:760px){.gate-title{font-size:44px}.gate-eyebrow{margin-top:20px}}
+@media (max-height:760px){.gate-title{font-size:44px}.gate-eyebrow{margin-top:20px}.gate-mark{width:min(220px,50vw)}.gate-mark+.gate-eyebrow{margin-top:14px}.gate-stack{padding-top:84px}}
+@media (max-width:880px){.gate-stack{padding-top:80px}}
 @media (max-width:600px){.gate-title{font-size:40px}.arch-tag{bottom:26px;font-size:12px;padding:0 40px}}
 
 /* ─────────────── topbar (projecthoneycomb.site deploy) ─────────────── */
