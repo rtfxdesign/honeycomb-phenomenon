@@ -759,7 +759,7 @@ function Gate({ onEnter, size }) {
               </p>
             ) : (
               <form className="gate-form gate-request-form" id="request-access" onSubmit={sendRequest}>
-                <p className="gate-request-lead">Leave your name and email. The team sends access codes by reply.</p>
+                <p className="gate-request-lead">Please enter your name and email address, and we&rsquo;ll get back to you with an access code as soon as we can.</p>
                 <Input label="Your name" name="name" value={rq.name} onChange={(e) => setRq({ ...rq, name: e.target.value })} required autoComplete="name" />
                 <Input label="Email" name="email" type="email" value={rq.email} onChange={(e) => setRq({ ...rq, email: e.target.value })} required autoComplete="email"
                        hint={reqErr || undefined} invalid={Boolean(reqErr)} />
