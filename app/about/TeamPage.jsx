@@ -18,13 +18,13 @@ const shuffled = (arr) => { const a = arr.slice(); for (let i = a.length - 1; i 
 // rows of three; a short first row sits to the right so it nestles into the
 // row below. Odd rows are drawn half a cell to the right, so on an odd row the
 // short row steps one column left to stay over the row beneath it.
-function placeRows(items, firstRow) {
-  const rows = Math.max(1, Math.ceil(items.length / 3));
-  const firstCount = items.length - 3 * (rows - 1);
+function placeRows(items, firstRow, perRow = 3) {
+  const rows = Math.max(1, Math.ceil(items.length / perRow));
+  const firstCount = items.length - perRow * (rows - 1);
   const cells = [];
   let i = 0;
   for (let r = 0; r < rows; r++) {
-    const n = r === 0 ? firstCount : 3;
+    const n = r === 0 ? firstCount : perRow;
     const shift = n < 3 && ((firstRow + r) & 1) ? 1 : 0;
     for (let j = 0; j < n; j++) cells.push({ ...items[i++], c: 3 - n + j - shift, r: firstRow + r });
   }
@@ -36,7 +36,8 @@ function buildRoster() {
   const adv = ADVISORS.map((a) => ({ g: 'adv', kind: 'Advisor', name: a.name, sub: a.role, url: a.url }));
   const groups = [
     { label: 'The team', items: team },
-    { label: 'Advisors', items: adv },
+    // four advisors sit as two rows of two, a tight block under the team
+    { label: 'Advisors', items: adv, perRow: adv.length === 4 ? 2 : 3 },
   ].filter((grp) => grp.items.length);
 
   const people = [], labels = [];
@@ -47,7 +48,7 @@ function buildRoster() {
       const rows = Math.max(...grp.items.map((x) => x.slot[1])) + 1;
       placed = { rows, cells: grp.items.map((x) => ({ ...x, c: x.slot[0], r: row + x.slot[1] })) };
     } else {
-      placed = placeRows(grp.items, row);
+      placed = placeRows(grp.items, row, grp.perRow);
     }
     // every visit the faces take different cells within their group: the
     // group's cells are dealt out in a shuffled order (the people's own order,
