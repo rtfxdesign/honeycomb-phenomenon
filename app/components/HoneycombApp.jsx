@@ -552,37 +552,53 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
 
 // ── story panel slideout (from the projecthoneycomb.site deploy) ────────────
 
-// "Download video and transcript": the transcript as a small text file made
-// here, then the recording from storage as an attachment (the API presigns it
-// with a content-disposition header, since a cross-origin link cannot force a
-// download by itself). Two files from one click; a browser may ask once to
-// allow multiple downloads.
-function downloadStory(exp) {
-  const stem = String(exp.title || exp.id || 'honeycomb-story').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'honeycomb-story';
-  const who = cellLabel(exp);
-  const lines = [
-    exp.title || 'Untitled',
-    '',
-    who ? `Submitted by: ${who}` : null,
-    `Where: ${exp.location || 'Location withheld'}`,
-    `When: ${exp.experienceYear || '—'}`,
-    exp.id ? `Submission ID: ${exp.id}` : null,
-    '',
-    exp.transcript ? String(exp.transcript) : '(No written account. The recording stands in for it.)',
-    '',
-    'From Project Honeycomb — projecthoneycomb.site',
-  ].filter((l) => l !== null);
-  const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+// "Download video and transcript" (or audio): the transcript as a small text
+// file made here, then the recording. A story's recording comes from storage
+// as an attachment (the API presigns it with a content-disposition header,
+// since a cross-origin link cannot force a download by itself); a community
+// face's video is a file on this site, so the download attribute is enough.
+// Two files from one click; a browser may ask once to allow multiple downloads.
+const slug = (s) => String(s || 'honeycomb-story').replace(/[^\w\- ]+/g, '').trim().replace(/\s+/g, '-').slice(0, 60) || 'honeycomb-story';
+function saveRecord({ stem, lines, mediaUrl, mediaName }) {
+  const blob = new Blob([lines.filter((l) => l !== null).join('\n')], { type: 'text/plain;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = `${stem}-transcript.txt`;
   document.body.appendChild(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 10000);
-  if (exp.downloadUrl) {
+  if (mediaUrl) {
     const b = document.createElement('a');
-    b.href = exp.downloadUrl; b.download = '';
+    b.href = mediaUrl; b.download = mediaName || '';
     document.body.appendChild(b); b.click(); b.remove();
   }
+}
+function downloadStory(exp) {
+  const who = cellLabel(exp);
+  saveRecord({
+    stem: slug(exp.title || exp.id),
+    lines: [
+      exp.title || 'Untitled',
+      '',
+      who ? `Submitted by: ${who}` : null,
+      `Where: ${exp.location || 'Location withheld'}`,
+      `When: ${exp.experienceYear || '—'}`,
+      exp.id ? `Submission ID: ${exp.id}` : null,
+      '',
+      exp.transcript ? String(exp.transcript) : '(No written account. The recording stands in for it.)',
+      '',
+      'From Project Honeycomb — projecthoneycomb.site',
+    ],
+    mediaUrl: exp.downloadUrl,
+  });
+}
+function downloadPerson(person) {
+  const ext = (String(person.video || '').match(/\.(\w+)(?:\?|$)/) || [null, 'mp4'])[1];
+  saveRecord({
+    stem: slug(person.name),
+    lines: [person.name, '', ...(person.about || []).map((p) => `${p}\n`), 'From Project Honeycomb — projecthoneycomb.site'],
+    mediaUrl: person.video,
+    mediaName: `${slug(person.name)}.${ext}`,
+  });
 }
 
 function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
@@ -645,7 +661,12 @@ function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
                 </>
               )}
               {person.experience.mediaUrl && person.experience.recordingMode === 'audio' && (
-                <audio className="story-media" src={person.experience.mediaUrl} controls preload="metadata" />
+                <>
+                  <audio className="story-media" src={person.experience.mediaUrl} controls preload="metadata" />
+                  <button className="story-download" type="button" onClick={() => downloadStory(person.experience)}>
+                    Download audio and transcript <span aria-hidden="true">↓</span>
+                  </button>
+                </>
               )}
               {person.experience.transcript && (
                 <div className="story-summary">
@@ -677,7 +698,12 @@ function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
             <h1>{person.name}</h1>
             <div className="panel-copy">
               {person.video ? (
-                <video className="story-media" src={person.video} controls playsInline preload="metadata" />
+                <>
+                  <video className="story-media" src={person.video} controls playsInline preload="metadata" />
+                  <button className="story-download" type="button" onClick={() => downloadPerson(person)}>
+                    Download video and transcript <span aria-hidden="true">↓</span>
+                  </button>
+                </>
               ) : null}
               {person.about.map((p, i) => <p key={i}>{p}</p>)}
               <button className="story-action" type="button" onClick={openRecorder}>
