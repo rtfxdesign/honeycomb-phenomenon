@@ -57,7 +57,10 @@ async function download(Key, file) {
   await pipeline(r.Body, fs.createWriteStream(file));
 }
 function encode(input, output) {
-  const args = ["-y", "-hide_banner", "-nostats", "-loglevel", "error", "-i", input, "-map", "0:v:0", "-map", "0:a:0?",
+  // -map_metadata -1: the web copy carries none of the source's tags — no
+  // device model, no GPS, no creation time — which is what /privacy promises
+  // for anything that reaches the archive.
+  const args = ["-y", "-hide_banner", "-nostats", "-loglevel", "error", "-i", input, "-map_metadata", "-1", "-map", "0:v:0", "-map", "0:a:0?",
     "-c:v", "libx264", "-preset", "medium", "-crf", "23", "-maxrate", "4M", "-bufsize", "8M", "-profile:v", "high", "-level", "4.1", "-pix_fmt", "yuv420p",
     "-vf", "scale='min(1920,iw)':'min(1920,ih)':force_original_aspect_ratio=decrease:force_divisible_by=2",
     "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", output];

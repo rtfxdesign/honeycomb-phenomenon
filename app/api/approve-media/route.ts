@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { isModerator } from "../../lib/auth";
 import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
+import { recordAudit } from "../../lib/audit";
+import sharp from "sharp";
 
 export async function POST(request: NextRequest) {
   if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -36,6 +38,37 @@ export async function POST(request: NextRequest) {
       const folder = parts.join("/"); // "image", "video", or "audio"
 
       const newKey = `approved/${folder}/${filename}`;
+
+      if (folder === "image") {
+        // A photo is re-encoded on its way to approved/, which drops every
+        // hidden tag it arrived with (EXIF, XMP, IPTC: where and when it was
+        // taken, the device). rotate() applies the EXIF orientation first so
+        // the picture does not turn sideways once the tag is gone. Recordings
+        // are stripped by the encoder (scripts/encode-approved.mjs) instead —
+        // a function cannot run ffmpeg on files that size.
+        const src = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: phys(oldKey) }));
+        const input = Buffer.from(await src.Body!.transformToByteArray());
+        const image = sharp(input).rotate();
+        const meta = await image.metadata();
+        const format = meta.format === "jpeg" || meta.format === "jpg" ? "jpeg"
+          : meta.format === "png" ? "png"
+            : meta.format === "webp" ? "webp"
+              : null;
+        if (format) {
+          const out = await (format === "jpeg" ? image.jpeg({ quality: 90 }) : format === "png" ? image.png() : image.webp({ quality: 90 })).toBuffer();
+          await client.send(new PutObjectCommand({
+            Bucket: BUCKET,
+            Key: phys(newKey),
+            Body: out,
+            ContentType: src.ContentType || `image/${format}`,
+          }));
+          await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: phys(oldKey) }));
+          return newKey;
+        }
+        // Any other format (HEIC, GIF, …) is moved as-is and noted for the
+        // moderator; sharp cannot write it back without a loss of fidelity.
+        console.warn(`approve: ${oldKey} is ${meta.format}; metadata not stripped`);
+      }
 
       await client.send(new CopyObjectCommand({
         Bucket: BUCKET,
@@ -85,6 +118,8 @@ export async function POST(request: NextRequest) {
       Bucket: BUCKET,
       Key: phys(submissionKey),
     }));
+
+    await recordAudit(request, "approve", submissionKey, { to: newSubmissionKey, privacy: data.privacy });
 
     return NextResponse.json({ success: true, newSubmissionKey });
   } catch (error) {
