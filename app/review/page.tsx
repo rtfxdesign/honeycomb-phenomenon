@@ -1,8 +1,19 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { formatDisplayName, NAME_DISPLAY_OPTIONS } from "../lib/name";
+import "./review.css";
+
+/**
+ * The moderator dashboard, as a master–detail queue.
+ *
+ * Tabs for what is waiting, what is live, the community faces and the
+ * members; a dense list on the left and one record open on the right; filters,
+ * search, j/k to move, Enter to edit, Esc to stop. The data shapes and the
+ * routes are the ones the old one-column dashboard used; only the layout and
+ * the look changed (design handoff, 2026-10-10).
+ */
 
 interface SubmissionData {
   id: string;
@@ -61,6 +72,12 @@ interface Person {
   video: string | null;
 }
 
+interface PersonEditState {
+  name: string;
+  about: string;
+  video: string;
+}
+
 interface MemberRecord {
   id: string;
   name: string;
@@ -71,23 +88,72 @@ interface MemberRecord {
   lastSeenAt?: string | null;
 }
 
-interface PersonEditState {
-  name: string;
-  about: string;
-  video: string;
+type Tab = "queue" | "live" | "faces" | "members";
+type Filter = "all" | "public" | "community" | "archive" | "media" | "transcript";
+
+const TABS: Array<[Tab, string]> = [["queue", "Queue"], ["live", "Live"], ["faces", "Faces"], ["members", "Members"]];
+const FILTERS: Array<[Filter, string]> = [
+  ["all", "All"], ["public", "Public"], ["community", "Community"], ["archive", "Archived"], ["media", "Has media"], ["transcript", "Needs transcript"],
+];
+const PRIV: Record<string, [string, string]> = {
+  public: ["Public", "rv-priv-public"],
+  community: ["Community", "rv-priv-community"],
+  archive: ["Archived", "rv-priv-archive"],
+};
+const TAB_KEY = "hc-review-tab";
+
+const isLive = (s: Submission) => s.submissionKey.startsWith("approved/");
+const hasMedia = (s: Submission) => Boolean(s.mediaUrl || s.photoUrl);
+const whoOf = (d: SubmissionData) => d.displayName || formatDisplayName(d.firstName, d.lastName, d.nameDisplay) || "";
+const privOf = (d: SubmissionData) => PRIV[d.privacy || "public"] || PRIV.public;
+const hay = (s: Submission) =>
+  [s.data.title, whoOf(s.data), s.data.location, s.data.experienceYear, s.data.id, ...(s.data.hashtags || [])].join(" ").toLowerCase();
+const paragraphs = (t: string) => t.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean);
+const formatDate = (iso: string) =>
+  new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+function Field({ label, hint, className, children }: { label: string; hint?: React.ReactNode; className?: string; children: React.ReactNode }) {
+  return (
+    <label className={`rv-field${className ? ` ${className}` : ""}`}>
+      <span>{label}</span>
+      {children}
+      {hint && <small>{hint}</small>}
+    </label>
+  );
+}
+
+/** One community face, open for editing. Keyed by the person so it starts fresh on each selection. */
+function FaceEditor({ person, saving, onSave }: { person: Person; saving: boolean; onSave: (key: string, edit: PersonEditState) => void }) {
+  const [edit, setEdit] = useState<PersonEditState>({ name: person.name, about: person.about.join("\n\n"), video: person.video || "" });
+  return (
+    <aside className="rv-aside rv-thin">
+      <span className="rv-ui">Community face · <code>{person.key}.webp</code></span>
+      <Field label="Name">
+        <input value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
+      </Field>
+      <Field label="About (blank line between paragraphs)">
+        <textarea rows={9} value={edit.about} onChange={(e) => setEdit({ ...edit, about: e.target.value })} />
+      </Field>
+      <Field label="Video path" hint="A path under /videos, or a URL. Blank for none.">
+        <input value={edit.video} onChange={(e) => setEdit({ ...edit, video: e.target.value })} placeholder="/videos/<file>.mp4" />
+      </Field>
+      <div>
+        <button type="button" className="rv-cta" disabled={saving} onClick={() => onSave(person.key, edit)}>{saving ? "Saving…" : "Save"}</button>
+      </div>
+    </aside>
+  );
 }
 
 export default function ReviewDashboard() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeMedia, setActiveMedia] = useState<string | null>(null);
+  const [activeMedia, setActiveMedia] = useState<{ url: string; type: Submission["mediaType"] } | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
   const [saving, setSaving] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
-  const [personEditKey, setPersonEditKey] = useState<string | null>(null);
-  const [personEdit, setPersonEdit] = useState<PersonEditState | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [password, setPassword] = useState("");
   const [authError, setAuthError] = useState("");
@@ -96,27 +162,40 @@ export default function ReviewDashboard() {
   // which submission is being transcribed right now, and anything it came back with
   const [transcribingKey, setTranscribingKey] = useState<string | null>(null);
   const [transcribeNote, setTranscribeNote] = useState<Record<string, string>>({});
+  const [hiddenDrafts, setHiddenDrafts] = useState<Record<string, boolean>>({});
   const [issuedCode, setIssuedCode] = useState<{ name: string; code: string; email?: string } | null>(null);
   const [memberBusy, setMemberBusy] = useState(false);
-  // Opened from the "request-access" notification email: ?member=&email= fill
-  // the new-member form and the page scrolls to it once it has loaded.
-  const [jumpToMembers, setJumpToMembers] = useState(false);
+
+  // the shell
+  const [tab, setTab] = useState<Tab>("queue");
+  const [query, setQuery] = useState("");
+  const [filter, setFilter] = useState<Filter>("all");
+  const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [faceKey, setFaceKey] = useState<string | null>(null);
+
+  // Read after mount so the server and the client render the same first frame:
+  // the tab remembered for this session, and ?member=&email= from the
+  // request-access notification email, which fills the new-member form.
   useEffect(() => {
-    // the URL is read after mount so the server and client render the same empty form
     const t = setTimeout(() => {
       const q = new URLSearchParams(window.location.search);
       const member = q.get("member") || "";
       const email = q.get("email") || "";
-      if (!member && !email) return;
-      setNewMember({ name: member, email, note: "Requested access from the gate" });
-      setJumpToMembers(true);
+      if (member || email) {
+        setNewMember({ name: member, email, note: "Requested access from the gate" });
+        setTab("members");
+        return;
+      }
+      try {
+        const saved = sessionStorage.getItem(TAB_KEY) as Tab | null;
+        if (saved && TABS.some(([id]) => id === saved)) setTab(saved);
+      } catch { /* private mode */ }
     }, 0);
     return () => clearTimeout(t);
   }, []);
   useEffect(() => {
-    if (!jumpToMembers || loading || authRequired) return;
-    document.getElementById("members")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  }, [jumpToMembers, loading, authRequired]);
+    try { sessionStorage.setItem(TAB_KEY, tab); } catch { /* private mode */ }
+  }, [tab]);
 
   const loadAll = () => {
     setLoading(true);
@@ -189,7 +268,7 @@ export default function ReviewDashboard() {
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
-      if (data.code) setIssuedCode({ name: data.member.name, code: data.code });
+      if (data.code) setIssuedCode({ name: data.member.name, code: data.code, email: data.member.email });
       loadMembers();
     } catch (err) {
       console.error(err);
@@ -214,7 +293,10 @@ export default function ReviewDashboard() {
     }
   };
 
-  useEffect(loadAll, []);
+  useEffect(() => {
+    const t = setTimeout(loadAll, 0);
+    return () => clearTimeout(t);
+  }, []);
 
   const handleUnlock = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -241,14 +323,14 @@ export default function ReviewDashboard() {
       const res = await fetch("/api/approve-media", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submissionKey })
+        body: JSON.stringify({ submissionKey }),
       });
       if (!res.ok) throw new Error("Failed to approve");
       const data = await res.json();
-      setSubmissions(current => current.map(sub =>
+      setSubmissions((current) => current.map((sub) =>
         sub.submissionKey === submissionKey
           ? { ...sub, submissionKey: data.newSubmissionKey, data: { ...sub.data, status: "approved" } }
-          : sub
+          : sub,
       ));
     } catch (err) {
       console.error(err);
@@ -262,10 +344,10 @@ export default function ReviewDashboard() {
       const res = await fetch("/api/delete-media", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submissionKey })
+        body: JSON.stringify({ submissionKey }),
       });
       if (!res.ok) throw new Error("Failed to delete");
-      setSubmissions(current => current.filter(sub => sub.submissionKey !== submissionKey));
+      setSubmissions((current) => current.filter((sub) => sub.submissionKey !== submissionKey));
     } catch (err) {
       console.error(err);
       alert("Failed to delete submission. Check console.");
@@ -287,6 +369,7 @@ export default function ReviewDashboard() {
       hashtags: (submission.data.hashtags || []).join(", "),
     });
   };
+  const stopEdit = () => { setEditingKey(null); setEdit(null); };
 
   const saveEdit = async (submissionKey: string) => {
     if (!edit) return;
@@ -302,20 +385,19 @@ export default function ReviewDashboard() {
         experienceYear: edit.experienceYear,
         privacy: edit.privacy,
         transcript: edit.transcript,
-        hashtags: edit.hashtags.split(",").map(t => t.trim().replace(/^#/, "")).filter(Boolean),
+        hashtags: edit.hashtags.split(",").map((t) => t.trim().replace(/^#/, "")).filter(Boolean),
       };
       const res = await fetch("/api/update-experience", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submissionKey, updates })
+        body: JSON.stringify({ submissionKey, updates }),
       });
       if (!res.ok) throw new Error("Failed to save");
       const result = await res.json();
-      setSubmissions(current => current.map(sub =>
-        sub.submissionKey === submissionKey ? { ...sub, data: result.data } : sub
+      setSubmissions((current) => current.map((sub) =>
+        sub.submissionKey === submissionKey ? { ...sub, data: result.data } : sub,
       ));
-      setEditingKey(null);
-      setEdit(null);
+      stopEdit();
     } catch (err) {
       console.error(err);
       alert("Failed to save changes. Check console.");
@@ -332,7 +414,8 @@ export default function ReviewDashboard() {
    */
   const transcribe = async (submissionKey: string) => {
     setTranscribingKey(submissionKey);
-    setTranscribeNote(n => ({ ...n, [submissionKey]: "" }));
+    setTranscribeNote((n) => ({ ...n, [submissionKey]: "" }));
+    setHiddenDrafts((h) => ({ ...h, [submissionKey]: false }));
     try {
       const res = await fetch("/api/transcribe", {
         method: "POST",
@@ -343,10 +426,10 @@ export default function ReviewDashboard() {
       if (!res.ok) {
         // The route explains its own failures; show what it said rather than
         // a generic message the moderator can do nothing with.
-        setTranscribeNote(n => ({ ...n, [submissionKey]: result.error || `Failed (${res.status})` }));
+        setTranscribeNote((n) => ({ ...n, [submissionKey]: result.error || `Failed (${res.status})` }));
         return;
       }
-      setSubmissions(current => current.map(sub =>
+      setSubmissions((current) => current.map((sub) =>
         sub.submissionKey === submissionKey
           ? { ...sub, data: {
               ...sub.data,
@@ -357,16 +440,16 @@ export default function ReviewDashboard() {
               transcriptWarnings: result.warnings,
               transcriptError: undefined,
             } }
-          : sub
+          : sub,
       ));
       const warned = (result.warnings || []).length;
-      setTranscribeNote(n => ({
+      setTranscribeNote((n) => ({
         ...n,
-        [submissionKey]: `${result.wordCount} words${warned ? " — see the note below" : ""}`,
+        [submissionKey]: `${result.wordCount} words${result.model ? ` · ${result.model}` : ""} · draft, not the record${warned ? " — see the note below" : ""}`,
       }));
     } catch (err) {
       console.error(err);
-      setTranscribeNote(n => ({ ...n, [submissionKey]: "Could not reach the transcription service." }));
+      setTranscribeNote((n) => ({ ...n, [submissionKey]: "Could not reach the transcription service." }));
     } finally {
       setTranscribingKey(null);
     }
@@ -386,10 +469,10 @@ export default function ReviewDashboard() {
       });
       if (!res.ok) throw new Error("Failed to save");
       const result = await res.json();
-      setSubmissions(current => current.map(sub =>
-        sub.submissionKey === submissionKey ? { ...sub, data: result.data } : sub
+      setSubmissions((current) => current.map((sub) =>
+        sub.submissionKey === submissionKey ? { ...sub, data: result.data } : sub,
       ));
-      setTranscribeNote(n => ({ ...n, [submissionKey]: "" }));
+      setTranscribeNote((n) => ({ ...n, [submissionKey]: "" }));
     } catch (err) {
       console.error(err);
       alert("Could not save the transcript. Check console.");
@@ -398,8 +481,7 @@ export default function ReviewDashboard() {
     }
   };
 
-  const savePerson = async (key: string) => {
-    if (!personEdit) return;
+  const savePerson = async (key: string, personEdit: PersonEditState) => {
     setSaving(true);
     try {
       const res = await fetch("/api/people", {
@@ -408,15 +490,13 @@ export default function ReviewDashboard() {
         body: JSON.stringify({
           key,
           name: personEdit.name,
-          about: personEdit.about.split(/\n\s*\n/).map(p => p.trim()).filter(Boolean),
+          about: personEdit.about.split(/\n\s*\n/).map((p) => p.trim()).filter(Boolean),
           video: personEdit.video.trim() || null,
-        })
+        }),
       });
       if (!res.ok) throw new Error("Failed to save");
       const result = await res.json();
-      setPeople(current => current.map(p => (p.key === key ? { ...p, ...result.person } : p)));
-      setPersonEditKey(null);
-      setPersonEdit(null);
+      setPeople((current) => current.map((p) => (p.key === key ? { ...p, ...result.person } : p)));
     } catch (err) {
       console.error(err);
       alert("Failed to save person. Check console.");
@@ -425,550 +505,411 @@ export default function ReviewDashboard() {
     }
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      hour: "numeric",
-      minute: "2-digit",
-    });
-  };
+  // ── what each tab shows ──────────────────────────────────────────────────
+  const pending = submissions.filter((s) => !isLive(s));
+  const live = submissions.filter(isLive);
+  const q = query.trim().toLowerCase();
 
-  const inputStyle: React.CSSProperties = {
-    width: "100%", padding: "0.5rem 0.6rem", borderRadius: "4px",
-    border: "1px solid var(--line, rgba(128,128,128,0.35))",
-    backgroundColor: "rgba(0,0,0,0.15)", color: "inherit", font: "inherit", fontSize: "0.9rem",
-  };
-  const labelStyle: React.CSSProperties = { fontSize: "0.72rem", opacity: 0.6, display: "block", margin: "0 0 0.25rem" };
+  const list = useMemo(() => (tab === "live" ? live : pending)
+    .filter((s) => {
+      if (filter === "all") return true;
+      if (filter === "media") return hasMedia(s);
+      if (filter === "transcript") return hasMedia(s) && !s.data.transcript;
+      return (s.data.privacy || "public") === filter;
+    })
+    .filter((s) => !q || hay(s).includes(q)), [tab, live, pending, filter, q]);
+  const sel = list.find((s) => s.submissionKey === selectedKey) || list[0] || null;
+  const editing = Boolean(sel && edit && editingKey === sel.submissionKey);
 
-  const pending = submissions.filter(s => !s.submissionKey.startsWith("approved/"));
-  const approved = submissions.filter(s => s.submissionKey.startsWith("approved/"));
+  const faces = people.filter((p) => !q || p.name.toLowerCase().includes(q));
+  const face = faces.find((p) => p.key === faceKey) || faces[0] || null;
+  const memberRows = members.filter((m) => !q || `${m.name} ${m.email || ""}`.toLowerCase().includes(q));
+  const matchCount = tab === "faces" ? faces.length : tab === "members" ? memberRows.length : list.length;
 
-  const renderPersonCard = (person: Person) => {
-    const isEditing = personEditKey === person.key && personEdit;
+  // j / k move the selection, Enter opens the record for editing, Esc closes
+  // it — unless the keys are going into a form control.
+  useEffect(() => {
+    if (tab !== "queue" && tab !== "live") return undefined;
+    const onKey = (e: KeyboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && t.matches("input,textarea,select")) return;
+      const i = list.findIndex((s) => s.submissionKey === (sel && sel.submissionKey));
+      if (e.key === "j" && i < list.length - 1) setSelectedKey(list[i + 1].submissionKey);
+      if (e.key === "k" && i > 0) setSelectedKey(list[i - 1].submissionKey);
+      if (e.key === "Enter" && sel && !editing) startEdit(sel);
+      if (e.key === "Escape") stopEdit();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  });
+
+  const select = (key: string) => { setSelectedKey(key); if (editingKey !== key) stopEdit(); };
+
+  // ── pieces ───────────────────────────────────────────────────────────────
+  const renderRow = (s: Submission) => {
+    const [p, pc] = privOf(s.data);
+    const active = Boolean(sel && sel.submissionKey === s.submissionKey);
+    const needs = hasMedia(s) && !s.data.transcript;
     return (
-      <div key={person.key} style={{ display: "flex", flexDirection: "column", border: "1px solid var(--line)", borderRadius: "8px", overflow: "hidden", backgroundColor: "rgba(242,191,73,0.04)" }}>
-        <div style={{ padding: "1.2rem 1.5rem", borderBottom: "1px solid var(--line)", display: "flex", gap: "1rem", alignItems: "center" }}>
-          <img src={`/uploads/${person.key}.webp`} alt={person.name} style={{ width: "64px", height: "54px", objectFit: "contain", flexShrink: 0 }} />
-          {isEditing ? (
-            <div style={{ flex: 1 }}>
-              <span style={labelStyle}>Name (shown on the cell and panel)</span>
-              <input style={inputStyle} value={personEdit.name} onChange={e => setPersonEdit({ ...personEdit, name: e.target.value })} />
-            </div>
-          ) : (
-            <div>
-              <h3 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>{person.name}</h3>
-              <div style={{ fontSize: "0.8rem", opacity: 0.55, marginTop: "0.2rem" }}>
-                {person.video ? `🎬 ${person.video}` : "No video yet"}
-              </div>
-            </div>
-          )}
+      <button key={s.submissionKey} type="button" className="rv-row" aria-current={active || undefined} onClick={() => select(s.submissionKey)}>
+        <span className="rv-row-bar" />
+        <span className="rv-row-main">
+          <span className="rv-row-title">{s.data.title || "Untitled"}</span>
+          <span className="rv-row-sub">{[whoOf(s.data), s.data.location, s.data.experienceYear].filter(Boolean).join(" · ") || "—"}</span>
+        </span>
+        <span className="rv-row-side">
+          <span className={`rv-ui rv-row-priv ${pc}`}>{p}</span>
+          <span className="rv-row-meta">
+            {s.mediaUrl && <span className="rv-glyph-media" title={s.mediaType || "media"}>{s.mediaType === "audio" ? "〰" : "◉"}</span>}
+            {needs && <span className="rv-glyph-needs" title="Needs transcript">◌</span>}
+            <span>{shortDate(s.lastModified)}</span>
+          </span>
+        </span>
+      </button>
+    );
+  };
+
+  const renderMachine = (s: Submission) => {
+    const d = s.data;
+    const canTranscribe = Boolean(d.audioKey || d.recordingMode === "audio");
+    const busy = transcribingKey === s.submissionKey;
+    const note = transcribeNote[s.submissionKey];
+    const draft = d.machineTranscript && !hiddenDrafts[s.submissionKey] ? d.machineTranscript : null;
+    if (!busy && !draft && !note && !(d.transcriptStatus === "confirmed" && d.transcriptSource === "machine")) return null;
+    const status = busy ? "Transcribing…"
+      : d.transcriptStatus === "confirmed" && d.transcriptSource === "machine" && !draft ? "Confirmed — moved into the record"
+      : note || (draft ? "draft, not the record" : "");
+    return (
+      <div className="rv-machine">
+        <div className="rv-machine-head">
+          <span className="rv-ui">Machine transcript</span>
+          {status && <span className="rv-machine-note">{status}</span>}
         </div>
-        <div style={{ padding: "1.2rem 1.5rem", flex: 1 }}>
-          {isEditing ? (
-            <div style={{ display: "grid", gap: "0.8rem" }}>
-              <div>
-                <span style={labelStyle}>Panel text (separate paragraphs with a blank line)</span>
-                <textarea style={{ ...inputStyle, resize: "vertical" }} rows={7} value={personEdit.about} onChange={e => setPersonEdit({ ...personEdit, about: e.target.value })} />
-              </div>
-              <div>
-                <span style={labelStyle}>Video path or URL (e.g. /videos/john-berg.mp4 — blank for none)</span>
-                <input style={inputStyle} value={personEdit.video} onChange={e => setPersonEdit({ ...personEdit, video: e.target.value })} />
-              </div>
+        {d.transcriptWarnings && d.transcriptWarnings.length > 0 && draft && (
+          <div className="rv-machine-warn">{d.transcriptWarnings.map((w, i) => <div key={i}>{w}</div>)}</div>
+        )}
+        {draft && (
+          <>
+            <p className="rv-machine-draft">{draft}</p>
+            <div className="rv-machine-actions">
+              <button type="button" className="rv-cta rv-cta--sm" disabled={saving} onClick={() => acceptDraft(s.submissionKey, draft)}>Use as transcript</button>
+              <button type="button" className="rv-quiet" disabled={saving} onClick={() => startEdit(s)}>Edit before using</button>
+              {canTranscribe && <button type="button" className="rv-quiet" disabled={busy || saving} onClick={() => transcribe(s.submissionKey)}>Transcribe again</button>}
+              <button type="button" className="rv-quiet" onClick={() => setHiddenDrafts((h) => ({ ...h, [s.submissionKey]: true }))}>Discard</button>
             </div>
-          ) : (
-            <div style={{ fontSize: "0.9rem", lineHeight: 1.55, opacity: 0.85, display: "grid", gap: "0.6rem" }}>
-              {person.about.map((p, i) => <p key={i} style={{ margin: 0 }}>{p}</p>)}
-            </div>
-          )}
-        </div>
-        <div style={{ padding: "1rem 1.5rem", borderTop: "1px solid var(--line)", display: "flex", gap: "0.5rem", backgroundColor: "rgba(0,0,0,0.1)" }}>
-          {isEditing ? (
-            <>
-              <button onClick={() => savePerson(person.key)} disabled={saving}
-                      style={{ flex: 1, padding: "0.6rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: "500", opacity: saving ? 0.6 : 1 }}>
-                {saving ? "Saving…" : "Save changes"}
-              </button>
-              <button onClick={() => { setPersonEditKey(null); setPersonEdit(null); }} disabled={saving}
-                      style={{ flex: 1, padding: "0.6rem", border: "1px solid var(--line)", borderRadius: "4px", backgroundColor: "transparent", color: "inherit", cursor: "pointer" }}>
-                Cancel
-              </button>
-            </>
-          ) : (
-            <button
-              onClick={() => { setPersonEditKey(person.key); setPersonEdit({ name: person.name, about: person.about.join("\n\n"), video: person.video || "" }); }}
-              style={{ flex: 1, padding: "0.6rem", border: "1px solid var(--line)", borderRadius: "4px", backgroundColor: "transparent", color: "inherit", cursor: "pointer", fontWeight: "500" }}
-            >
-              Edit
-            </button>
-          )}
-        </div>
+            <p className="rv-machine-fine">A draft, not a record. Nothing here is published until you use it.</p>
+          </>
+        )}
       </div>
     );
   };
 
-  const renderCard = (submission: Submission) => {
-    const isApproved = submission.submissionKey.startsWith("approved/");
-    const { title, displayName, location, experienceYear, transcript, hashtags, privacy } = submission.data;
-    const isEditing = editingKey === submission.submissionKey && edit;
-
+  const renderDetail = (s: Submission) => {
+    const d = s.data;
+    const [p, pc] = privOf(d);
+    const live = isLive(s);
+    const canTranscribe = Boolean(d.audioKey || d.recordingMode === "audio");
+    const busy = transcribingKey === s.submissionKey;
+    const named = Boolean(edit && (edit.firstName || edit.lastName));
     return (
-      <div key={submission.submissionKey} style={{ display: "flex", flexDirection: "column", border: "1px solid var(--line)", borderRadius: "8px", overflow: "hidden", backgroundColor: isApproved ? "rgba(0, 255, 100, 0.05)" : "var(--card-bg, rgba(0,0,0,0.02))" }}>
+      <article className="rv-detail">
+        <div className="rv-detail-body rv-thin">
+          <div className="rv-detail-head">
+            <p className="rv-eyebrow">
+              <span>{live ? (d.privacy === "archive" ? "Approved · hidden" : "Approved · live") : "Pending review"}</span>
+              {d.id && <code title="Submission ID — what a contributor quotes to have this removed">{d.id}</code>}
+              {d.privacy === "community" && <span className="rv-badge">Community only</span>}
+              {d.adsOk && <span className="rv-badge" title="The contributor is willing to have this story or photo used in Honeycomb advertising">OK for advertising</span>}
+            </p>
+            <span className="rv-ui rv-submitted">Submitted {formatDate(s.lastModified)}</span>
+          </div>
 
-        {/* Header */}
-        <div style={{ padding: "1.5rem", borderBottom: "1px solid var(--line)" }}>
-          {isEditing ? (
-            <div style={{ display: "grid", gap: "0.8rem" }}>
-              <div>
-                <span style={labelStyle}>Title</span>
-                <input style={inputStyle} value={edit.title} onChange={e => setEdit({ ...edit, title: e.target.value })} />
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
-                <div style={{ display: "grid", gap: "0.5rem" }}>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.5rem" }}>
-                    <div>
-                      <span style={labelStyle}>First name</span>
-                      <input style={inputStyle} value={edit.firstName} onChange={e => setEdit({ ...edit, firstName: e.target.value })} placeholder="Jane" />
-                    </div>
-                    <div>
-                      <span style={labelStyle}>Last name</span>
-                      <input style={inputStyle} value={edit.lastName} onChange={e => setEdit({ ...edit, lastName: e.target.value })} placeholder="Doe" />
-                    </div>
-                  </div>
-                  <div>
-                    <span style={labelStyle}>Show name as</span>
-                    <select style={inputStyle} value={edit.nameDisplay} onChange={e => setEdit({ ...edit, nameDisplay: e.target.value })}>
-                      {NAME_DISPLAY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-                    </select>
-                  </div>
-                  {(edit.firstName || edit.lastName) ? (
-                    <div style={{ fontSize: "0.8rem", opacity: 0.7 }}>
-                      Cell reads: <strong>{formatDisplayName(edit.firstName, edit.lastName, edit.nameDisplay)}</strong>
-                    </div>
-                  ) : (
-                    <div>
-                      <span style={labelStyle}>Display name (no first/last on this record)</span>
-                      <input style={inputStyle} value={edit.displayName} onChange={e => setEdit({ ...edit, displayName: e.target.value })} placeholder="e.g. John Berg" />
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <span style={labelStyle}>Privacy</span>
-                  <select style={inputStyle} value={edit.privacy} onChange={e => setEdit({ ...edit, privacy: e.target.value })}>
-                    <option value="public">Public archive</option>
-                    <option value="community">Community only</option>
-                    <option value="archive">Strictly archived (hidden from site)</option>
-                  </select>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "0.8rem" }}>
-                <div>
-                  <span style={labelStyle}>Place</span>
-                  <input style={inputStyle} value={edit.location} onChange={e => setEdit({ ...edit, location: e.target.value })} />
-                </div>
-                <div>
-                  <span style={labelStyle}>Year</span>
-                  <input style={inputStyle} value={edit.experienceYear} onChange={e => setEdit({ ...edit, experienceYear: e.target.value })} />
-                </div>
-              </div>
-            </div>
-          ) : (
+          {!editing || !edit ? (
             <>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "0.5rem" }}>
-                <h3 style={{ margin: 0, fontSize: "1.2rem", fontWeight: "600" }}>{title || "Untitled"}</h3>
-                {isApproved && (
-                  <div style={{ fontSize: "0.8rem", padding: "0.2rem 0.5rem", borderRadius: "100px", backgroundColor: privacy === "archive" ? "#666" : "#007067", color: "#fff", whiteSpace: "nowrap" }}>
-                    {privacy === "archive" ? "Approved · hidden" : "Approved"}
-                  </div>
+              <h1 className="rv-title">{d.title || "Untitled"}</h1>
+              <dl className="rv-meta">
+                <div><dt>Submitted by</dt><dd>{whoOf(d) || "—"}</dd></div>
+                <div><dt>Where</dt><dd>{d.location || "Unknown"}</dd></div>
+                <div><dt>When</dt><dd>{d.experienceYear || "Unknown"}</dd></div>
+                <div><dt>Visibility</dt><dd className={pc}>{p}</dd></div>
+              </dl>
+              <div className={`rv-content${hasMedia(s) ? " rv-content--media" : ""}`}>
+                <div>
+                  {d.transcript ? (
+                    <div className="rv-story">{paragraphs(d.transcript).map((pp, i) => <p key={i}>{pp}</p>)}</div>
+                  ) : (
+                    <p className="rv-story--none">No written account — a recording stands in for it.</p>
+                  )}
+                  {d.hashtags && d.hashtags.length > 0 && (
+                    <div className="rv-tags">{d.hashtags.map((tag) => <span key={tag} className="rv-tag">#{tag}</span>)}</div>
+                  )}
+                  {renderMachine(s)}
+                </div>
+                {hasMedia(s) && (
+                  <aside className="rv-media">
+                    <span className="rv-label">Attached media</span>
+                    {s.photoUrl && <img className="rv-media-photo" src={s.photoUrl} alt="Attached photo" />}
+                    {s.mediaUrl && (s.mediaType === "video" || s.mediaType === "audio" || s.mediaType === "image") && (
+                      <button type="button" className="rv-media-box" onClick={() => setActiveMedia({ url: s.mediaUrl as string, type: s.mediaType })}>
+                        <span><b>▶</b>{s.mediaType === "image" ? "Open image" : `Play ${s.mediaType}`}</span>
+                      </button>
+                    )}
+                    {s.mediaUrl && <a className="rv-ui" href={s.mediaUrl} target="_blank" rel="noreferrer">Download ↓</a>}
+                  </aside>
                 )}
-              </div>
-              <div style={{ fontSize: "0.85rem", opacity: 0.7, display: "flex", gap: "1rem", flexWrap: "wrap" }}>
-                {submission.data.id && (
-                  <span title="Submission ID — what a contributor quotes to have this removed">
-                    🆔 <code style={{ userSelect: "all", letterSpacing: "0.06em" }}>{submission.data.id}</code>
-                  </span>
-                )}
-                {displayName && <span>👤 {displayName}</span>}
-                {submission.data.adsOk && <span title="The contributor is willing to have this story or photo used in Honeycomb advertising">📣 OK for advertising</span>}
-                <span>⌖ {location || "Unknown"}</span>
-                <span>📅 {experienceYear || "Unknown"}</span>
-                {privacy && <span>🔒 {privacy}</span>}
-              </div>
-              <div style={{ fontSize: "0.8rem", opacity: 0.5, marginTop: "0.5rem" }}>
-                Submitted: {formatDate(submission.lastModified)}
               </div>
             </>
-          )}
-        </div>
-
-        {/* Transcript */}
-        <div style={{ padding: "1.5rem", flex: 1 }}>
-          {isEditing ? (
-            <div style={{ display: "grid", gap: "0.8rem" }}>
-              <div>
-                <span style={labelStyle}>Transcript</span>
-                <textarea style={{ ...inputStyle, resize: "vertical" }} rows={8} value={edit.transcript} onChange={e => setEdit({ ...edit, transcript: e.target.value })} />
-              </div>
-              <div>
-                <span style={labelStyle}>Tags (comma-separated)</span>
-                <input style={inputStyle} value={edit.hashtags} onChange={e => setEdit({ ...edit, hashtags: e.target.value })} placeholder="orb, dc, daytime" />
-              </div>
-            </div>
           ) : (
-            <>
-              {transcript ? (
-                <p style={{ margin: "0 0 1rem 0", lineHeight: 1.6, whiteSpace: "pre-wrap", fontSize: "0.95rem" }}>
-                  &ldquo;{transcript}&rdquo;
-                </p>
+            <div className="rv-edit">
+              <Field label="Title" className="rv-span">
+                <input value={edit.title} onChange={(e) => setEdit({ ...edit, title: e.target.value })} />
+              </Field>
+              <Field label="First name">
+                <input value={edit.firstName} onChange={(e) => setEdit({ ...edit, firstName: e.target.value })} placeholder="Jane" />
+              </Field>
+              <Field label="Last name">
+                <input value={edit.lastName} onChange={(e) => setEdit({ ...edit, lastName: e.target.value })} placeholder="Doe" />
+              </Field>
+              <Field label="Show name as">
+                <select value={edit.nameDisplay} onChange={(e) => setEdit({ ...edit, nameDisplay: e.target.value })}>
+                  {NAME_DISPLAY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </Field>
+              <Field label="Visibility">
+                <select value={edit.privacy} onChange={(e) => setEdit({ ...edit, privacy: e.target.value })}>
+                  <option value="public">Public archive</option>
+                  <option value="community">Community only</option>
+                  <option value="archive">Strictly archived</option>
+                </select>
+              </Field>
+              {named ? (
+                <div className="rv-reads rv-span2">Cell reads: <strong>{formatDisplayName(edit.firstName, edit.lastName, edit.nameDisplay)}</strong></div>
               ) : (
-                <p style={{ margin: "0 0 1rem 0", fontSize: "0.9rem", opacity: 0.55, fontStyle: "italic" }}>
-                  No transcript yet — this account is only a recording so far.
-                </p>
+                <Field label="Display name (no first / last on this record)" className="rv-span2">
+                  <input value={edit.displayName} onChange={(e) => setEdit({ ...edit, displayName: e.target.value })} placeholder="e.g. John Berg" />
+                </Field>
               )}
-
-              {/* ── machine transcription ───────────────────────────────── */}
-              {(() => {
-                const d = submission.data;
-                const canTranscribe = Boolean(d.audioKey || d.recordingMode === "audio");
-                const busy = transcribingKey === submission.submissionKey;
-                const note = transcribeNote[submission.submissionKey];
-                if (!canTranscribe && !d.machineTranscript) return null;
-                return (
-                  <div style={{ margin: "0 0 1rem 0", padding: "0.9rem", border: "1px solid var(--line)", borderRadius: "8px", background: "rgba(255,255,255,0.03)" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "0.7rem", flexWrap: "wrap" }}>
-                      <span style={{ ...labelStyle, margin: 0 }}>Machine transcript</span>
-                      {canTranscribe && (
-                        <button
-                          onClick={() => transcribe(submission.submissionKey)}
-                          disabled={busy || saving}
-                          style={{ background: "rgba(242,191,73,0.14)", color: "var(--gold)", border: "1px solid var(--line)", padding: "0.3rem 0.75rem", borderRadius: "100px", cursor: busy ? "wait" : "pointer", fontSize: "0.78rem" }}
-                        >
-                          {busy ? "Transcribing…" : d.machineTranscript ? "Transcribe again" : "Transcribe recording"}
-                        </button>
-                      )}
-                      {d.transcriptStatus === "confirmed" && d.transcriptSource === "machine" && (
-                        <span style={{ fontSize: "0.72rem", opacity: 0.6 }}>confirmed</span>
-                      )}
-                      {note && <span style={{ fontSize: "0.75rem", opacity: 0.75 }}>{note}</span>}
-                    </div>
-
-                    {d.transcriptWarnings && d.transcriptWarnings.length > 0 && (
-                      <div style={{ marginTop: "0.6rem", fontSize: "0.78rem", color: "#f0b95c", lineHeight: 1.5 }}>
-                        {d.transcriptWarnings.map((w, i) => <div key={i}>⚠ {w}</div>)}
-                      </div>
-                    )}
-
-                    {d.machineTranscript && (
-                      <>
-                        <p style={{ margin: "0.7rem 0 0.6rem", lineHeight: 1.6, fontSize: "0.9rem", opacity: 0.9, whiteSpace: "pre-wrap" }}>
-                          {d.machineTranscript}
-                        </p>
-                        <div style={{ display: "flex", gap: "0.5rem", flexWrap: "wrap" }}>
-                          <button
-                            onClick={() => acceptDraft(submission.submissionKey, d.machineTranscript as string)}
-                            disabled={saving}
-                            style={{ background: "var(--gold)", color: "#1A0F06", border: "none", padding: "0.35rem 0.8rem", borderRadius: "100px", cursor: "pointer", fontSize: "0.78rem", fontWeight: 600 }}
-                          >
-                            Use as transcript
-                          </button>
-                          <button
-                            onClick={() => startEdit(submission)}
-                            disabled={saving}
-                            style={{ background: "transparent", color: "var(--gold)", border: "1px solid var(--line)", padding: "0.35rem 0.8rem", borderRadius: "100px", cursor: "pointer", fontSize: "0.78rem" }}
-                          >
-                            Edit before using
-                          </button>
-                        </div>
-                        <p style={{ margin: "0.6rem 0 0", fontSize: "0.72rem", opacity: 0.5, lineHeight: 1.5 }}>
-                          A draft, not a record. Nothing here is published until you use it.
-                          {d.transcriptModel ? ` (${d.transcriptModel})` : ""}
-                        </p>
-                      </>
-                    )}
-                  </div>
-                );
-              })()}
-              {hashtags && hashtags.length > 0 && (
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "0.4rem" }}>
-                  {hashtags.map(tag => (
-                    <span key={tag} style={{ backgroundColor: "var(--line)", padding: "0.2rem 0.6rem", borderRadius: "100px", fontSize: "0.75rem", opacity: 0.8 }}>
-                      #{tag}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </>
+              <Field label="Place">
+                <input value={edit.location} onChange={(e) => setEdit({ ...edit, location: e.target.value })} />
+              </Field>
+              <Field label="Year">
+                <input value={edit.experienceYear} onChange={(e) => setEdit({ ...edit, experienceYear: e.target.value })} />
+              </Field>
+              <Field label="Transcript" className="rv-span">
+                <textarea rows={10} value={edit.transcript} onChange={(e) => setEdit({ ...edit, transcript: e.target.value })} />
+              </Field>
+              <Field label="Tags (comma-separated)" className="rv-span">
+                <input value={edit.hashtags} onChange={(e) => setEdit({ ...edit, hashtags: e.target.value })} placeholder="orb, dc, daytime" />
+              </Field>
+            </div>
           )}
         </div>
 
-        {/* Media Section */}
-        {(submission.mediaUrl || submission.photoUrl) && (
-          <div style={{ padding: "1rem 1.5rem", borderTop: "1px solid var(--line)", backgroundColor: "rgba(255,255,255,0.02)" }}>
-            <h4 style={{ margin: "0 0 0.8rem 0", fontSize: "0.9rem", opacity: 0.7 }}>Attached Media</h4>
-            <div style={{ display: "flex", gap: "1rem", overflowX: "auto" }}>
-              {submission.photoUrl && (
-                <div style={{ flexShrink: 0, width: "100px", height: "100px", borderRadius: "4px", overflow: "hidden", border: "1px solid var(--line)" }}>
-                  <img src={submission.photoUrl} alt="Attached" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                </div>
+        <footer className="rv-detail-foot">
+          {editing ? (
+            <>
+              <button type="button" className="rv-cta" disabled={saving} onClick={() => saveEdit(s.submissionKey)}>{saving ? "Saving…" : "Save changes"}</button>
+              <button type="button" className="rv-quiet" disabled={saving} onClick={stopEdit}>Cancel</button>
+            </>
+          ) : (
+            <>
+              {!live && <button type="button" className="rv-cta" onClick={() => handleApprove(s.submissionKey)}>Approve &amp; publish<span aria-hidden="true">↗</span></button>}
+              <button type="button" className="rv-quiet" onClick={() => startEdit(s)}>Edit</button>
+              {canTranscribe && !d.machineTranscript && (
+                <button type="button" className="rv-quiet" disabled={busy || saving} onClick={() => transcribe(s.submissionKey)}>{busy ? "Transcribing…" : "Transcribe recording"}</button>
               )}
-              {submission.mediaUrl && (
-                <div style={{ flexShrink: 0, width: "160px", height: "100px", borderRadius: "4px", overflow: "hidden", border: "1px solid var(--line)", position: "relative", backgroundColor: "#000", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                  {submission.mediaType === "video" ? (
-                    <>
-                      <video src={submission.mediaUrl} style={{ width: "100%", height: "100%", objectFit: "cover", opacity: 0.6 }} />
-                      <button onClick={() => setActiveMedia(submission.mediaUrl)} style={{ position: "absolute", background: "rgba(0,0,0,0.6)", color: "white", border: "1px solid rgba(255,255,255,0.3)", padding: "0.4rem 0.8rem", borderRadius: "20px", cursor: "pointer", fontSize: "0.8rem" }}>▶ Play Video</button>
-                    </>
-                  ) : submission.mediaType === "audio" ? (
-                    <button onClick={() => setActiveMedia(submission.mediaUrl)} style={{ background: "rgba(255,255,255,0.1)", color: "white", border: "1px solid rgba(255,255,255,0.3)", padding: "0.4rem 0.8rem", borderRadius: "20px", cursor: "pointer", fontSize: "0.8rem" }}>▶ Play Audio</button>
-                  ) : (
-                    <a href={submission.mediaUrl} target="_blank" rel="noreferrer" style={{ color: "white", fontSize: "0.8rem" }}>Download Media</a>
-                  )}
-                </div>
-              )}
+            </>
+          )}
+          <span className="rv-spacer" />
+          <button type="button" className="rv-ui rv-danger" onClick={() => handleDelete(s.submissionKey)}>Delete permanently</button>
+        </footer>
+      </article>
+    );
+  };
+
+  const renderQueue = () => (
+    <div className="rv-queue">
+      <section className="rv-list">
+        <div className="rv-filters rv-thin">
+          {FILTERS.map(([id, label]) => (
+            <button key={id} type="button" className="rv-ui rv-filter" aria-pressed={filter === id} onClick={() => setFilter(id)}>{label}</button>
+          ))}
+        </div>
+        <div className="rv-rows rv-thin">
+          {list.length === 0 && (
+            <p className="rv-empty">{tab === "queue" && !q && filter === "all" ? "Nothing waiting. New submissions land here." : "No records match."}</p>
+          )}
+          {list.map(renderRow)}
+        </div>
+        <div className="rv-ui rv-list-foot">
+          <span>{list.length} record{list.length === 1 ? "" : "s"}</span>
+          <span>j / k · Enter edits · Esc</span>
+        </div>
+      </section>
+      {sel ? renderDetail(sel) : <div className="rv-none">Select a record</div>}
+    </div>
+  );
+
+  const renderFaces = () => (
+    <div className="rv-faces">
+      <div className="rv-faces-grid rv-thin">
+        {faces.length === 0 && <p className="rv-empty">{people.length ? "No faces match." : "Could not load the community faces."}</p>}
+        {faces.map((person) => (
+          <button key={person.key} type="button" className="rv-face" aria-pressed={Boolean(face && face.key === person.key)} onClick={() => setFaceKey(person.key)}>
+            <span className="rv-hex">
+              <img src="/assets/cell-gold.png" alt="" />
+              <img className="rv-hex-face" src={`/uploads/${person.key}.webp`} alt={person.name} />
+            </span>
+            <span className="rv-face-name">{person.name}</span>
+            <span className="rv-ui rv-face-sub">{person.video ? "◉ video" : "no video yet"}</span>
+          </button>
+        ))}
+      </div>
+      {face && <FaceEditor key={face.key} person={face} saving={saving} onSave={savePerson} />}
+    </div>
+  );
+
+  const codeMail = (c: { name: string; code: string; email?: string }) => c.email
+    ? `mailto:${c.email}?subject=${encodeURIComponent("Your Honeycomb access code")}&body=${encodeURIComponent(
+      `Hello ${c.name},\n\nHere is your access code for Project Honeycomb: ${c.code}\n\nGo to ${window.location.origin} and enter it where the gate asks for a password or access code. The code is yours alone; please keep it to yourself.\n\nThe Honeycomb team`,
+    )}`
+    : null;
+
+  const renderMembers = () => (
+    <div className="rv-members rv-thin" id="members">
+      <div>
+        <p className="rv-intro">
+          Members unlock the archive with a personal access code instead of the shared password, and can see stories marked
+          &ldquo;Community only&rdquo;. Codes are shown once, when issued. Lost codes are replaced, not looked up.
+        </p>
+        {memberRows.length === 0 ? (
+          <p className="rv-empty" style={{ margin: 0 }}>{members.length ? "No members match." : "No members yet."}</p>
+        ) : (
+          <table className="rv-table">
+            <thead>
+              <tr><th>Member</th><th>Note</th><th>Added</th><th>Last seen</th><th></th></tr>
+            </thead>
+            <tbody>
+              {memberRows.map((m) => (
+                <tr key={m.id} style={{ opacity: m.disabledAt ? 0.6 : 1 }}>
+                  <td>
+                    <div className="rv-member-name">{m.name}{m.disabledAt && <span className="rv-ui rv-pill">disabled</span>}</div>
+                    <div className="rv-member-mail">{m.email || "—"}</div>
+                  </td>
+                  <td className="rv-dim">{m.note || "—"}</td>
+                  <td className="rv-dim rv-nowrap">{new Date(m.createdAt).toLocaleDateString(undefined, { month: "short", day: "numeric" })}</td>
+                  <td className="rv-dim rv-nowrap">{m.lastSeenAt ? new Date(m.lastSeenAt).toLocaleDateString(undefined, { month: "short", day: "numeric" }) : "never"}</td>
+                  <td className="rv-nowrap rv-right">
+                    <span className="rv-actions">
+                      <button type="button" className="rv-quiet rv-quiet--sm" disabled={memberBusy} onClick={() => patchMember(m.id, { action: "regenerate" })}>New code</button>
+                      <button type="button" className="rv-quiet rv-quiet--sm" disabled={memberBusy} onClick={() => patchMember(m.id, { disabled: !m.disabledAt })}>{m.disabledAt ? "Enable" : "Disable"}</button>
+                      <button type="button" className="rv-quiet rv-quiet--sm rv-quiet--danger" disabled={memberBusy} onClick={() => removeMember(m.id, m.name)}>Remove</button>
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+      <div className="rv-col">
+        {issuedCode && (
+          <div className="rv-issued">
+            <span className="rv-ui">Access code for {issuedCode.name}</span>
+            <div className="rv-issued-row">
+              <code>{issuedCode.code}</code>
+              <button type="button" className="rv-outline" onClick={() => navigator.clipboard?.writeText(issuedCode.code)}>Copy</button>
+              {codeMail(issuedCode) && <a className="rv-outline" href={codeMail(issuedCode) as string}>Email it to {issuedCode.name}</a>}
+              <button type="button" className="rv-quiet" onClick={() => setIssuedCode(null)}>Done</button>
             </div>
+            <p>Send it to them privately. It is not stored in a readable form and cannot be shown again.</p>
           </div>
         )}
-
-        {/* Actions */}
-        <div style={{ padding: "1rem 1.5rem", borderTop: "1px solid var(--line)", display: "flex", gap: "0.5rem", backgroundColor: "rgba(0,0,0,0.1)" }}>
-          {isEditing ? (
-            <>
-              <button
-                onClick={() => saveEdit(submission.submissionKey)}
-                disabled={saving}
-                style={{ flex: 1, padding: "0.6rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: "500", opacity: saving ? 0.6 : 1 }}
-              >
-                {saving ? "Saving…" : "Save changes"}
-              </button>
-              <button
-                onClick={() => { setEditingKey(null); setEdit(null); }}
-                disabled={saving}
-                style={{ flex: 1, padding: "0.6rem", border: "1px solid var(--line)", borderRadius: "4px", backgroundColor: "transparent", color: "inherit", cursor: "pointer" }}
-              >
-                Cancel
-              </button>
-            </>
-          ) : (
-            <>
-              {!isApproved && (
-                <button
-                  onClick={() => handleApprove(submission.submissionKey)}
-                  style={{ flex: 1, padding: "0.6rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: "500" }}
-                >
-                  Approve
-                </button>
-              )}
-              <button
-                onClick={() => startEdit(submission)}
-                style={{ flex: 1, padding: "0.6rem", border: "1px solid var(--line)", borderRadius: "4px", backgroundColor: "transparent", color: "inherit", cursor: "pointer", fontWeight: "500" }}
-              >
-                Edit
-              </button>
-              <button
-                onClick={() => handleDelete(submission.submissionKey)}
-                style={{ flex: 1, padding: "0.6rem", border: "none", borderRadius: "4px", backgroundColor: "#d9534f", color: "#fff", cursor: "pointer", fontWeight: "500" }}
-              >
-                Delete
-              </button>
-            </>
-          )}
-        </div>
-
+        <form className="rv-form" onSubmit={addMember}>
+          <span className="rv-ui">Add a member</span>
+          <Field label="Name">
+            <input value={newMember.name} onChange={(e) => setNewMember({ ...newMember, name: e.target.value })} placeholder="Full name" required />
+          </Field>
+          <Field label="Email (optional)">
+            <input value={newMember.email} onChange={(e) => setNewMember({ ...newMember, email: e.target.value })} placeholder="name@example.com" />
+          </Field>
+          <Field label="Note (optional)">
+            <input value={newMember.note} onChange={(e) => setNewMember({ ...newMember, note: e.target.value })} placeholder="Why they have access" />
+          </Field>
+          <div>
+            <button type="submit" className="rv-cta" disabled={memberBusy}>Issue a code<span aria-hidden="true">↗</span></button>
+          </div>
+        </form>
       </div>
-    );
-  };
+    </div>
+  );
+
+  const counts: Record<Tab, number> = { queue: pending.length, live: live.length, faces: people.length, members: members.length };
+  const ready = !loading && !error && !authRequired;
 
   return (
-    <div style={{ minHeight: "100vh", backgroundColor: "var(--bg)", color: "var(--text)", padding: "2rem" }}>
-      <header style={{ marginBottom: "2rem", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div>
-          <h1 style={{ fontSize: "2rem", fontWeight: "600", margin: "0 0 0.5rem 0" }}>Unified Review Dashboard</h1>
-          <p style={{ margin: 0, opacity: 0.7 }}>Secure archive of uploaded anomalous experiences (Text + Media).</p>
+    <div className="rv-shell">
+      <header className="rv-bar">
+        <div className="rv-brand">
+          <Link href="/" className="rv-wordmark">HONEYCOMB</Link>
+          <span className="rv-ui">Review</span>
         </div>
-        <div style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-          <Link href="/review/todo" style={{ padding: "0.5rem 1rem", border: "1px solid var(--line)", borderRadius: "4px", textDecoration: "none", color: "inherit" }}>
-            To Do
-          </Link>
-          <Link href="/" style={{ padding: "0.5rem 1rem", border: "1px solid var(--line)", borderRadius: "4px", textDecoration: "none", color: "inherit" }}>
-            &larr; Back to Site
-          </Link>
+        <nav className="rv-tabs rv-thin" aria-label="Dashboard sections">
+          {TABS.map(([id, label]) => (
+            <button key={id} type="button" className="rv-tab" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>
+              {label}<span className="rv-tab-n">{ready ? counts[id] : "·"}</span>
+            </button>
+          ))}
+          <Link href="/review/todo" className="rv-ui rv-tablink">To Do <span aria-hidden="true">→</span></Link>
+        </nav>
+        <div className="rv-tools">
+          <div className="rv-search">
+            <span className="rv-search-glyph" aria-hidden="true">⌕</span>
+            <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search title, name, place, tag" aria-label="Search the dashboard" />
+            {query && (
+              <>
+                <span className="rv-search-n">{matchCount}</span>
+                <button type="button" className="rv-search-x" aria-label="Clear search" onClick={() => setQuery("")}>×</button>
+              </>
+            )}
+          </div>
+          <span className="rv-chip"><i aria-hidden="true" />Moderator</span>
+          <Link href="/" className="rv-ui rv-back">← Back to site</Link>
         </div>
       </header>
 
-      {loading && <div style={{ opacity: 0.5 }}>Loading securely...</div>}
-      {error && <div style={{ color: "#d9534f" }}>{error}</div>}
+      {loading && <div className="rv-status">Loading securely…</div>}
+      {error && !loading && <div className="rv-status rv-err">{error}</div>}
 
       {authRequired && !loading && (
-        <form onSubmit={handleUnlock} style={{ maxWidth: "360px", margin: "4rem auto", padding: "2rem", border: "1px solid var(--line)", borderRadius: "8px", display: "grid", gap: "1rem" }}>
-          <h2 style={{ margin: 0, fontSize: "1.1rem", fontWeight: 600 }}>Moderator access</h2>
-          <p style={{ margin: 0, fontSize: "0.85rem", opacity: 0.65 }}>Enter the archive password to open the review dashboard.</p>
-          <input
-            type="password" value={password} onChange={e => setPassword(e.target.value)} autoFocus
-            style={inputStyle} placeholder="Password"
-          />
-          {authError && <div style={{ color: "#d9534f", fontSize: "0.85rem" }}>{authError}</div>}
-          <button type="submit" style={{ padding: "0.7rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: 500 }}>
-            Unlock
-          </button>
-        </form>
-      )}
-
-      {!loading && !error && !authRequired && (
-        <>
-          <h2 style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0 0 1rem" }}>Pending review ({pending.length})</h2>
-          {pending.length === 0 ? (
-            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7, marginBottom: "2.5rem" }}>
-              No submissions pending review.
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: "2rem", marginBottom: "2.5rem" }}>
-              {pending.map(renderCard)}
-            </div>
-          )}
-
-          <h2 style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0 0 0.4rem" }}>Approved &amp; live ({approved.length})</h2>
-          <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", opacity: 0.6 }}>
-            These appear as cells in the honeycomb. Edits publish immediately; set privacy to &ldquo;Strictly archived&rdquo; to hide one from the site without deleting it.
-          </p>
-          {approved.length === 0 ? (
-            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7, marginBottom: "2.5rem" }}>
-              Nothing approved yet.
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: "2rem", marginBottom: "2.5rem" }}>
-              {approved.map(renderCard)}
-            </div>
-          )}
-
-          <h2 style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0 0 0.4rem" }}>Community faces ({people.length})</h2>
-          <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", opacity: 0.6 }}>
-            The named cells in the honeycomb. Edit the name, the panel text, or point one at a video — changes go live immediately.
-          </p>
-          {people.length === 0 ? (
-            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7, marginBottom: "2.5rem" }}>
-              Could not load the community faces.
-            </div>
-          ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(400px, 1fr))", gap: "2rem", marginBottom: "2.5rem" }}>
-              {people.map(renderPersonCard)}
-            </div>
-          )}
-
-          <h2 id="members" style={{ fontSize: "1.2rem", fontWeight: 600, margin: "0 0 0.4rem", scrollMarginTop: "1.5rem" }}>Members ({members.length})</h2>
-          <p style={{ margin: "0 0 1rem", fontSize: "0.85rem", opacity: 0.6 }}>
-            Approved members sign in at the gate with their own access code and can see stories marked &ldquo;Community only&rdquo;.
-            A code is shown once, here, when you create it &mdash; pass it on however you like. Lost codes are replaced, not looked up.
-          </p>
-
-          {issuedCode && (
-            <div style={{ marginBottom: "1.5rem", padding: "1.2rem 1.5rem", border: "1px solid #007067", borderRadius: "8px", backgroundColor: "rgba(0,112,103,0.12)" }}>
-              <div style={{ fontSize: "0.85rem", opacity: 0.8, marginBottom: "0.5rem" }}>
-                Access code for <strong>{issuedCode.name}</strong> — copy it now, it will not be shown again:
-              </div>
-              <div style={{ display: "flex", gap: "0.75rem", alignItems: "center", flexWrap: "wrap" }}>
-                <code style={{ fontSize: "1.5rem", letterSpacing: "0.12em", fontWeight: 600 }}>{issuedCode.code}</code>
-                <button
-                  onClick={() => navigator.clipboard?.writeText(issuedCode.code)}
-                  style={{ padding: "0.45rem 0.9rem", border: "1px solid var(--line)", borderRadius: "4px", background: "transparent", color: "inherit", cursor: "pointer" }}
-                >Copy</button>
-                {issuedCode.email && (
-                  <a
-                    href={`mailto:${issuedCode.email}?subject=${encodeURIComponent("Your Honeycomb access code")}&body=${encodeURIComponent(
-                      `Hello ${issuedCode.name},\n\nHere is your access code for Project Honeycomb: ${issuedCode.code}\n\nGo to ${window.location.origin} and enter it where the gate asks for a password or access code. The code is yours alone; please keep it to yourself.\n\nThe Honeycomb team`,
-                    )}`}
-                    style={{ padding: "0.45rem 0.9rem", border: "1px solid #007067", borderRadius: "4px", color: "inherit", textDecoration: "none" }}
-                  >Email the code to {issuedCode.name}</a>
-                )}
-                <button
-                  onClick={() => setIssuedCode(null)}
-                  style={{ padding: "0.45rem 0.9rem", border: "0", borderRadius: "4px", background: "#007067", color: "#fff", cursor: "pointer" }}
-                >Done</button>
-              </div>
-            </div>
-          )}
-
-          <form onSubmit={addMember} style={{ display: "flex", gap: "0.75rem", flexWrap: "wrap", alignItems: "flex-end", marginBottom: "1.5rem" }}>
-            <div style={{ flex: "1 1 200px" }}>
-              <span style={labelStyle}>Name</span>
-              <input style={inputStyle} value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} placeholder="Jane Okafor" required />
-            </div>
-            <div style={{ flex: "1 1 200px" }}>
-              <span style={labelStyle}>Email (optional)</span>
-              <input style={inputStyle} value={newMember.email} onChange={e => setNewMember({ ...newMember, email: e.target.value })} placeholder="jane@example.com" />
-            </div>
-            <div style={{ flex: "1 1 200px" }}>
-              <span style={labelStyle}>Note (optional)</span>
-              <input style={inputStyle} value={newMember.note} onChange={e => setNewMember({ ...newMember, note: e.target.value })} placeholder="Met at the Denver meetup" />
-            </div>
-            <button type="submit" disabled={memberBusy}
-                    style={{ padding: "0.6rem 1.2rem", border: "none", borderRadius: "4px", backgroundColor: "#007067", color: "#fff", cursor: "pointer", fontWeight: 500, opacity: memberBusy ? 0.6 : 1 }}>
-              Add member
-            </button>
+        <div className="rv-center">
+          <form onSubmit={handleUnlock} className="rv-gate">
+            <h2>Moderator access</h2>
+            <p>Enter the moderator password to open the dashboard.</p>
+            <Field label="Password">
+              <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoFocus autoComplete="current-password" />
+            </Field>
+            {authError && <div className="rv-err">{authError}</div>}
+            <div><button type="submit" className="rv-cta">Unlock<span aria-hidden="true">→</span></button></div>
           </form>
-
-          {members.length === 0 ? (
-            <div style={{ padding: "2rem", textAlign: "center", border: "1px dashed var(--line)", borderRadius: "8px", opacity: 0.7 }}>
-              No members yet.
-            </div>
-          ) : (
-            <div style={{ border: "1px solid var(--line)", borderRadius: "8px", overflow: "hidden" }}>
-              {members.map((m, i) => (
-                <div key={m.id} style={{
-                  display: "flex", gap: "1rem", alignItems: "center", flexWrap: "wrap",
-                  padding: "0.9rem 1.2rem", borderTop: i ? "1px solid var(--line)" : "none",
-                  opacity: m.disabledAt ? 0.55 : 1,
-                }}>
-                  <div style={{ flex: "1 1 220px", minWidth: 0 }}>
-                    <div style={{ fontWeight: 600 }}>
-                      {m.name}
-                      {m.disabledAt && <span style={{ marginLeft: "0.6rem", fontSize: "0.7rem", padding: "0.15rem 0.45rem", borderRadius: "100px", background: "#5b3535", color: "#ffd9d9" }}>disabled</span>}
-                    </div>
-                    <div style={{ fontSize: "0.78rem", opacity: 0.6 }}>
-                      {m.email || "no email"} · added {new Date(m.createdAt).toLocaleDateString()}
-                      {m.lastSeenAt ? ` · last signed in ${new Date(m.lastSeenAt).toLocaleDateString()}` : " · never signed in"}
-                    </div>
-                    {m.note && <div style={{ fontSize: "0.78rem", opacity: 0.5, marginTop: "0.2rem" }}>{m.note}</div>}
-                  </div>
-                  <button onClick={() => patchMember(m.id, { action: "regenerate" })} disabled={memberBusy}
-                          style={{ padding: "0.45rem 0.8rem", border: "1px solid var(--line)", borderRadius: "4px", background: "transparent", color: "inherit", cursor: "pointer", fontSize: "0.8rem" }}>
-                    New code
-                  </button>
-                  <button onClick={() => patchMember(m.id, { disabled: !m.disabledAt })} disabled={memberBusy}
-                          style={{ padding: "0.45rem 0.8rem", border: "1px solid var(--line)", borderRadius: "4px", background: "transparent", color: "inherit", cursor: "pointer", fontSize: "0.8rem" }}>
-                    {m.disabledAt ? "Re-enable" : "Disable"}
-                  </button>
-                  <button onClick={() => removeMember(m.id, m.name)} disabled={memberBusy}
-                          style={{ padding: "0.45rem 0.8rem", border: "none", borderRadius: "4px", background: "#d9534f", color: "#fff", cursor: "pointer", fontSize: "0.8rem" }}>
-                    Remove
-                  </button>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
+        </div>
       )}
 
-      {/* Media Player Modal */}
+      {ready && (tab === "queue" || tab === "live") && renderQueue()}
+      {ready && tab === "faces" && renderFaces()}
+      {ready && tab === "members" && renderMembers()}
+
       {activeMedia && (
-        <div style={{
-          position: "fixed", top: 0, left: 0, right: 0, bottom: 0,
-          backgroundColor: "rgba(0,0,0,0.9)",
-          display: "flex", justifyContent: "center", alignItems: "center",
-          zIndex: 9999, padding: "2rem"
-        }}>
-          <div style={{ position: "relative", width: "100%", maxWidth: "900px", backgroundColor: "#000", borderRadius: "8px", overflow: "hidden" }}>
-            <button
-              onClick={() => setActiveMedia(null)}
-              style={{ position: "absolute", top: "1rem", right: "1rem", zIndex: 10, background: "rgba(255,255,255,0.2)", border: "none", color: "#fff", padding: "0.5rem 1rem", borderRadius: "4px", cursor: "pointer" }}
-            >
-              Close
-            </button>
-            <video
-              src={activeMedia ?? undefined}
-              controls
-              autoPlay
-              style={{ width: "100%", maxHeight: "80vh", display: "block" }}
-            />
+        <div className="rv-lightbox" onClick={() => setActiveMedia(null)}>
+          <div onClick={(e) => e.stopPropagation()}>
+            <button type="button" className="rv-quiet" onClick={() => setActiveMedia(null)}>Close ×</button>
+            {activeMedia.type === "audio" ? (
+              <audio src={activeMedia.url} controls autoPlay />
+            ) : activeMedia.type === "image" ? (
+              <img src={activeMedia.url} alt="Attached media" />
+            ) : (
+              <video src={activeMedia.url} controls autoPlay />
+            )}
           </div>
         </div>
       )}

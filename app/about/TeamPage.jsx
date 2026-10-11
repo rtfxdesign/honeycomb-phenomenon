@@ -372,7 +372,6 @@ export default function TeamPage() {
 
         <footer className="tp-foot">
           <span className="tp-ui">Honeycomb</span>
-          <a className="tp-ui" href="mailto:liz@honeycomb-phenomenon.com">liz@honeycomb-phenomenon.com</a>
           <Link className="tp-ui" href="/privacy">How we handle your story</Link>
         </footer>
       </div>

@@ -45,7 +45,7 @@
 --scale-grow:1.12;--scale-press:0.98;
 --scrim:rgba(13,8,6,0.72);--blur-scrim:6px;
 /* live-deploy palette (topbar, slideouts, recorder) */
---ink:#080604;--panel:rgba(15,9,5,0.975);--cream:#f4e8d2;--muted:#c6a982;--amber:#d89126;--gold:#f2bf49;--line:rgba(224,151,37,0.42);
+--ink:#080604;--panel:rgba(15,9,5,0.975);--line-soft:rgba(224,151,37,0.28);--hc-paper-white:#fff7e8;--hc-sand-light:#ddc9ab;--cta-gradient:linear-gradient(135deg,#f0b039,#d98a21);--status-live:#c4463a;--status-live-text:#ffb3a8;--mod-teal:#007067;--mod-danger:#d9534f;--cream:#f4e8d2;--muted:#c6a982;--amber:#d89126;--gold:#f2bf49;--line:rgba(224,151,37,0.42);
 }
 
 /* ───────────────────────────── base ───────────────────────────── */
