@@ -623,9 +623,6 @@ button{font:inherit;color:inherit}
 .story-action span{font-size:18px;font-weight:400}
 .story-media{display:block;width:100%;max-height:300px;margin:0 0 22px;border:1px solid rgba(224,151,37,.32);border-radius:3px;background:#000}
 /* under a video story: the recording and its transcript, saved */
-.story-download{display:inline-flex;align-items:center;gap:12px;margin:-8px 0 26px;padding:10px 14px;border:1px solid rgba(224,151,37,.42);border-radius:3px;background:transparent;color:var(--cream);font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;cursor:pointer;transition:color .2s,border-color .2s}
-.story-download:hover,.story-download:focus-visible{color:var(--gold);border-color:rgba(242,191,73,.7);outline:none}
-.story-download span{font-size:14px;font-weight:400}
 audio.story-media{max-height:none}
 .story-footer{display:flex;align-items:center;gap:13px;padding:23px clamp(42px,5.8vw,92px) 26px;background:rgba(78,42,14,.22)}
 .story-footer img{width:58px;height:30px;object-fit:contain;opacity:.88}
@@ -853,6 +850,9 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
 .consent-row{display:flex;gap:12px;align-items:flex-start;margin:22px 0 0;font-size:13px;line-height:1.6;color:var(--text-soft);cursor:pointer}
 .consent-row input{flex:none;width:18px;height:18px;margin-top:3px;accent-color:var(--gold)}
 .consent-row a{white-space:nowrap}
+/* the email field that opens under "open to being contacted", indented to the checkbox text */
+.contact-field{margin:12px 0 0 30px;max-width:420px}
+.contact-field .field-hint{display:block;font-size:12.5px;line-height:1.55;color:var(--text-soft)}
 
 /* confirmation: the ID, copyable, and what to do with it */
 .submission-id-block{margin:26px auto 30px;max-width:560px;padding:20px 22px;border:1px solid rgba(242,191,73,.4);

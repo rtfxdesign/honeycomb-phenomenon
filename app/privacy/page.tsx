@@ -15,7 +15,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const REVIEWED = "2026-09-18";
+const REVIEWED = "2026-10-21";
 const mailto = `mailto:${REMOVAL_EMAIL}`;
 
 export default function PrivacyPage() {
@@ -54,9 +54,16 @@ export default function PrivacyPage() {
           <li><strong>The visibility you chose</strong>: public, community only, or strictly archived.</li>
           <li><strong>The moment you submitted and confirmed</strong> the account was yours to share.</li>
           <li><strong>A submission ID</strong>, generated for you and shown once, which is how you refer to the record later.</li>
+          <li><strong>Your email address — only if you tick</strong> that you are open to the team contacting you. See below.</li>
         </ul>
         <p>
-          We do not ask for your email address, so we cannot write to you — and nobody who obtains the archive could either.
+          <strong>If you leave an email.</strong> It is stored on its own, apart from your story, and is never shown on the
+          site or sent to any visitor or member. Only the moderators see it, and they use it for one thing: writing to you
+          about the story you submitted. It is never used for marketing, never shared, and never added to a mailing list.
+          It is deleted with your story, or on its own whenever you ask. Leave the box unticked and we have no way to write
+          to you — and nobody who obtains the archive could either.
+        </p>
+        <p>
           Nothing about your device or connection is written into the record: no IP address, no browser details, no
           location beyond what you type.
         </p>
@@ -147,12 +154,12 @@ export default function PrivacyPage() {
         </p>
         <p>
           <strong>What “removed” means.</strong> The written record, the recording, its separate audio track, the photo,
-          the transcript and the tags — all deleted, whether the submission was still pending or already approved. No
+          the transcript, the tags and your email address if you left one — all deleted, whether the submission was still pending or already approved. No
           copy remains anywhere we control.
         </p>
         <p>
           <strong>Changing rather than removing.</strong> The same email can change your visibility level, or how much of
-          your name shows, without resubmitting.
+          your name shows, without resubmitting — or withdraw your email address and leave the story in place.
         </p>
       </section>
 
@@ -160,7 +167,7 @@ export default function PrivacyPage() {
         <p className="dh-num">06</p>
         <h2 id="strip">What we strip, and what we never collect</h2>
         <p>
-          <strong>Never collected:</strong> your IP address with the record, your email, analytics or tracking of any kind,
+          <strong>Never collected:</strong> your IP address with the record, your email unless you choose to leave it, analytics or tracking of any kind,
           scripts from other companies. There is no account to create and no profile to build.
         </p>
         <p>
@@ -179,7 +186,7 @@ export default function PrivacyPage() {
         <h3>Where things run</h3>
         <ul>
           <li><strong>Site and API</strong>: Next.js on Netlify (static assets at the edge, server code as Netlify functions, US region).</li>
-          <li><strong>Storage</strong>: one private Cloudflare R2 bucket. No public read on any object. Every read of a recording or photo is a signed URL valid for one hour; every upload is a signed PUT valid for thirty minutes, bound to one object key and content type. Records are JSON objects in the same bucket under <code>submissions/</code> (pending) and <code>approved/submissions/</code>.</li>
+          <li><strong>Storage</strong>: one private Cloudflare R2 bucket. No public read on any object. Every read of a recording or photo is a signed URL valid for one hour; every upload is a signed PUT valid for thirty minutes, bound to one object key and content type. Records are JSON objects in the same bucket under <code>submissions/</code> (pending) and <code>approved/submissions/</code>. An optional contact address is a separate object under <code>contacts/</code>, keyed by submission ID; the public stories endpoint never reads that prefix, only the moderator-only review queue does, and deleting a submission deletes it.</li>
           <li><strong>Preview environment</strong> shares the bucket under a key prefix, with its own passwords and its own fictional test data; nothing crosses.</li>
           <li><strong>Transcription</strong>: Cloudflare Workers AI (Whisper), called from the server with the recording that is already in R2. The draft is stored on the record as a machine transcript and is never served to a visitor; a moderator confirms or replaces it.</li>
         </ul>

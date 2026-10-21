@@ -54,6 +54,8 @@ interface Submission {
   mediaUrl: string | null;
   mediaType: "image" | "video" | "audio" | "unknown" | null;
   photoUrl: string | null;
+  // only when the contributor ticked "open to being contacted"
+  contactEmail?: string | null;
   lastModified: string;
 }
 
@@ -626,6 +628,7 @@ export default function ReviewDashboard() {
               {d.id && <code title="Submission ID — what a contributor quotes to have this removed">{d.id}</code>}
               {d.privacy === "community" && <span className="rv-badge">Community only</span>}
               {d.adsOk && <span className="rv-badge" title="The contributor is willing to have this story or photo used in Honeycomb advertising">OK for advertising</span>}
+              {s.contactEmail && <span className="rv-badge" title="The contributor left an email and is open to the team writing to them about this story">Open to contact</span>}
               {d.recordingMode === "video" && d.mediaKey && (/-web\.mp4$/i.test(d.mediaKey)
                 ? <span className="rv-badge" title="A copy encoded for streaming plays on the site; the original is kept">Streaming copy</span>
                 : <span className="rv-badge" style={{ color: "var(--muted)", borderColor: "rgba(198,169,130,.35)" }} title={live ? "The encoder picks this up within about fifteen minutes of approval" : "A streaming copy is made after approval"}>{live ? "Original file · copy pending" : "Original file"}</span>)}
@@ -641,6 +644,9 @@ export default function ReviewDashboard() {
                 <div><dt>Where</dt><dd>{d.location || "Unknown"}</dd></div>
                 <div><dt>When</dt><dd>{d.experienceYear || "Unknown"}</dd></div>
                 <div><dt>Visibility</dt><dd className={pc}>{p}</dd></div>
+                {s.contactEmail && (
+                  <div><dt>Contact</dt><dd><a href={`mailto:${s.contactEmail}?subject=${encodeURIComponent(`Your Honeycomb story ${d.id || ""}`.trim())}`}>{s.contactEmail}</a></dd></div>
+                )}
               </dl>
               <div className={`rv-content${hasMedia(s) ? " rv-content--media" : ""}`}>
                 <div>

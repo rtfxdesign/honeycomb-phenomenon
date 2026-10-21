@@ -12,7 +12,7 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { uploadToR2 } from '../lib/upload';
-import { REMOVAL_EMAIL, PRIVACY_PATH } from '../lib/contact';
+import { REMOVAL_EMAIL, PRIVACY_PATH, EMAIL_RE } from '../lib/contact';
 import { NAME_DISPLAY_OPTIONS, formatDisplayName } from '../lib/name';
 
 function formatBytes(bytes) {
@@ -66,6 +66,10 @@ export default function RecorderModal({ onClose }) {
   const [consent, setConsent] = useState(false);
   // optional: willing to have the story or photo used in Honeycomb's advertising
   const [adsOk, setAdsOk] = useState(false);
+  // optional: willing to be contacted by the team about this story. The
+  // address is kept apart from the record and never shown on the site.
+  const [contactOk, setContactOk] = useState(false);
+  const [contactEmail, setContactEmail] = useState('');
   const [submissionId, setSubmissionId] = useState('');
   const [copied, setCopied] = useState(false);
   const recorderRef = useRef(null);
@@ -205,6 +209,10 @@ export default function RecorderModal({ onClose }) {
       setStatus('Please confirm the account is yours to share and that you are 18 or older.');
       return;
     }
+    if (contactOk && !EMAIL_RE.test(contactEmail.trim())) {
+      setStatus('Please add an email address we can reach you at, or untick the contact box.');
+      return;
+    }
     setSubmitting(true);
     setProgress(0);
 
@@ -269,6 +277,8 @@ export default function RecorderModal({ onClose }) {
       hashtags: tags,
       consent: true,
       adsOk,
+      contactOk,
+      contactEmail: contactOk ? contactEmail.trim() : undefined,
     };
 
     try {
@@ -424,6 +434,23 @@ export default function RecorderModal({ onClose }) {
               <input type="checkbox" checked={adsOk} onChange={(event) => setAdsOk(event.target.checked)} />
               <span>Optional: I would be willing to have my story or profile photo shared in Honeycomb&rsquo;s advertisements.</span>
             </label>
+            <label className="consent-row consent-row--optional">
+              <input type="checkbox" checked={contactOk} onChange={(event) => setContactOk(event.target.checked)} />
+              <span>Optional: I&rsquo;m open to the Honeycomb team contacting me about my story.</span>
+            </label>
+            {contactOk && (
+              <label className="field contact-field">
+                <span>Email</span>
+                <input
+                  type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)}
+                  autoComplete="email" placeholder="you@example.com" required
+                />
+                <small className="field-hint">
+                  Kept separately from your story and never shown on the site. Only the moderators see it, and only to
+                  write to you about this story. To withdraw it, email {REMOVAL_EMAIL}. <HandlingLink>Details</HandlingLink>
+                </small>
+              </label>
+            )}
             <label className="consent-row">
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} required />
               <span>

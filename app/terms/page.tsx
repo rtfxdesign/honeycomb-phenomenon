@@ -19,7 +19,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-const EFFECTIVE = "2026-10-11";
+const EFFECTIVE = "2026-10-21";
 const mailto = `mailto:${REMOVAL_EMAIL}`;
 
 export default function TermsPage() {
@@ -61,7 +61,6 @@ export default function TermsPage() {
         <h2 id="use">What you may do</h2>
         <ul>
           <li>Read, watch and listen to the stories shown to you at your level of access.</li>
-          <li>Download a recording where the site offers a download button. That button appears only on stories the contributor chose to make public, and only for your own viewing.</li>
           <li>Tell people the archive exists, and share the site address.</li>
         </ul>
       </section>
@@ -71,7 +70,7 @@ export default function TermsPage() {
         <h2 id="not">What you may not do</h2>
         <ul>
           <li><strong>Redistribute a contributor&rsquo;s recording, photo, transcript or name</strong> — no reposting, re-uploading, excerpting into a video, or sharing to a group — anywhere outside this site. A contributor can withdraw their story from here at any time; a copy you made somewhere else cannot be withdrawn, and that is the promise you would be breaking.</li>
-          <li>Record your screen, scrape, crawl or bulk-download any part of the archive, or use any of it to train a machine-learning model.</li>
+          <li>Download, record your screen, scrape or crawl any part of the archive, or use any of it to train a machine-learning model. The site offers no download of any recording; please don&rsquo;t work around that.</li>
           <li>Attempt to identify a contributor who chose to show less than their full name, or to contact a contributor through any means other than this site.</li>
           <li>Harass, ridicule or threaten a contributor, on this site or elsewhere, because of what they shared here.</li>
           <li>Share the site password or your access code, or try to reach records at a level of access you were not given.</li>

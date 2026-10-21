@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, HeadObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 import { formatDisplayName, NAME_DISPLAY_LEVELS } from "../../lib/name";
 import { generateSubmissionId } from "../../lib/submission-id";
-import { POLICY_VERSION, CONSENT_VERSION } from "../../lib/contact";
+import { POLICY_VERSION, CONSENT_VERSION, EMAIL_RE, contactKey } from "../../lib/contact";
 
 const PRIVACY_LEVELS = ["public", "community", "archive"];
 const RECORDING_MODES = ["video", "audio", "text"];
@@ -42,6 +42,16 @@ export async function POST(request: NextRequest) {
     if (data.consent !== true) {
       return NextResponse.json(
         { error: "Please confirm the account is yours to share and that you are 18 or older" },
+        { status: 400 }
+      );
+    }
+
+    // Optional, and only with an address that looks like one: a ticked box
+    // with no way to reach the person is no use to the team.
+    const contactEmail = data.contactOk === true ? str(data.contactEmail, 254) : "";
+    if (data.contactOk === true && !EMAIL_RE.test(contactEmail)) {
+      return NextResponse.json(
+        { error: "Please add an email address we can reach you at, or untick the contact box" },
         { status: 400 }
       );
     }
@@ -114,14 +124,36 @@ export async function POST(request: NextRequest) {
       transcriptStatus: hasWords ? "confirmed" : hasRecording ? "awaiting" : "none",
     };
 
-    await client.send(
-      new PutObjectCommand({
-        Bucket: BUCKET,
-        Key: phys(key),
-        Body: JSON.stringify(payload, null, 2),
-        ContentType: "application/json",
-      })
-    );
+    // The contact goes first: if it fails, nothing is saved and the person
+    // can try again, rather than ending up with a story the team believes
+    // they cannot write to. If the record then fails, the contact is taken
+    // back out, so no address is ever kept without a story behind it.
+    if (contactEmail) {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: phys(contactKey(submissionId)),
+          Body: JSON.stringify({ id: submissionId, email: contactEmail, consentAt: now, consentVersion: CONSENT_VERSION }, null, 2),
+          ContentType: "application/json",
+        })
+      );
+    }
+
+    try {
+      await client.send(
+        new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: phys(key),
+          Body: JSON.stringify(payload, null, 2),
+          ContentType: "application/json",
+        })
+      );
+    } catch (error) {
+      if (contactEmail) {
+        await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: phys(contactKey(submissionId)) })).catch(() => {});
+      }
+      throw error;
+    }
 
     return NextResponse.json({ success: true, id: submissionId });
   } catch (error) {

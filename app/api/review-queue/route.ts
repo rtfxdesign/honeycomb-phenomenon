@@ -29,6 +29,23 @@ export async function GET(request: NextRequest) {
     // Filter to only get .json metadata files
     const jsonObjects = objects.filter(obj => obj.Key?.endsWith('.json'));
 
+    // Contact addresses live apart from the records (see lib/contact.js);
+    // moderators are the one audience that sees them, so they join here.
+    const contacts = new Map<string, string>();
+    // Not worth failing the whole queue over: without them it still loads.
+    const contactList = await client.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: phys("contacts/") })).catch((err) => {
+      console.error("Failed to list contacts", err);
+      return { Contents: [] };
+    });
+    await Promise.all((contactList.Contents || []).filter((o) => o.Key?.endsWith(".json")).map(async (o) => {
+      try {
+        const c = JSON.parse(await (await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: o.Key }))).Body!.transformToString());
+        if (c.id && c.email) contacts.set(c.id, c.email);
+      } catch (err) {
+        console.error(`Failed to read contact ${o.Key}`, err);
+      }
+    }));
+
     const submissions = await Promise.all(
       jsonObjects.map(async (obj) => {
         // Read the JSON content
@@ -78,6 +95,7 @@ export async function GET(request: NextRequest) {
             mediaUrl,
             mediaType,
             photoUrl,
+            contactEmail: (data.id && contacts.get(data.id)) || null,
             lastModified: obj.LastModified
           };
         } catch (err) {

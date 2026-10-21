@@ -45,31 +45,17 @@ export async function GET(request: NextRequest) {
           if (data.privacy === "community" && !community) return null;
 
           let mediaUrl = null;
-          let downloadUrl = null;
           let photoUrl = null;
 
+          // A link to play the recording here, never one to save it: viewers
+          // get no download (team decision, 2026-10-21). Moderators still can,
+          // from /review.
           if (data.mediaKey) {
             const mediaCmd = new GetObjectCommand({
               Bucket: BUCKET,
               Key: phys(data.mediaKey),
             });
             mediaUrl = await getSignedUrl(client, mediaCmd, { expiresIn: 3600 });
-            // The same file, served as an attachment with a readable name, for
-            // the "Download video and transcript" button: a cross-origin link
-            // ignores the download attribute, so the header has to do it.
-            // Only for stories the contributor chose to make public: a
-            // "community only" recording stays inside the signed-in circle and
-            // is not handed out as a file.
-            if (data.privacy === "public") {
-              const ext = (data.mediaKey.match(/\.(\w+)$/) || [null, "mp4"])[1];
-              const stem = String(data.title || data.id || "honeycomb-story").replace(/[^\w\- ]+/g, "").trim().replace(/\s+/g, "-").slice(0, 60) || "honeycomb-story";
-              const dlCmd = new GetObjectCommand({
-                Bucket: BUCKET,
-                Key: phys(data.mediaKey),
-                ResponseContentDisposition: `attachment; filename="${stem}.${ext}"`,
-              });
-              downloadUrl = await getSignedUrl(client, dlCmd, { expiresIn: 3600 });
-            }
           }
 
           if (data.photoKey) {
@@ -93,7 +79,6 @@ export async function GET(request: NextRequest) {
           return {
             ...safe,
             mediaUrl,
-            downloadUrl,
             photoUrl,
             lastModified: obj.LastModified
           };

@@ -4,9 +4,9 @@
 // with that person's submission recording.
 //
 // These people did not come through the recorder, so no consent record
-// exists for them in the archive. Their video plays in the panel but is not
-// offered as a download until a signed release is filed (design-handoff/
-// legal/releases/) and `downloadOk: true` is added to their entry here.
+// exists for them in the archive; their signed releases belong in
+// design-handoff/legal/releases/. Their video plays in the panel and, like
+// every recording on the site, is not offered as a download.
 
 const PLACEHOLDER = [
   'This cell holds a member of the Honeycomb community. Their recorded experience is being prepared for the archive.',

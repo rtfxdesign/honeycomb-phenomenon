@@ -3,6 +3,7 @@ import { isModerator } from "../../lib/auth";
 import { DeleteObjectCommand, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 import { recordAudit } from "../../lib/audit";
+import { contactKey } from "../../lib/contact";
 
 export async function POST(request: NextRequest) {
   if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -45,11 +46,15 @@ export async function POST(request: NextRequest) {
       console.warn("Could not fetch submission for media deletion, attempting to delete JSON anyway.", err);
     }
 
-    // 3. Delete the JSON submission itself
+    // 3. Delete the JSON submission itself, and the contact address if the
+    // contributor left one. The record's file name is its submission ID, so
+    // this works even when the record above could not be read.
     await client.send(new DeleteObjectCommand({
       Bucket: BUCKET,
       Key: phys(submissionKey),
     }));
+    const id = submissionKey.split("/").pop()!.replace(/\.json$/, "");
+    await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: phys(contactKey(id)) }));
 
     // A delete from the pending queue is a decline; from approved/ it is a
     // removal. Both are logged, with the media keys that went with the record.
