@@ -19,12 +19,14 @@ import { spawnSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
 import { pipeline } from "node:stream/promises";
+import { fileURLToPath } from "node:url";
 
 const DRY = process.argv.includes("--dry-run");
-const WORK = "E:/Project Honeycomb/media-work";
+// media-work sits beside the repo clone unless MEDIA_WORK says otherwise
+const WORK = process.env.MEDIA_WORK || fileURLToPath(new URL("../../media-work", import.meta.url));
 const LOG = path.join(WORK, "encode.log");
 const LOCK = path.join(WORK, "encode.lock");
-const FFMPEG = process.env.FFMPEG || "C:/Users/allen/AppData/Local/Microsoft/WinGet/Packages/Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe/ffmpeg-8.0.1-full_build/bin/ffmpeg.exe";
+const FFMPEG = process.env.FFMPEG || "ffmpeg";
 const PREFIXES = ["", "preview/"];
 const VIDEO_EXT = /\.(mov|mp4|m4v|webm|mkv|avi|3gp)$/i;
 
