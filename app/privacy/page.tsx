@@ -189,6 +189,7 @@ export default function PrivacyPage() {
           <li><strong>Storage</strong>: one private Cloudflare R2 bucket. No public read on any object. Every read of a recording or photo is a signed URL valid for one hour; every upload is a signed PUT valid for thirty minutes, bound to one object key and content type. Records are JSON objects in the same bucket under <code>submissions/</code> (pending) and <code>approved/submissions/</code>. An optional contact address is a separate object under <code>contacts/</code>, keyed by submission ID; the public stories endpoint never reads that prefix, only the moderator-only review queue does, and deleting a submission deletes it.</li>
           <li><strong>Preview environment</strong> shares the bucket under a key prefix, with its own passwords and its own fictional test data; nothing crosses.</li>
           <li><strong>Transcription</strong>: Cloudflare Workers AI (Whisper), called from the server with the recording that is already in R2. The draft is stored on the record as a machine transcript and is never served to a visitor; a moderator confirms or replaces it.</li>
+          <li><strong>Tag suggestions</strong>: when a moderator asks, the story&rsquo;s words go to a language model on Cloudflare Workers AI, in the same account, which suggests tags from the archive&rsquo;s fixed list. Nothing is stored by that step; a moderator confirms or changes the tags.</li>
         </ul>
 
         <h3>Who is on the list</h3>

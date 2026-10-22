@@ -10,11 +10,13 @@
  *   node scripts/check-autotag.mjs
  */
 import { readFileSync } from 'node:fs';
-import { STORIES, ALL_TAGS } from './seed-stories.mjs';
+import { STORIES } from './seed-stories.mjs';
+// the whole archive vocabulary, "encounter" group included
+import { ALL_TAGS } from '../app/lib/tags.js';
 
 // Pull the dictionary out of the route without booting Next.
 const src = readFileSync(new URL('../app/api/generate-tags/route.ts', import.meta.url), 'utf8');
-const body = src.slice(src.indexOf('const tagDictionary'), src.indexOf('/** The tags this endpoint'));
+const body = src.slice(src.indexOf('const tagDictionary'), src.indexOf('// The tags this endpoint'));
 const dict = {};
 for (const m of body.matchAll(/^\s*"?([a-z-]+)"?:\s*\[(.+?)\],\s*$/gm)) {
   const [, tag, patterns] = m;

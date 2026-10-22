@@ -1,7 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isModerator } from "../../lib/auth";
+import { aiTags, aiTaggingConfigured } from "../../lib/autotag";
 
 /**
- * Suggests tags for a submission by scanning its text.
+ * Suggests tags for a submission.
+ *
+ * Two taggers. A moderator gets the AI tagger (lib/autotag.ts), which reads
+ * the story and chooses from the vocabulary by meaning. Everyone else — the
+ * recorder, suggesting as a contributor types — gets the dictionary below,
+ * which matches phrases: free, instant, and good enough for a suggestion a
+ * moderator will see again. If the AI tagger is not configured or fails, the
+ * moderator gets the dictionary too, and the response says which answered.
+ *
+ * The vocabulary is app/lib/tags.js.
  *
  * The vocabulary here is deliberately the same lowercase, hyphenated set the
  * comb clusters on. It used to emit CamelCase labels of its own ("MissingTime",
@@ -10,7 +21,8 @@ import { NextRequest, NextResponse } from "next/server";
  * carrying "LightPhenomenon" would never gather with a story tagged "orb". Two
  * vocabularies meant auto-tagged records quietly sat alone in the field.
  *
- * Keep this list in step with TAG_VOCABULARY in scripts/seed-stories.mjs.
+ * Every tag in app/lib/tags.js needs at least one pattern here
+ * (scripts/check-autotag.mjs checks both ways).
  */
 const tagDictionary: Record<string, RegExp[]> = {
   // phenomenon
@@ -21,7 +33,8 @@ const tagDictionary: Record<string, RegExp[]> = {
   triangle: [/\btriangle\b/i, /\btriangular\b/i, /\bchevron\b/i, /\bthree points\b/i],
   disc: [/\bdisc\b/i, /\bdisk\b/i, /\bsaucer\b/i, /\bcircular craft\b/i],
   formation: [/\bformation\b/i, /\bin a line\b/i, /\bheld (its |their )?spacing\b/i, /\bin sequence\b/i],
-  humanoid: [/\bhumanoid\b/i, /\bfigure(s)?\b/i, /\bbeing(s)?\b/i, /\btall (and )?thin\b/i, /\bentity\b/i],
+  // "being" alone matched "being able to"; "figure" matched "figure out"
+  humanoid: [/\bhumanoid\b/i, /\bfigure(s)?\b(?! out)/i, /\b(a|the|these|those|tall|small|grey|gray|strange|other) beings?\b/i, /\bbeings\b/i, /\btall (and )?thin\b/i, /\bentity\b/i],
   presence: [/\bpresence\b/i, /\bsomething (was )?in the room\b/i, /\bbeing watched\b/i, /\bnot alone\b/i, /\battended to\b/i, /\bsomeone (was )?waiting\b/i, /\bcompany\b/i, /\bin the room\b/i, /\bfelt (it|something)\b/i],
   apparition: [/\bapparition\b/i, /\bghost\b/i, /\bshadow person\b/i, /\bthen (it|there) was not\b/i],
 
@@ -30,7 +43,8 @@ const tagDictionary: Record<string, RegExp[]> = {
   hum: [/\bhum(ming)?\b/i, /\blow frequency\b/i, /\bvibrat(ion|ing)\b/i, /\bthrough the (floor|ground)\b/i],
   static: [/\bstatic\b/i, /\bwhite noise\b/i, /\bevery channel\b/i],
   cold: [/\bcold\b/i, /\bcold spot\b/i, /\btemperature drop(ped)?\b/i, /\bchill\b/i],
-  pressure: [/\bpressure\b/i, /\bin (my|the) ears\b/i, /\bchest felt\b/i, /\bheav(y|iness) in the air\b/i],
+  // physical pressure only: "all this pressure" in a feeling is not this tag
+  pressure: [/\bpressure (in|on) (my|the|our)\b/i, /\bair pressure\b/i, /\bin (my|the) ears\b/i, /\bchest felt\b/i, /\bheav(y|iness) in the air\b/i],
 
   // effects
   "radio-failure": [/\bradio (cut|went|failed|died)\b/i, /\blost the radio\b/i, /\bradio was (dead|useless)\b/i],
@@ -50,7 +64,7 @@ const tagDictionary: Record<string, RegExp[]> = {
   mountain: [/\bmountain\b/i, /\bridge\b/i, /\bvalley\b/i, /\bmoor\b/i, /\bhillside\b/i, /\bhill\b/i],
 
   // time
-  night: [/\bnight\b/i, /\bmidnight\b/i, /\bsmall hours\b/i, /\bafter dark\b/i, /\bstars\b/i],
+  night: [/\bnight\b(?!['’]s sleep)/i,/\bmidnight\b/i, /\bsmall hours\b/i, /\bafter dark\b/i, /\bstars\b/i],
   dawn: [/\bdawn\b/i, /\bfirst light\b/i, /\bsunrise\b/i, /\bearly morning\b/i],
   daytime: [/\bmidday\b/i, /\bafternoon\b/i, /\bbroad daylight\b/i, /\bmid-?morning\b/i, /\bdaylight\b/i, /\bbright\b/i, /\blate morning\b/i, /\bin full day\b/i, /\bat noon\b/i],
   dusk: [/\bdusk\b/i, /\btwilight\b/i, /\bsunset\b/i, /\bevening\b/i],
@@ -60,7 +74,7 @@ const tagDictionary: Record<string, RegExp[]> = {
   family: [/\bmy (mother|father|brother|sister|wife|husband|son|daughter|grandmother|grandfather)\b/i, /\bfamily\b/i],
   children: [/\bchild(ren)?\b/i, /\bkids?\b/i, /\bschoolyard\b/i, /\bmy son\b/i, /\bmy daughter\b/i],
   childhood: [/\bwhen I was (a child|young|\d{1,2})\b/i, /\bas a (child|kid|boy|girl)\b/i, /\bchildhood\b/i],
-  "multiple-witness": [/\b(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|many) of us\b/i, /\bwe all saw\b/i, /\bwitness(es)?\b/i, /\beveryone saw\b/i, /\bthere were \w+ of us\b/i, /\ball (three|four|five|six) \b/i, /\bnone of us\b/i, /\bwe (stood|watched|stopped|agreed)\b/i],
+  "multiple-witness": [/\b(two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|several|many) of us\b/i, /\bwe all saw\b/i, /\b(other|several|two|three) witnesses\b/i, /\bwitnesses\b/i,/\beveryone saw\b/i, /\bthere were \w+ of us\b/i, /\ball (three|four|five|six) \b/i, /\bnone of us\b/i, /\bwe (stood|watched|stopped|agreed)\b/i],
   solitary: [/\bI was alone\b/i, /\bby myself\b/i, /\bon my own\b/i, /\bnobody else (was|saw)\b/i, /\balone in\b/i, /\bI stood there\b/i, /\bI was (outside|out|driving|working)\b/i],
   generational: [/\bmy grandmother\b/i, /\bher mother had\b/i, /\bthree generations\b/i, /\bhad told me\b/i, /\bpassed down\b/i],
   military: [/\bmilitary\b/i, /\bair force\b/i, /\bbase\b/i, /\bserved\b/i, /\bservice\b/i, /\blogbook\b/i],
@@ -72,6 +86,16 @@ const tagDictionary: Record<string, RegExp[]> = {
   drawing: [/\bdrew it\b/i, /\bdrawing(s)?\b/i, /\bsketch(ed)?\b/i, /\bon paper\b/i],
   "never-told": [/\bnever (told|spoke|said|reported)\b/i, /\bdid not (speak|talk) about it\b/i, /\bkept (it )?quiet\b/i, /\bfor thirty years\b/i, /\bnever mentioned\b/i, /\bnot (a word|one word)\b/i, /\bnever shown\b/i, /\bin a drawer\b/i, /\btold (nobody|no one)\b/i, /\bstayed quiet\b/i],
   telepathy: [/\btelepath(y|ic)\b/i, /\bin my head\b/i, /\bvoice in my mind\b/i, /\bwithout speaking\b/i, /\bit told me\b/i],
+
+  // encounter (added 2026-10-21)
+  dream: [/\bin (a|my|the) dream\b/i, /\bI (dreamt|dreamed)\b/i, /\b(had|have|having) a dream\b/i],
+  voice: [/\b(a|the) voice (said|told|spoke|came)\b/i, /\bheard a voice\b/i, /\bvoice in my (head|mind)\b/i, /\b(male|female|booming|deep|loud) voice\b/i],
+  message: [/\b(a|the) message\b/i, /\bI was told\b/i, /\bit (said|told me) that\b/i],
+  consciousness: [/\bconsciousness\b/i, /\bawakening\b/i, /\bhigher (self|awareness)\b/i],
+  visitation: [/\bin my (bed)?room\b/i, /\bfoot of (my|the) bed\b/i, /\bbeside my bed\b/i, /\bvisitors\b/i],
+  abduction: [/\babduct(ed|ion)\b/i, /\btaken (from|aboard|on board|up)\b/i, /\bwas taken\b/i, /\bon board\b/i],
+  examination: [/\bexamin(ed|ation)\b/i, /\bon a table\b/i, /\bmedical\b/i, /\bprocedure\b/i, /\bscann(ed|ing)\b/i],
+  paralysis: [/\bparaly[sz]ed\b/i, /\bparalysis\b/i, /\bcould ?n['’o]?t move\b/i, /\bunable to move\b/i],
 };
 
 // The tags this endpoint can produce are the same set the comb clusters on.
@@ -85,6 +109,12 @@ export async function POST(request: NextRequest) {
 
     if (!text || typeof text !== "string") {
       return NextResponse.json({ tags: [] });
+    }
+
+    if (isModerator(request) && aiTaggingConfigured()) {
+      const ai = await aiTags(text);
+      if (ai.ok) return NextResponse.json({ tags: ai.tags, source: "ai", model: ai.model });
+      console.warn("AI tagging failed; using the dictionary:", ai.error);
     }
 
     const matched = new Set<string>();
@@ -104,7 +134,7 @@ export async function POST(request: NextRequest) {
     // so the suggestion set is capped and the moderator adds any that matter.
     const tags = Array.from(matched).slice(0, 8);
 
-    return NextResponse.json({ tags });
+    return NextResponse.json({ tags, source: "dictionary" });
   } catch (error) {
     console.error("Failed to generate tags:", error);
     return NextResponse.json({ tags: [] });

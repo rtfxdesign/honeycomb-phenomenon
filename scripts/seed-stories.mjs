@@ -22,17 +22,12 @@
  *      the comb gathers along lines a reader can recognise.
  */
 
-// The vocabulary, grouped by what each tag is about. Exported so the review
-// dashboard can offer it as suggestions rather than free text.
-export const TAG_VOCABULARY = {
-  phenomenon: ['orb', 'triangle', 'disc', 'formation', 'humanoid', 'presence', 'apparition'],
-  sensory: ['silent', 'hum', 'static', 'cold', 'pressure'],
-  effects: ['radio-failure', 'engine-stall', 'ground-trace', 'animal-reaction', 'electrical'],
-  setting: ['highway', 'farm', 'water', 'forest', 'desert', 'urban', 'coastal', 'mountain'],
-  time: ['night', 'dawn', 'daytime', 'dusk', 'winter'],
-  witness: ['family', 'children', 'childhood', 'multiple-witness', 'solitary', 'generational', 'military'],
-  aftermath: ['missing-time', 'memory-gap', 'dreams-after', 'drawing', 'never-told', 'telepathy'],
-};
+import { SEED_GROUPS } from '../app/lib/tags.js';
+
+// The vocabulary, grouped by what each tag is about. It lives in
+// app/lib/tags.js; the seed stories use every group of it except "encounter",
+// which was added after they were written.
+export const TAG_VOCABULARY = SEED_GROUPS;
 
 export const ALL_TAGS = Object.values(TAG_VOCABULARY).flat();
 
