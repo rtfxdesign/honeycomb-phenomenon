@@ -106,6 +106,12 @@
 .rv-still{margin:0;display:grid;gap:6px}
 .rv-still figcaption{display:grid;gap:4px;font-size:8.5px;letter-spacing:.1em;max-width:180px}
 .rv-still figcaption button{justify-self:start}
+/* set the cell's photo: a frame from the video, a file, or neither */
+.rv-photo-actions{display:grid;gap:6px;justify-items:start;margin-top:4px}
+.rv-upload{display:inline-flex;align-items:center}
+.rv-upload input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+.rv-upload.is-off{opacity:.5;pointer-events:none}
+.rv-pickbar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;padding:12px 16px;border-top:1px solid rgba(224,151,37,.32);background:#0b0805;color:var(--muted);font-size:12px}
 .rv-edit{margin-top:22px;display:grid;grid-template-columns:1fr 1fr 1fr 150px;gap:14px}
 .rv-span{grid-column:1/-1}
 .rv-span2{grid-column:span 2}

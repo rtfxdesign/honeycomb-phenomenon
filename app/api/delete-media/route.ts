@@ -37,7 +37,12 @@ export async function POST(request: NextRequest) {
         // the audio track was previously left behind, and so was the
         // streaming copy the encoder makes (webKey / originalMediaKey), and the
         // still it takes from the video (stillKey).
-        const keys = new Set([data.mediaKey, data.audioKey, data.photoKey, data.webKey, data.originalMediaKey, data.stillKey].filter(Boolean));
+        // Also the audio parts, and any photo the record had before.
+        const keys = new Set([
+          data.mediaKey, data.audioKey, data.photoKey, data.webKey, data.originalMediaKey, data.stillKey,
+          ...(Array.isArray(data.audioParts) ? data.audioParts.map((p: { key?: string }) => p?.key) : []),
+          ...(Array.isArray(data.photoHistory) ? data.photoHistory : []),
+        ].filter(Boolean));
         deleted = [...keys] as string[];
         for (const k of keys) {
           await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: phys(k) }));

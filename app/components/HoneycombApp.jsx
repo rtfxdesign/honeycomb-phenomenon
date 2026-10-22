@@ -568,6 +568,9 @@ const PLAYER_GUARD = {
   onContextMenu: (event) => event.preventDefault(),
 };
 
+// the title's size class: the display size suits a few words, not a sentence
+const titleLen = (t) => { const n = String(t || '').length; return n > 40 ? 'xl' : n > 24 ? 'l' : undefined; };
+
 function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
   const open = Boolean(page || person);
   const asideRef = useRef(null);
@@ -613,7 +616,7 @@ function StoryPanel({ page, person, onClose, openRecorder, focusSearch }) {
               FROM THE ARCHIVE{person.experience.displayName ? ` · ${String(person.experience.displayName).toUpperCase()}` : ''}
               {person.experience.privacy === 'community' && <span className="community-badge">COMMUNITY ONLY</span>}
             </p>
-            <h1>{person.experience.title}</h1>
+            <h1 data-len={titleLen(person.experience.title)}>{person.experience.title}</h1>
             <div className="panel-copy">
               <dl className="story-meta">
                 <div><dt>WHERE</dt><dd>{person.experience.location || 'Location withheld'}</dd></div>

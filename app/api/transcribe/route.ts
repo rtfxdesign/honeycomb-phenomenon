@@ -7,6 +7,7 @@ import {
   transcriptionConfigured,
   mediaKeyForTranscription,
   explainFailure,
+  DEFAULT_MODEL,
 } from "../../lib/transcribe";
 
 /**
@@ -38,7 +39,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const { submissionKey } = await request.json();
+    // Three calls share this route. Plain {submissionKey}: transcribe the
+    // whole track at once (recordings without parts). {submissionKey, part}:
+    // transcribe one of the record's audioParts and return its text, writing
+    // nothing. {submissionKey, texts}: the dashboard has every part's text;
+    // join them and write the draft, exactly as the single call would.
+    const { submissionKey, part, texts } = await request.json();
 
     if (
       !submissionKey ||
@@ -56,6 +62,38 @@ export async function POST(request: NextRequest) {
     const raw = await existing.Body?.transformToString();
     if (!raw) return NextResponse.json({ error: "Submission not found" }, { status: 404 });
     const record = JSON.parse(raw);
+    const parts: Array<{ key: string }> = Array.isArray(record.audioParts) ? record.audioParts : [];
+
+    if (typeof part === "number") {
+      const p = parts[part];
+      if (!p?.key) return NextResponse.json({ error: "No such part" }, { status: 400 });
+      const media = await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: phys(p.key) }));
+      const bytes = await media.Body?.transformToByteArray();
+      if (!bytes) return NextResponse.json({ error: "Could not read that part" }, { status: 422 });
+      const result = await transcribeAudio(bytes, { contentType: media.ContentType || "audio/mpeg", timeoutMs: 22_000 });
+      if (!result.ok) return NextResponse.json({ error: explainFailure(result.reason, result.detail) }, { status: 502 });
+      return NextResponse.json({ part, text: result.text, wordCount: result.wordCount, model: result.model, warnings: result.warnings });
+    }
+
+    if (Array.isArray(texts)) {
+      if (!parts.length || texts.length !== parts.length || !texts.every((t) => typeof t === "string")) {
+        return NextResponse.json({ error: "Expected one text per part" }, { status: 400 });
+      }
+      const text = texts.map((t) => t.trim()).filter(Boolean).join(" ");
+      if (!text) return NextResponse.json({ error: "The parts came back empty" }, { status: 422 });
+      const updated = {
+        ...record,
+        machineTranscript: text,
+        transcriptStatus: "ready",
+        transcriptSource: "machine",
+        transcriptModel: process.env.CF_AI_MODEL || DEFAULT_MODEL,
+        transcribedAt: new Date().toISOString(),
+        transcriptError: undefined,
+        transcriptWarnings: undefined,
+      };
+      await client.send(new PutObjectCommand({ Bucket: BUCKET, Key: phys(submissionKey), Body: JSON.stringify(updated, null, 2), ContentType: "application/json" }));
+      return NextResponse.json({ success: true, machineTranscript: text, wordCount: text.split(/\s+/).filter(Boolean).length, model: updated.transcriptModel, warnings: [] });
+    }
 
     const { key: audioKey, why } = mediaKeyForTranscription(record);
     if (!audioKey) {

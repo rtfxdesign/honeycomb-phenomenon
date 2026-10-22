@@ -22,6 +22,12 @@
 // "Transcribe recording" had nothing to work with for most videos. Pending
 // submissions get only this step: the encode and the still wait for approval.
 //
+// The audio is also cut into parts of about two minutes, at silences, as
+// <name>-part-01.mp3 … and listed on the record as audioParts. The site
+// transcribes a recording part by part, each call well inside the time a
+// site function is allowed, so a long recording no longer has to wait for
+// this script. Audio-only submissions get parts too.
+//
 // Then it transcribes what the site could not wait for. A site function gets
 // well under thirty seconds and Whisper takes about seven a minute of audio,
 // so "Transcribe recording" on anything over about three minutes marks the
@@ -41,6 +47,7 @@
 // Usage: node scripts/encode-approved.mjs [--dry-run] [--no-stills] [--no-audio] [--only=<prefix>]
 //   --no-stills       make no stills
 //   --no-audio        make no audio tracks and transcribe nothing
+//   --no-parts        cut no audio into parts
 //   --only=preview/   one prefix only; --only= (empty) is production alone
 import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { spawnSync } from "node:child_process";
@@ -58,6 +65,10 @@ const LOCK = path.join(WORK, "encode.lock");
 const FFMPEG = process.env.FFMPEG || "ffmpeg";
 const STILLS = !process.argv.includes("--no-stills");
 const AUDIO = !process.argv.includes("--no-audio");
+const PARTS = !process.argv.includes("--no-parts");
+const PART_SECONDS = 120; // aim for parts this long …
+const PART_SLACK = 40; // … cut at a silence up to this far either side
+const AUDIO_EXT = /\.(mp3|m4a|wav|ogg|webm|aac)$/i;
 const ONLY = process.argv.find((a) => a.startsWith("--only="));
 const PREFIXES = ONLY !== undefined ? [ONLY.slice("--only=".length)] : ["", "preview/"];
 const VIDEO_EXT = /\.(mov|mp4|m4v|webm|mkv|avi|3gp)$/i;
@@ -94,6 +105,7 @@ const webKeyFor = (mediaKey) => mediaKey.replace(VIDEO_EXT, "") + "-web.mp4";
 const stemOf = (mediaKey) => mediaKey.replace(/-web\.mp4$/i, "").replace(VIDEO_EXT, "");
 const stillKeyFor = (mediaKey) => stemOf(mediaKey) + "-still.webp";
 const audioKeyFor = (mediaKey) => stemOf(mediaKey) + "-audio.mp3";
+const partKeyFor = (audioKey, i) => audioKey.replace(/-audio\.mp3$/i, "").replace(AUDIO_EXT, "") + `-part-${String(i + 1).padStart(2, "0")}.mp3`;
 
 async function download(Key, file) {
   const r = await client.send(new GetObjectCommand({ Bucket, Key }));
@@ -136,6 +148,37 @@ function extractAudio(input, output) {
   }
 }
 
+// Where to cut: the midpoint of a silence near each two-minute mark, else the
+// mark itself. The whole recording is one part when it is short enough.
+function cutPoints(input) {
+  const r = spawnSync(FFMPEG, ["-hide_banner", "-nostats", "-i", input, "-af", "silencedetect=noise=-35dB:d=0.5", "-f", "null", "-"], { encoding: "utf8" });
+  const err = r.stderr || "";
+  const dur = err.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
+  if (!dur) throw new Error("ffmpeg gave no duration");
+  const duration = Number(dur[1]) * 3600 + Number(dur[2]) * 60 + Number(dur[3]);
+  const silences = [];
+  let start = null;
+  for (const line of err.split(/\r?\n/)) {
+    const s = line.match(/silence_start: ([\d.]+)/); if (s) start = Number(s[1]);
+    const e = line.match(/silence_end: ([\d.]+)/); if (e && start !== null) { silences.push((start + Number(e[1])) / 2); start = null; }
+  }
+  const cuts = [];
+  let cursor = 0;
+  while (duration - cursor > PART_SECONDS + PART_SLACK) {
+    const target = cursor + PART_SECONDS;
+    const near = silences.filter((t) => Math.abs(t - target) <= PART_SLACK).sort((a, b) => Math.abs(a - target) - Math.abs(b - target))[0];
+    cursor = near ?? target;
+    cuts.push(cursor);
+  }
+  return { duration, cuts };
+}
+function cutPart(input, start, end, output) {
+  const args = ["-y", "-hide_banner", "-nostats", "-loglevel", "error", "-ss", String(start), ...(end != null ? ["-to", String(end)] : []), "-i", input,
+    "-vn", "-map_metadata", "-1", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "48k", output];
+  const r = spawnSync(FFMPEG, args, { encoding: "utf8" });
+  if (r.status !== 0 || !fs.existsSync(output)) throw new Error(`ffmpeg could not cut a part: ${(r.stderr || "").slice(0, 300)}`);
+}
+
 const encoded = new Map(); // logical web key -> local file, for this run
 const stills = new Map(); // logical still key -> local file, for this run
 const audios = new Map(); // logical audio key -> local file, for this run
@@ -148,13 +191,17 @@ for (const prefix of PREFIXES) {
       const d = await readRecord(k);
       if (!d || !d.mediaKey) continue;
       const isVideo = d.recordingMode === "video" && VIDEO_EXT.test(d.mediaKey);
+      const isAudio = d.recordingMode === "audio";
       const needsWeb = isVideo && approved && !(/-web\.mp4$/i.test(d.mediaKey) || d.mediaEncodedAt);
       const needsStill = isVideo && approved && STILLS && !d.stillKey;
       const needsAudio = isVideo && AUDIO && !d.audioKey;
+      // the audio this record is transcribed from: its track, or the recording itself
+      const audioSource = d.audioKey || (isAudio ? d.mediaKey : null);
+      const needsParts = PARTS && !d.audioParts && (audioSource || needsAudio);
       // what the dashboard queued, or a pending video that came with no words
       const needsTranscript = AUDIO && transcriptionConfigured() && d.recordingMode !== "text" &&
         (d.transcriptStatus === "queued" || (!approved && isVideo && !d.machineTranscript && d.transcriptStatus === "awaiting"));
-      if (!needsWeb && !needsStill && !needsAudio && !needsTranscript) continue;
+      if (!needsWeb && !needsStill && !needsAudio && !needsParts && !needsTranscript) continue;
       const webKey = needsWeb ? webKeyFor(d.mediaKey) : d.mediaKey;
       const stillKey = stillKeyFor(d.mediaKey);
       const audioKey = audioKeyFor(d.mediaKey);
@@ -163,7 +210,7 @@ for (const prefix of PREFIXES) {
       const physStill = prefix + stillKey;
       const physAudio = prefix + audioKey;
       work++;
-      log(`${DRY ? "[dry] " : ""}${k}: "${d.title}"${needsWeb ? ` -> ${webKey}` : ""}${needsStill ? ` + ${stillKey}` : ""}${needsAudio ? ` + ${audioKey}` : ""}${needsTranscript ? " + transcript" : ""}`);
+      log(`${DRY ? "[dry] " : ""}${k}: "${d.title}"${needsWeb ? ` -> ${webKey}` : ""}${needsStill ? ` + ${stillKey}` : ""}${needsAudio ? ` + ${audioKey}` : ""}${needsParts ? " + parts" : ""}${needsTranscript ? " + transcript" : ""}`);
       if (DRY) continue;
       const fields = {}; // only what this script adds to the record
       let local = encoded.get(webKey); // the streaming copy on disk, when this run made it
@@ -226,6 +273,36 @@ for (const prefix of PREFIXES) {
             log(`  uploaded ${physAudio} (${Math.round(fs.statSync(audio).size / 1024)} KB)`);
           }
           Object.assign(fields, { audioKey, audioExtractedAt: new Date().toISOString() });
+        }
+        if (needsParts) {
+          const srcKey = fields.audioKey || audioSource;
+          let audio = audios.get(srcKey);
+          let fetchedAudio = null;
+          if (!audio) {
+            fetchedAudio = path.join(WORK, "originals", path.basename(srcKey));
+            log(`  downloading ${srcKey} to cut into parts`);
+            await download(prefix + srcKey, fetchedAudio);
+            audio = fetchedAudio;
+          }
+          const { duration, cuts } = cutPoints(audio);
+          const bounds = [0, ...cuts, duration];
+          const parts = [];
+          if (cuts.length === 0) {
+            // short enough to go in one piece: the part is the track itself
+            parts.push({ key: srcKey, start: 0, end: duration });
+          } else {
+            for (let i = 0; i < bounds.length - 1; i++) {
+              const key = partKeyFor(srcKey, i);
+              const file = path.join(WORK, "web", path.basename(key));
+              cutPart(audio, bounds[i], i === bounds.length - 2 ? null : bounds[i + 1], file);
+              await client.send(new PutObjectCommand({ Bucket, Key: prefix + key, Body: fs.readFileSync(file), ContentType: "audio/mpeg" }));
+              parts.push({ key, start: Math.round(bounds[i]), end: Math.round(bounds[i + 1]) });
+              fs.unlinkSync(file);
+            }
+          }
+          if (fetchedAudio) fs.unlinkSync(fetchedAudio);
+          log(`  ${parts.length} part(s) over ${Math.round(duration)}s`);
+          Object.assign(fields, { audioParts: parts, audioPartsMadeAt: new Date().toISOString() });
         }
         const transcript = {}; // kept apart: dropped if a moderator decided meanwhile
         if (needsTranscript) {

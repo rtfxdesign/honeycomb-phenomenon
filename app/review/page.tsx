@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { formatDisplayName, NAME_DISPLAY_OPTIONS } from "../lib/name";
+import { uploadToR2 } from "../lib/upload";
 import "./review.css";
 
 /**
@@ -50,6 +51,12 @@ interface SubmissionData {
   // the video still, and whether a moderator has kept it off the comb
   stillKey?: string;
   stillHidden?: boolean;
+  // the audio cut into parts by the encoder, for part-by-part transcription
+  audioParts?: Array<{ key: string; start: number; end: number }>;
+  // the cell's photo: the contributor's, or one a moderator chose or uploaded
+  photoKey?: string;
+  photoSource?: "contributor" | "moderator-frame" | "moderator-upload";
+  photoFrameAt?: number;
 }
 
 interface Submission {
@@ -163,7 +170,9 @@ export default function ReviewDashboard() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [activeMedia, setActiveMedia] = useState<{ url: string; type: Submission["mediaType"] } | null>(null);
+  // pick: the lightbox offers "use this frame as the photo" for that record
+  const [activeMedia, setActiveMedia] = useState<{ url: string; type: Submission["mediaType"]; pick?: string } | null>(null);
+  const pickVideoRef = useRef<HTMLVideoElement | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
   // the editor was opened on a machine draft ("Edit before using")
@@ -465,12 +474,37 @@ export default function ReviewDashboard() {
     setTranscribingKey(submissionKey);
     setTranscribeNote((n) => ({ ...n, [submissionKey]: "" }));
     setHiddenDrafts((h) => ({ ...h, [submissionKey]: false }));
+    const call = (body: Record<string, unknown>) => fetch("/api/transcribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ submissionKey, ...body }),
+    });
     try {
-      const res = await fetch("/api/transcribe", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submissionKey }),
-      });
+      // A recording the encoder has cut into parts is transcribed part by
+      // part, two at a time, each call well inside the time the site is
+      // allowed; the texts are then joined into one draft. Anything else goes
+      // in one call, which the route may answer with "queued".
+      const parts = submissions.find((sub) => sub.submissionKey === submissionKey)?.data.audioParts || [];
+      let res: Response;
+      if (parts.length) {
+        const texts: string[] = new Array(parts.length).fill("");
+        let done = 0;
+        const progress = () => setTranscribeNote((n) => ({ ...n, [submissionKey]: `Transcribing · part ${Math.min(done + 1, parts.length)} of ${parts.length}` }));
+        progress();
+        const one = async (i: number) => {
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            const r = await call({ part: i });
+            if (r.ok) { texts[i] = (await r.json()).text || ""; done++; progress(); return; }
+          }
+          throw new Error(`Part ${i + 1} of ${parts.length} would not transcribe after three tries. Try again in a moment.`);
+        };
+        let next = 0;
+        const worker = async () => { while (next < parts.length) { const i = next++; await one(i); } };
+        await Promise.all([worker(), worker()]);
+        res = await call({ texts });
+      } else {
+        res = await call({});
+      }
       const result = await res.json();
       if (res.status === 202 && result.queued) {
         // too long to wait for: the encoder on Allen's desktop will do it
@@ -506,7 +540,7 @@ export default function ReviewDashboard() {
       }));
     } catch (err) {
       console.error(err);
-      setTranscribeNote((n) => ({ ...n, [submissionKey]: "Could not reach the transcription service." }));
+      setTranscribeNote((n) => ({ ...n, [submissionKey]: err instanceof Error && err.message.startsWith("Part ") ? err.message : "Could not reach the transcription service." }));
     } finally {
       setTranscribingKey(null);
     }
@@ -537,6 +571,69 @@ export default function ReviewDashboard() {
     } catch (err) {
       console.error(err);
       alert("Could not save the transcript. Check console.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /**
+   * Give a record its cell photo: a frame grabbed from the video in the
+   * lightbox, or a file from the moderator's machine. The image goes up the
+   * same way a contributor's does, then /api/set-photo strips and resizes it
+   * and points the record at it. "Remove" puts the still, or initials, back.
+   */
+  const setPhoto = async (submissionKey: string, file: Blob, source: "frame" | "upload", frameAt?: number) => {
+    setSaving(true);
+    try {
+      const name = source === "frame" ? "frame.webp" : (file as File).name || "photo.jpg";
+      const { key: imageKey } = await uploadToR2(file, name);
+      const res = await fetch("/api/set-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionKey, imageKey, source, frameAt }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to set the photo");
+      setSubmissions((current) => current.map((sub) =>
+        sub.submissionKey === submissionKey ? { ...sub, data: result.data, photoUrl: result.photoUrl } : sub,
+      ));
+      setActiveMedia(null);
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Could not set the photo. Check console.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const grabFrame = async (submissionKey: string) => {
+    const v = pickVideoRef.current;
+    if (!v || v.readyState < 2) { alert("Let the video load, then pause on the frame you want."); return; }
+    v.pause();
+    const c = document.createElement("canvas");
+    c.width = v.videoWidth; c.height = v.videoHeight;
+    c.getContext("2d")!.drawImage(v, 0, 0);
+    let blob: Blob | null = null;
+    try { blob = await new Promise<Blob | null>((r) => c.toBlob(r, "image/webp", 0.9)); } catch { blob = null; }
+    if (!blob) { alert("Could not read a frame from this video."); return; }
+    await setPhoto(submissionKey, blob, "frame", Math.round(v.currentTime * 10) / 10);
+  };
+  const removePhoto = async (submissionKey: string) => {
+    if (!confirm("Remove this photo from the cell? The cell shows the video still, or initials, instead. The file is kept.")) return;
+    setSaving(true);
+    try {
+      const res = await fetch("/api/set-photo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionKey, remove: true }),
+      });
+      const result = await res.json();
+      if (!res.ok) throw new Error(result.error || "Failed to remove the photo");
+      setSubmissions((current) => current.map((sub) =>
+        sub.submissionKey === submissionKey ? { ...sub, data: result.data, photoUrl: null } : sub,
+      ));
+    } catch (err) {
+      console.error(err);
+      alert(err instanceof Error ? err.message : "Could not remove the photo. Check console.");
     } finally {
       setSaving(false);
     }
@@ -660,7 +757,7 @@ export default function ReviewDashboard() {
     const draft = d.machineTranscript && !hiddenDrafts[s.submissionKey] ? d.machineTranscript : null;
     const queued = d.transcriptStatus === "queued";
     if (!busy && !draft && !note && !queued && !(d.transcriptStatus === "confirmed" && d.transcriptSource === "machine")) return null;
-    const status = busy ? "Transcribing…"
+    const status = busy ? (note?.startsWith("Transcribing ·") ? note : "Transcribing…")
       : queued && !note ? "Queued — the encoder on Allen's desktop transcribes it within about fifteen minutes. Reload to check."
       : d.transcriptStatus === "confirmed" && d.transcriptSource === "machine" && !draft ? "Confirmed — moved into the record"
       : note || (draft ? "draft, not the record" : "");
@@ -740,13 +837,22 @@ export default function ReviewDashboard() {
                 {hasMedia(s) && (
                   <aside className="rv-media">
                     <span className="rv-label">Attached media</span>
-                    {s.photoUrl && <img className="rv-media-photo" src={s.photoUrl} alt="Attached photo" />}
+                    {s.photoUrl && (
+                      <figure className="rv-still">
+                        <img className="rv-media-photo" src={s.photoUrl} alt="Photo" />
+                        <figcaption className="rv-ui">
+                          {d.photoSource === "moderator-frame" ? `Photo — a frame chosen in review${d.photoFrameAt != null ? ` at ${Math.floor(d.photoFrameAt / 60)}:${String(Math.floor(d.photoFrameAt % 60)).padStart(2, "0")}` : ""}`
+                            : d.photoSource === "moderator-upload" ? "Photo — uploaded in review"
+                            : "Photo — from the contributor"}; the cell&rsquo;s face
+                        </figcaption>
+                      </figure>
+                    )}
                     {s.stillUrl && (
                       <figure className="rv-still">
                         <img className="rv-media-photo" src={s.stillUrl} alt="Still from the video" style={d.stillHidden ? { opacity: 0.35 } : undefined} />
                         <figcaption className="rv-ui">
                           {s.photoUrl
-                            ? "Video still — not used, the photo is the cell's face"
+                            ? "Video still — not used while there is a photo"
                             : d.stillHidden ? "Video still — hidden from the comb" : "Video still — the cell's face on the comb"}
                           {!s.photoUrl && (
                             <button type="button" className="rv-quiet" disabled={saving} onClick={() => setStillHidden(s.submissionKey, !d.stillHidden)}>
@@ -756,6 +862,20 @@ export default function ReviewDashboard() {
                         </figcaption>
                       </figure>
                     )}
+                    {/* the cell's photo is the moderator's to set: a frame from
+                        the video, picked in the lightbox, or a file */}
+                    <div className="rv-photo-actions">
+                      {s.mediaUrl && s.mediaType === "video" && (
+                        <button type="button" className="rv-quiet" disabled={saving} onClick={() => setActiveMedia({ url: s.mediaUrl as string, type: "video", pick: s.submissionKey })}>
+                          {s.photoUrl ? "Choose a different frame" : "Choose a frame as the photo"}
+                        </button>
+                      )}
+                      <label className={`rv-quiet rv-upload${saving ? " is-off" : ""}`}>
+                        Upload a photo
+                        <input type="file" accept="image/*" disabled={saving} onChange={(e) => { const f = e.target.files?.[0]; if (f) setPhoto(s.submissionKey, f, "upload"); e.target.value = ""; }} />
+                      </label>
+                      {s.photoUrl && <button type="button" className="rv-quiet" disabled={saving} onClick={() => removePhoto(s.submissionKey)}>Remove photo</button>}
+                    </div>
                     {s.mediaUrl && (s.mediaType === "video" || s.mediaType === "audio" || s.mediaType === "image") && (
                       <button type="button" className="rv-media-box" onClick={() => setActiveMedia({ url: s.mediaUrl as string, type: s.mediaType })}>
                         <span><b>▶</b>{s.mediaType === "image" ? "Open image" : `Play ${s.mediaType}`}</span>
@@ -1040,7 +1160,17 @@ export default function ReviewDashboard() {
             ) : activeMedia.type === "image" ? (
               <img src={activeMedia.url} alt="Attached media" />
             ) : (
-              <video src={activeMedia.url} controls autoPlay />
+              // crossOrigin lets a frame be drawn to a canvas (the bucket
+              // answers with CORS headers); without it the canvas is tainted
+              <video ref={pickVideoRef} src={activeMedia.url} controls autoPlay={!activeMedia.pick} crossOrigin="anonymous" playsInline />
+            )}
+            {activeMedia.pick && (
+              <div className="rv-pickbar">
+                <span>Pause on the moment you want, then</span>
+                <button type="button" className="rv-cta rv-cta--sm" disabled={saving} onClick={() => grabFrame(activeMedia.pick as string)}>
+                  {saving ? "Saving…" : "Use this frame as the photo"}
+                </button>
+              </div>
             )}
           </div>
         </div>

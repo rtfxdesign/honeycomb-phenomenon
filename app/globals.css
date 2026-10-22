@@ -582,6 +582,10 @@ button{font:inherit;color:inherit}
 .panel-copy .story-action{margin-top:28px;text-decoration:none}
 .story-panel--about{width:min(78vw,1180px)}
 .story-panel--about .story-content h1{max-width:860px}
+/* a long title steps down: at the full size "Gimbal Event From the 2017 New
+   York Times Article" ran four lines and filled the panel */
+.story-content h1[data-len="l"]{font-size:clamp(34px,3.4vw,52px)}
+.story-content h1[data-len="xl"]{font-size:clamp(28px,2.7vw,40px);line-height:1.08;letter-spacing:-.03em}
 .story-panel--about .panel-copy{max-width:none;max-height:calc(100svh - 330px);padding-right:22px}
 .bios{gap:0;padding-bottom:28px}
 .bio,.bios{display:grid}
@@ -776,6 +780,8 @@ audio.rec-playback{width:100%}
 .story-content{justify-content:flex-start;padding:120px 25px 28px 44px}
 .story-content:before{left:25px;top:120px;bottom:28px}
 .story-content h1{width:100%;font-size:clamp(38px,10.5vw,53px)}
+.story-content h1[data-len="l"]{font-size:clamp(30px,8vw,42px)}
+.story-content h1[data-len="xl"]{font-size:clamp(26px,6.5vw,34px)}
 .story-summary{font-size:15px;line-height:1.58}
 .panel-copy{font-size:14px;line-height:1.55}
 .story-panel--about .panel-copy{max-height:calc(100svh - 300px)}
