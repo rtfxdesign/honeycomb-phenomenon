@@ -10,8 +10,9 @@
 // removal instructions, and the submission ID they can quote to have it
 // taken down. Those three appear on every path — text, audio and video.
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { uploadToR2 } from '../lib/upload';
+import RecordingStage, { extFor } from './RecordingStage';
 import { REMOVAL_EMAIL, PRIVACY_PATH, EMAIL_RE } from '../lib/contact';
 import { NAME_DISPLAY_OPTIONS, formatDisplayName } from '../lib/name';
 
@@ -56,7 +57,8 @@ export default function RecorderModal({ onClose }) {
   // Audio-only copy of a video recording, so it can be machine-transcribed.
   const [audioFile, setAudioFile] = useState(null);
   const [photoFile, setPhotoFile] = useState(null);
-  const [recording, setRecording] = useState(false);
+  // a take is open on the recording stage: camera on, recording, or not yet kept
+  const [recordingOpen, setRecordingOpen] = useState(false);
   const [dictating, setDictating] = useState(false);
   const [status, setStatus] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -72,74 +74,23 @@ export default function RecorderModal({ onClose }) {
   const [contactEmail, setContactEmail] = useState('');
   const [submissionId, setSubmissionId] = useState('');
   const [copied, setCopied] = useState(false);
-  const recorderRef = useRef(null);
-  const streamRef = useRef(null);
-  const chunksRef = useRef([]);
-  const audioChunksRef = useRef([]);
-  const audioRecorderRef = useRef(null);
   const speechRef = useRef(null);
   const idRef = useRef(null);
 
   useEffect(() => () => {
-    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
-    if (audioRecorderRef.current?.state === 'recording') audioRecorderRef.current.stop();
-    streamRef.current?.getTracks().forEach((track) => track.stop());
     speechRef.current?.stop();
   }, []);
 
-  const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: mode === 'video' });
-      streamRef.current = stream;
-      chunksRef.current = [];
-      audioChunksRef.current = [];
-      const recorder = new MediaRecorder(stream);
-      recorderRef.current = recorder;
-      recorder.ondataavailable = (event) => { if (event.data.size) chunksRef.current.push(event.data); };
-
-      // For video we also record the audio track on its own. Transcription
-      // takes audio, not a video container, and extracting a track server-side
-      // would mean running ffmpeg somewhere — this gets the same result for
-      // the cost of a second MediaRecorder over the microphone track we
-      // already have.
-      let audioRecorder = null;
-      if (mode === 'video') {
-        try {
-          const audioOnly = new MediaStream(stream.getAudioTracks());
-          audioRecorder = new MediaRecorder(audioOnly);
-          audioRecorder.ondataavailable = (event) => { if (event.data.size) audioChunksRef.current.push(event.data); };
-          audioRecorderRef.current = audioRecorder;
-        } catch {
-          // Not fatal: the video still records, it just cannot be
-          // auto-transcribed, and the dashboard says so.
-          audioRecorderRef.current = null;
-        }
-      }
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: recorder.mimeType || (mode === 'video' ? 'video/webm' : 'audio/webm') });
-        setMediaFile(blob);
-        if (audioChunksRef.current.length) {
-          setAudioFile(new Blob(audioChunksRef.current, { type: audioRecorderRef.current?.mimeType || 'audio/webm' }));
-        }
-        stream.getTracks().forEach((track) => track.stop());
-        setStatus('Recording ready. You can add notes or continue.');
-      };
-      recorder.start();
-      audioRecorder?.start();
-      setRecording(true);
-      setStatus('Recording now — take your time.');
-    } catch {
-      setStatus('Camera or microphone access was not available. You can upload a file or continue with text.');
-    }
-  };
-
-  const stopRecording = () => {
-    if (recorderRef.current?.state === 'recording') recorderRef.current.stop();
-    if (audioRecorderRef.current?.state === 'recording') audioRecorderRef.current.stop();
-    streamRef.current?.getTracks().forEach((track) => track.stop());
-    setRecording(false);
-  };
+  // A finished take from the recording stage, or a file chosen with Upload.
+  const keepRecording = useCallback((media, audio) => {
+    setMediaFile(media);
+    setAudioFile(audio);
+  }, []);
+  const discardRecording = useCallback(() => {
+    setMediaFile(null);
+    setAudioFile(null);
+    setStatus('');
+  }, []);
 
   const toggleDictation = () => {
     if (dictating) {
@@ -171,7 +122,6 @@ export default function RecorderModal({ onClose }) {
   };
 
   const close = () => {
-    if (recording) stopRecording();
     speechRef.current?.stop();
     onClose();
   };
@@ -201,6 +151,10 @@ export default function RecorderModal({ onClose }) {
     event.preventDefault();
     // A recording is an account in itself. Asking someone to also type it out
     // before they may submit is the work machine transcription removes.
+    if (recordingOpen) {
+      setStatus('Please keep or discard your recording first — the buttons are under it.');
+      return;
+    }
     if (!title.trim() || (!storyText.trim() && !mediaFile)) {
       setStatus('Please add a title, and either a few words or a recording.');
       return;
@@ -218,7 +172,7 @@ export default function RecorderModal({ onClose }) {
 
     let mediaKey = '';
     if (mediaFile) {
-      const name = mediaFile instanceof File ? mediaFile.name : `experience-${Date.now()}.webm`;
+      const name = mediaFile instanceof File ? mediaFile.name : `experience-${Date.now()}.${extFor(mediaFile.type)}`;
       try {
         setStatus(`Uploading ${formatBytes(mediaFile.size)}…`);
         const result = await uploadToR2(mediaFile, name, (p) => {
@@ -244,7 +198,7 @@ export default function RecorderModal({ onClose }) {
     if (audioFile) {
       try {
         setStatus('Storing the audio track…');
-        audioKey = (await uploadToR2(audioFile, `experience-audio-${Date.now()}.webm`, () => {})).key;
+        audioKey = (await uploadToR2(audioFile, `experience-audio-${Date.now()}.${extFor(audioFile.type)}`, () => {})).key;
       } catch (error) {
         console.warn('Audio track upload failed', error);
       }
@@ -366,6 +320,13 @@ export default function RecorderModal({ onClose }) {
           <form onSubmit={submitExperience}>
             <p className="eyebrow"><span /> Step 3 of 3</p>
             <h2 id="recorder-title">Tell us what happened</h2>
+            {mode !== 'text' && (
+              <RecordingStage
+                mode={mode} mediaFile={mediaFile}
+                onKeep={keepRecording} onDiscard={discardRecording}
+                onPendingChange={setRecordingOpen} setStatus={setStatus}
+              />
+            )}
             <div className="form-grid">
               <label className="field"><span>First name</span><input value={firstName} onChange={(event) => setFirstName(event.target.value)} autoComplete="given-name" placeholder="Jane" /></label>
               <label className="field"><span>Last name</span><input value={lastName} onChange={(event) => setLastName(event.target.value)} autoComplete="family-name" placeholder="Doe" /></label>
@@ -412,13 +373,12 @@ export default function RecorderModal({ onClose }) {
             </div>
             <div className="capture-tools">
               <button type="button" onClick={toggleDictation} className={dictating ? 'is-live' : ''}>{dictating ? '■ Stop dictation' : '◌ Dictate'}</button>
-              {mode !== 'text' && <button type="button" onClick={recording ? stopRecording : startRecording} className={recording ? 'is-live' : ''}>{recording ? '■ Stop recording' : `● Record ${mode}`}</button>}
-              {mode !== 'text' && (
-                <label className="upload-button">↑ Upload {mode}
-                  <input type="file" accept={mode === 'video' ? 'video/*' : 'audio/*'} onChange={(event) => setMediaFile(event.target.files?.[0] ?? null)} />
+              {mode !== 'text' && !recordingOpen && (
+                <label className="upload-button">↑ {mediaFile ? 'Replace with a file' : `Or upload a ${mode} file`}
+                  <input type="file" accept={mode === 'video' ? 'video/*' : 'audio/*'} onChange={(event) => { const f = event.target.files?.[0]; if (f) keepRecording(f, null); }} />
                 </label>
               )}
-              {mediaFile && <span className="media-ready">✓ Media ready ({formatBytes(mediaFile.size)})</span>}
+              {mediaFile && <span className="media-ready">✓ {mode === 'video' ? 'Video' : 'Audio'} ready ({formatBytes(mediaFile.size)})</span>}
               <label className="upload-button">↑ Attach a photo
                 <input type="file" accept="image/*" onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)} />
               </label>
