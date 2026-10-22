@@ -65,6 +65,8 @@ export default function RecorderModal({ onClose }) {
   const [progress, setProgress] = useState(0);
   const [tags, setTags] = useState([]);
   const [tagInput, setTagInput] = useState('');
+  // tags the contributor took off; suggestions never put them back
+  const [removedTags, setRemovedTags] = useState([]);
   const [consent, setConsent] = useState(false);
   // optional: willing to have the story or photo used in Honeycomb's advertising
   const [adsOk, setAdsOk] = useState(false);
@@ -80,6 +82,24 @@ export default function RecorderModal({ onClose }) {
   useEffect(() => () => {
     speechRef.current?.stop();
   }, []);
+
+  // Tags suggested from what has been written so far, a moment after typing
+  // stops. They join the list as removable chips; one taken off stays off.
+  // (This ran in the first recorder and was lost when it was replaced.)
+  useEffect(() => {
+    const text = `${title}\n${storyText}`.trim();
+    if (text.length < 20) return undefined;
+    const timer = setTimeout(() => {
+      fetch('/api/generate-tags', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text }) })
+        .then((r) => r.json())
+        .then(({ tags: found }) => {
+          if (!Array.isArray(found)) return;
+          setTags((current) => [...current, ...found.filter((t) => !current.includes(t) && !removedTags.includes(t))]);
+        })
+        .catch(() => undefined);
+    }, 900);
+    return () => clearTimeout(timer);
+  }, [title, storyText, removedTags]);
 
   // A finished take from the recording stage, or a file chosen with Upload.
   const keepRecording = useCallback((media, audio) => {
@@ -359,7 +379,7 @@ export default function RecorderModal({ onClose }) {
                   {tags.map((tag) => (
                     <span className="tag-chip" key={tag}>
                       #{tag}
-                      <button type="button" onClick={() => setTags((t) => t.filter((x) => x !== tag))} aria-label={`Remove tag ${tag}`}>×</button>
+                      <button type="button" onClick={() => { setTags((t) => t.filter((x) => x !== tag)); setRemovedTags((r) => [...r, tag]); }} aria-label={`Remove tag ${tag}`}>×</button>
                     </span>
                   ))}
                 </div>

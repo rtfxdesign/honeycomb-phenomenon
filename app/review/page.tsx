@@ -46,6 +46,9 @@ interface SubmissionData {
   transcriptWarnings?: string[];
   transcriptError?: string;
   transcribedAt?: string;
+  // the video still, and whether a moderator has kept it off the comb
+  stillKey?: string;
+  stillHidden?: boolean;
 }
 
 interface Submission {
@@ -54,6 +57,8 @@ interface Submission {
   mediaUrl: string | null;
   mediaType: "image" | "video" | "audio" | "unknown" | null;
   photoUrl: string | null;
+  // a frame from the video, made by the encoder after approval
+  stillUrl?: string | null;
   // only when the contributor ticked "open to being contacted"
   contactEmail?: string | null;
   lastModified: string;
@@ -160,6 +165,8 @@ export default function ReviewDashboard() {
   const [activeMedia, setActiveMedia] = useState<{ url: string; type: Submission["mediaType"] } | null>(null);
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [edit, setEdit] = useState<EditState | null>(null);
+  // the editor was opened on a machine draft ("Edit before using")
+  const [editingDraft, setEditingDraft] = useState(false);
   const [saving, setSaving] = useState(false);
   const [people, setPeople] = useState<Person[]>([]);
   const [authRequired, setAuthRequired] = useState(false);
@@ -362,8 +369,13 @@ export default function ReviewDashboard() {
     }
   };
 
-  const startEdit = (submission: Submission) => {
+  // "Edit before using" opens the editor on the machine draft, not on what the
+  // contributor typed — it used to open on the record's transcript, so the
+  // draft vanished the moment you went to fix it. Saving that edit confirms
+  // the draft, exactly as "Use as transcript" does.
+  const startEdit = (submission: Submission, draft?: string) => {
     setEditingKey(submission.submissionKey);
+    setEditingDraft(draft !== undefined);
     setEdit({
       title: submission.data.title || "",
       displayName: submission.data.displayName || "",
@@ -373,17 +385,39 @@ export default function ReviewDashboard() {
       location: submission.data.location || "",
       experienceYear: submission.data.experienceYear || "",
       privacy: submission.data.privacy || "public",
-      transcript: submission.data.transcript || "",
+      transcript: draft ?? submission.data.transcript ?? "",
       hashtags: (submission.data.hashtags || []).join(", "),
     });
   };
-  const stopEdit = () => { setEditingKey(null); setEdit(null); };
+  const stopEdit = () => { setEditingKey(null); setEdit(null); setEditingDraft(false); };
+
+  /**
+   * Tags the dictionary in /api/generate-tags finds in a text, minus the ones
+   * already on the record. Nothing calls this on its own: it runs when a
+   * transcript is confirmed, and from the "Suggest tags" button.
+   */
+  const suggestTags = async (text: string, have: string[]) => {
+    try {
+      const res = await fetch("/api/generate-tags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text }),
+      });
+      const { tags } = await res.json();
+      const lower = new Set(have.map((t) => t.toLowerCase()));
+      return (Array.isArray(tags) ? tags : []).filter((t: string) => !lower.has(t.toLowerCase()));
+    } catch {
+      return [];
+    }
+  };
+  const splitTags = (s: string) => s.split(",").map((t) => t.trim().replace(/^#/, "")).filter(Boolean);
 
   const saveEdit = async (submissionKey: string) => {
     if (!edit) return;
     setSaving(true);
     try {
-      const updates = {
+      const hashtags = splitTags(edit.hashtags);
+      const updates: Record<string, unknown> = {
         title: edit.title,
         displayName: edit.displayName,
         firstName: edit.firstName,
@@ -393,8 +427,14 @@ export default function ReviewDashboard() {
         experienceYear: edit.experienceYear,
         privacy: edit.privacy,
         transcript: edit.transcript,
-        hashtags: edit.hashtags.split(",").map((t) => t.trim().replace(/^#/, "")).filter(Boolean),
+        hashtags,
       };
+      if (editingDraft) {
+        // an edited machine draft becomes the record, and is tagged like one
+        updates.transcriptStatus = "confirmed";
+        updates.transcriptSource = "machine";
+        updates.hashtags = [...hashtags, ...(await suggestTags(edit.transcript, hashtags))];
+      }
       const res = await fetch("/api/update-experience", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -467,12 +507,16 @@ export default function ReviewDashboard() {
   const acceptDraft = async (submissionKey: string, text: string) => {
     setSaving(true);
     try {
+      // A recording arrives with no words, so it arrives with no tags either;
+      // confirming its transcript is the moment it can be tagged.
+      const have = submissions.find((sub) => sub.submissionKey === submissionKey)?.data.hashtags || [];
+      const hashtags = [...have, ...(await suggestTags(text, have))];
       const res = await fetch("/api/update-experience", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           submissionKey,
-          updates: { transcript: text, transcriptStatus: "confirmed", transcriptSource: "machine" },
+          updates: { transcript: text, transcriptStatus: "confirmed", transcriptSource: "machine", hashtags },
         }),
       });
       if (!res.ok) throw new Error("Failed to save");
@@ -484,6 +528,28 @@ export default function ReviewDashboard() {
     } catch (err) {
       console.error(err);
       alert("Could not save the transcript. Check console.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  /** Show or hide the video still on the comb. */
+  const setStillHidden = async (submissionKey: string, hidden: boolean) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/update-experience", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ submissionKey, updates: { stillHidden: hidden } }),
+      });
+      if (!res.ok) throw new Error("Failed to save");
+      const result = await res.json();
+      setSubmissions((current) => current.map((sub) =>
+        sub.submissionKey === submissionKey ? { ...sub, data: result.data } : sub,
+      ));
+    } catch (err) {
+      console.error(err);
+      alert("Could not change the still. Check console.");
     } finally {
       setSaving(false);
     }
@@ -601,7 +667,7 @@ export default function ReviewDashboard() {
             <p className="rv-machine-draft">{draft}</p>
             <div className="rv-machine-actions">
               <button type="button" className="rv-cta rv-cta--sm" disabled={saving} onClick={() => acceptDraft(s.submissionKey, draft)}>Use as transcript</button>
-              <button type="button" className="rv-quiet" disabled={saving} onClick={() => startEdit(s)}>Edit before using</button>
+              <button type="button" className="rv-quiet" disabled={saving} onClick={() => startEdit(s, draft)}>Edit before using</button>
               {canTranscribe && <button type="button" className="rv-quiet" disabled={busy || saving} onClick={() => transcribe(s.submissionKey)}>Transcribe again</button>}
               <button type="button" className="rv-quiet" onClick={() => setHiddenDrafts((h) => ({ ...h, [s.submissionKey]: true }))}>Discard</button>
             </div>
@@ -664,6 +730,21 @@ export default function ReviewDashboard() {
                   <aside className="rv-media">
                     <span className="rv-label">Attached media</span>
                     {s.photoUrl && <img className="rv-media-photo" src={s.photoUrl} alt="Attached photo" />}
+                    {s.stillUrl && (
+                      <figure className="rv-still">
+                        <img className="rv-media-photo" src={s.stillUrl} alt="Still from the video" style={d.stillHidden ? { opacity: 0.35 } : undefined} />
+                        <figcaption className="rv-ui">
+                          {s.photoUrl
+                            ? "Video still — not used, the photo is the cell's face"
+                            : d.stillHidden ? "Video still — hidden from the comb" : "Video still — the cell's face on the comb"}
+                          {!s.photoUrl && (
+                            <button type="button" className="rv-quiet" disabled={saving} onClick={() => setStillHidden(s.submissionKey, !d.stillHidden)}>
+                              {d.stillHidden ? "Show on comb" : "Hide from comb"}
+                            </button>
+                          )}
+                        </figcaption>
+                      </figure>
+                    )}
                     {s.mediaUrl && (s.mediaType === "video" || s.mediaType === "audio" || s.mediaType === "image") && (
                       <button type="button" className="rv-media-box" onClick={() => setActiveMedia({ url: s.mediaUrl as string, type: s.mediaType })}>
                         <span><b>▶</b>{s.mediaType === "image" ? "Open image" : `Play ${s.mediaType}`}</span>
@@ -713,7 +794,16 @@ export default function ReviewDashboard() {
               <Field label="Transcript" className="rv-span">
                 <textarea rows={10} value={edit.transcript} onChange={(e) => setEdit({ ...edit, transcript: e.target.value })} />
               </Field>
-              <Field label="Tags (comma-separated)" className="rv-span">
+              <Field
+                label="Tags (comma-separated)" className="rv-span"
+                hint={
+                  <button type="button" className="rv-quiet" onClick={async () => {
+                    const have = splitTags(edit.hashtags);
+                    const more = await suggestTags(`${edit.title}\n${edit.transcript}`, have);
+                    setEdit((cur) => cur && { ...cur, hashtags: [...splitTags(cur.hashtags), ...more].join(", ") });
+                  }}>Suggest tags from the text</button>
+                }
+              >
                 <input value={edit.hashtags} onChange={(e) => setEdit({ ...edit, hashtags: e.target.value })} placeholder="orb, dc, daytime" />
               </Field>
             </div>

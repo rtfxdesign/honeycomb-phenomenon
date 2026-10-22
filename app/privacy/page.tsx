@@ -48,7 +48,7 @@ export default function PrivacyPage() {
         <p>Only what you put into the form. Every field except the title is optional.</p>
         <ul>
           <li><strong>Your account</strong> — the words you type or dictate, and/or a video or audio recording. For a video we also keep its audio track on its own, so it can be transcribed.</li>
-          <li><strong>A photo</strong>, if you attach one. It becomes the face of your cell in the comb.</li>
+          <li><strong>A photo</strong>, if you attach one. It becomes the face of your cell in the comb. If you send a video and no photo, a single frame from the video becomes the face instead, once the story is approved; it is shown at the same visibility level as the story, a moderator can hide it, and it is deleted with the story.</li>
           <li><strong>Your name</strong>, first and last, and <strong>how much of it to show</strong>: full name, first name and last initial, or initials only. Both are kept separately so you can change how much shows later without telling us your name again. Leave both blank to stay anonymous; your cell then shows the place, or the title, instead.</li>
           <li><strong>A title, a place, a year, and tags</strong> — as you wrote them.</li>
           <li><strong>The visibility you chose</strong>: public, community only, or strictly archived.</li>

@@ -530,6 +530,9 @@ function TopBar({ onNav, onSubmit, activePage, query, onQuery, matchCount, autoh
             {p.label || p.id.toUpperCase()}
           </button>
           )))}
+        {/* moderators only; /review checks the role itself, so this is a
+            shortcut, not the lock */}
+        {session?.role === 'moderator' && <a href="/review">REVIEW</a>}
         {session && session.role && session.role !== 'visitor' && (
           <button
             className="member-chip" type="button"
@@ -892,10 +895,11 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
         const exp = experiences[e++];
         // name as the contributor chose to show it, else place, else title
         const name = cellLabel(exp) || 'Archive voice';
-        // a story with no photo still needs to be findable in the comb, so the
-        // cell carries its initials instead of a portrait
+        // the contributor's photo, else a frame from their video, so several
+        // stories from one person read as different cells; a story with
+        // neither still needs to be findable, so it carries its initials
         const initials = initialsOf(name) || '?';
-        m.set(b.k, { src: exp.photoUrl || null, photo: true, initials, name, person: { name, experience: exp } });
+        m.set(b.k, { src: exp.photoUrl || exp.stillUrl || null, photo: true, initials, name, person: { name, experience: exp } });
       }
     }
     return m;

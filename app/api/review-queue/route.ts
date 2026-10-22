@@ -89,12 +89,19 @@ export async function GET(request: NextRequest) {
             photoUrl = await getSignedUrl(client, photoCmd, { expiresIn: 3600 });
           }
 
+          // the video still, shown to moderators even when hidden from the comb
+          let stillUrl = null;
+          if (data.stillKey) {
+            stillUrl = await getSignedUrl(client, new GetObjectCommand({ Bucket: BUCKET, Key: phys(data.stillKey) }), { expiresIn: 3600 });
+          }
+
           return {
             submissionKey: toLogical(obj.Key!),
             data,
             mediaUrl,
             mediaType,
             photoUrl,
+            stillUrl,
             contactEmail: (data.id && contacts.get(data.id)) || null,
             lastModified: obj.LastModified
           };

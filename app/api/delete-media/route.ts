@@ -35,8 +35,9 @@ export async function POST(request: NextRequest) {
         // 2. Delete every object the record points at. "Removed" has to mean
         // the recording, its audio track and the photo, not just the JSON —
         // the audio track was previously left behind, and so was the
-        // streaming copy the encoder makes (webKey / originalMediaKey).
-        const keys = new Set([data.mediaKey, data.audioKey, data.photoKey, data.webKey, data.originalMediaKey].filter(Boolean));
+        // streaming copy the encoder makes (webKey / originalMediaKey), and the
+        // still it takes from the video (stillKey).
+        const keys = new Set([data.mediaKey, data.audioKey, data.photoKey, data.webKey, data.originalMediaKey, data.stillKey].filter(Boolean));
         deleted = [...keys] as string[];
         for (const k of keys) {
           await client.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: phys(k) }));

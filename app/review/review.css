@@ -101,6 +101,9 @@
 .rv-media-box b{color:var(--gold);font-size:18px;font-weight:400}
 .rv-media-photo{width:100px;height:100px;border-radius:4px;object-fit:cover;border:1px solid rgba(224,151,37,.32);display:block}
 .rv-media a.rv-ui{display:inline-block;letter-spacing:.1em;font-size:8.5px}
+.rv-still{margin:0;display:grid;gap:6px}
+.rv-still figcaption{display:grid;gap:4px;font-size:8.5px;letter-spacing:.1em;max-width:180px}
+.rv-still figcaption button{justify-self:start}
 .rv-edit{margin-top:22px;display:grid;grid-template-columns:1fr 1fr 1fr 150px;gap:14px}
 .rv-span{grid-column:1/-1}
 .rv-span2{grid-column:span 2}

@@ -30,6 +30,9 @@ const EDITABLE_FIELDS = [
   // transcript later.
   "transcriptStatus",
   "transcriptSource",
+  // keep the video still off the comb (a bad frame, or a face that should
+  // not be the first thing seen); the still itself is kept
+  "stillHidden",
 ] as const;
 
 export async function POST(request: NextRequest) {
@@ -64,6 +67,8 @@ export async function POST(request: NextRequest) {
           data.hashtags = Array.isArray(updates.hashtags)
             ? updates.hashtags.map((t: unknown) => String(t).trim()).filter(Boolean)
             : [];
+        } else if (field === "stillHidden") {
+          data.stillHidden = updates.stillHidden === true;
         } else {
           data[field] = String(updates[field] ?? "");
         }

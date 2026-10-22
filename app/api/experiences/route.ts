@@ -71,6 +71,13 @@ export async function GET(request: NextRequest) {
             photoUrl = await getSignedUrl(client, photoCmd, { expiresIn: 3600 });
           }
 
+          // A frame from the video (made by scripts/encode-approved.mjs), the
+          // cell's face when there is no photo. A moderator can hide it.
+          let stillUrl = null;
+          if (data.stillKey && data.stillHidden !== true) {
+            stillUrl = await getSignedUrl(client, new GetObjectCommand({ Bucket: BUCKET, Key: phys(data.stillKey) }), { expiresIn: 3600 });
+          }
+
           // An unconfirmed machine transcript is a draft for the moderator,
           // not a record of what anybody said. It must not reach a browser and
           // must not stand in for the transcript — same rule as the archived
@@ -93,6 +100,7 @@ export async function GET(request: NextRequest) {
             displayName: data.displayName || formatDisplayName(data.firstName, data.lastName, data.nameDisplay) || undefined,
             mediaUrl,
             photoUrl,
+            stillUrl,
             lastModified: obj.LastModified
           };
         } catch (err) {

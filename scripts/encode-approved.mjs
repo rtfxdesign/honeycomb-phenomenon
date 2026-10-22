@@ -8,12 +8,21 @@
 // both handled; a logical key is encoded once and uploaded under each prefix
 // that needs it.
 //
+// It also takes a still from every approved video — one representative frame
+// a couple of seconds in, 640px wide, WebP, no metadata — uploaded as
+// <name>-still.webp and recorded as stillKey. A cell with no photo shows the
+// still instead of initials, so twelve stories from one person read as twelve
+// different cells. Records that already have a still are left alone; ones
+// encoded before stills existed get theirs from the -web.mp4.
+//
 // Runs from a scheduled task every few minutes on Allen's machine (the site's
 // functions cannot run ffmpeg on files this size). Safe to run at any time:
-// records already pointing at a -web.mp4, or carrying mediaEncodedAt, are
-// skipped, and a lock file stops two runs overlapping.
+// records already pointing at a -web.mp4, or carrying mediaEncodedAt, are not
+// re-encoded, and a lock file stops two runs overlapping.
 //
-// Usage: node scripts/encode-approved.mjs [--dry-run]
+// Usage: node scripts/encode-approved.mjs [--dry-run] [--no-stills] [--only=<prefix>]
+//   --no-stills       encode only; make no stills
+//   --only=preview/   one prefix only; --only= (empty) is production alone
 import { S3Client, ListObjectsV2Command, GetObjectCommand, PutObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -27,7 +36,9 @@ const WORK = process.env.MEDIA_WORK || fileURLToPath(new URL("../../media-work",
 const LOG = path.join(WORK, "encode.log");
 const LOCK = path.join(WORK, "encode.lock");
 const FFMPEG = process.env.FFMPEG || "ffmpeg";
-const PREFIXES = ["", "preview/"];
+const STILLS = !process.argv.includes("--no-stills");
+const ONLY = process.argv.find((a) => a.startsWith("--only="));
+const PREFIXES = ONLY !== undefined ? [ONLY.slice("--only=".length)] : ["", "preview/"];
 const VIDEO_EXT = /\.(mov|mp4|m4v|webm|mkv|avi|3gp)$/i;
 
 fs.mkdirSync(path.join(WORK, "originals"), { recursive: true });
@@ -53,6 +64,8 @@ async function listKeys(Prefix) {
   return keys;
 }
 const webKeyFor = (mediaKey) => mediaKey.replace(VIDEO_EXT, "") + "-web.mp4";
+// from either the original or its -web.mp4 copy, the same still name
+const stillKeyFor = (mediaKey) => mediaKey.replace(/-web\.mp4$/i, "").replace(VIDEO_EXT, "") + "-still.webp";
 
 async function download(Key, file) {
   const r = await client.send(new GetObjectCommand({ Bucket, Key }));
@@ -69,8 +82,23 @@ function encode(input, output) {
   const r = spawnSync(FFMPEG, args, { encoding: "utf8" });
   if (r.status !== 0) throw new Error(`ffmpeg failed (${r.status}): ${(r.stderr || "").slice(0, 400)}`);
 }
+function grabStill(input, output) {
+  // thumbnail=60 picks the most typical of 60 frames, which skips a blink or
+  // a frame of motion blur. Two seconds in misses the fumble of pressing
+  // record; a clip shorter than that is taken from the start.
+  let err = "";
+  for (const seek of ["2", "0"]) {
+    const args = ["-y", "-hide_banner", "-nostats", "-loglevel", "error", "-ss", seek, "-i", input, "-map_metadata", "-1",
+      "-vf", "thumbnail=60,scale='min(640,iw)':-2", "-frames:v", "1", "-c:v", "libwebp", "-quality", "80", output];
+    const r = spawnSync(FFMPEG, args, { encoding: "utf8" });
+    if (r.status === 0 && fs.existsSync(output) && fs.statSync(output).size > 0) return;
+    err = r.stderr || "";
+  }
+  throw new Error(`ffmpeg could not take a still: ${err.slice(0, 400)}`);
+}
 
 const encoded = new Map(); // logical web key -> local file, for this run
+const stills = new Map(); // logical still key -> local file, for this run
 let work = 0;
 for (const prefix of PREFIXES) {
   const keys = (await listKeys(prefix + "approved/submissions/")).filter((k) => k.endsWith(".json"));
@@ -78,39 +106,71 @@ for (const prefix of PREFIXES) {
     const r = await client.send(new GetObjectCommand({ Bucket, Key: k }));
     const d = JSON.parse(await r.Body.transformToString());
     if (d.recordingMode !== "video" || !d.mediaKey || !VIDEO_EXT.test(d.mediaKey)) continue;
-    if (/-web\.mp4$/i.test(d.mediaKey) || d.mediaEncodedAt) continue;
-    const webKey = webKeyFor(d.mediaKey);
+    const needsWeb = !(/-web\.mp4$/i.test(d.mediaKey) || d.mediaEncodedAt);
+    const needsStill = STILLS && !d.stillKey;
+    if (!needsWeb && !needsStill) continue;
+    const webKey = needsWeb ? webKeyFor(d.mediaKey) : d.mediaKey;
+    const stillKey = stillKeyFor(d.mediaKey);
     const physOriginal = prefix + d.mediaKey;
     const physWeb = prefix + webKey;
+    const physStill = prefix + stillKey;
     work++;
-    log(`${DRY ? "[dry] " : ""}${k}: "${d.title}" -> ${webKey}`);
+    log(`${DRY ? "[dry] " : ""}${k}: "${d.title}"${needsWeb ? ` -> ${webKey}` : ""}${needsStill ? ` + ${stillKey}` : ""}`);
     if (DRY) continue;
     try {
-      if (!(await exists(physWeb))) {
-        let local = encoded.get(webKey);
-        if (!local) {
-          if (!(await exists(physOriginal))) { log(`  original missing: ${physOriginal}; skipped`); continue; }
-          const orig = path.join(WORK, "originals", path.basename(d.mediaKey));
-          const out = path.join(WORK, "web", path.basename(webKey));
-          log(`  downloading ${physOriginal}`);
-          await download(physOriginal, orig);
-          log(`  encoding (${Math.round(fs.statSync(orig).size / 1048576)} MB in)`);
-          encode(orig, out);
-          log(`  encoded (${Math.round(fs.statSync(out).size / 1048576)} MB out)`);
-          fs.unlinkSync(orig);
-          local = out; encoded.set(webKey, out);
+      const next = { ...d };
+      let local = encoded.get(webKey); // the streaming copy on disk, when this run made it
+      if (needsWeb) {
+        if (!(await exists(physWeb))) {
+          if (!local) {
+            if (!(await exists(physOriginal))) { log(`  original missing: ${physOriginal}; skipped`); continue; }
+            const orig = path.join(WORK, "originals", path.basename(d.mediaKey));
+            const out = path.join(WORK, "web", path.basename(webKey));
+            log(`  downloading ${physOriginal}`);
+            await download(physOriginal, orig);
+            log(`  encoding (${Math.round(fs.statSync(orig).size / 1048576)} MB in)`);
+            encode(orig, out);
+            log(`  encoded (${Math.round(fs.statSync(out).size / 1048576)} MB out)`);
+            fs.unlinkSync(orig);
+            local = out; encoded.set(webKey, out);
+          }
+          const size = fs.statSync(local).size;
+          await client.send(new PutObjectCommand({ Bucket, Key: physWeb, Body: fs.readFileSync(local), ContentLength: size, ContentType: "video/mp4" }));
+          log(`  uploaded ${physWeb}`);
         }
-        const size = fs.statSync(local).size;
-        await client.send(new PutObjectCommand({ Bucket, Key: physWeb, Body: fs.readFileSync(local), ContentLength: size, ContentType: "video/mp4" }));
-        log(`  uploaded ${physWeb}`);
+        Object.assign(next, { mediaKey: webKey, originalMediaKey: d.originalMediaKey || d.mediaKey, mediaEncodedAt: new Date().toISOString() });
       }
-      const next = { ...d, mediaKey: webKey, originalMediaKey: d.originalMediaKey || d.mediaKey, mediaEncodedAt: new Date().toISOString() };
+      if (needsStill) {
+        if (!(await exists(physStill))) {
+          let still = stills.get(stillKey);
+          if (!still) {
+            // from the streaming copy where there is one: smaller to fetch
+            let source = local;
+            let fetched = null;
+            if (!source) {
+              const src = (await exists(physWeb)) ? physWeb : physOriginal;
+              if (!(await exists(src))) { log(`  video missing: ${src}; no still`); throw new Error("no video to take a still from"); }
+              fetched = path.join(WORK, "originals", path.basename(src));
+              log(`  downloading ${src} for a still`);
+              await download(src, fetched);
+              source = fetched;
+            }
+            still = path.join(WORK, "web", path.basename(stillKey));
+            grabStill(source, still);
+            if (fetched) fs.unlinkSync(fetched);
+            stills.set(stillKey, still);
+          }
+          await client.send(new PutObjectCommand({ Bucket, Key: physStill, Body: fs.readFileSync(still), ContentType: "image/webp" }));
+          log(`  uploaded ${physStill} (${Math.round(fs.statSync(still).size / 1024)} KB)`);
+        }
+        Object.assign(next, { stillKey, stillMadeAt: new Date().toISOString() });
+      }
       await client.send(new PutObjectCommand({ Bucket, Key: k, Body: JSON.stringify(next, null, 2), ContentType: "application/json" }));
-      log(`  record repointed: ${k}`);
+      log(`  record updated: ${k}`);
     } catch (e) {
       log(`  FAILED ${k}: ${e.message}`);
     }
   }
 }
-for (const f of encoded.values()) { try { fs.unlinkSync(f); } catch { /* keep going */ } }
-log(work ? `done: ${work} record(s) considered` : "nothing to encode");
+for (const f of [...encoded.values(), ...stills.values()]) { try { fs.unlinkSync(f); } catch { /* keep going */ } }
+log(work ? `done: ${work} record(s) considered` : "nothing to do");
