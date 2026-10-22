@@ -40,7 +40,8 @@ interface SubmissionData {
   audioKey?: string;
   recordingMode?: string;
   machineTranscript?: string;
-  transcriptStatus?: "none" | "awaiting" | "ready" | "confirmed" | "failed";
+  // "queued": too long to transcribe while the moderator waits; the encoder does it
+  transcriptStatus?: "none" | "awaiting" | "queued" | "ready" | "confirmed" | "failed";
   transcriptSource?: string;
   transcriptModel?: string;
   transcriptWarnings?: string[];
@@ -471,6 +472,14 @@ export default function ReviewDashboard() {
         body: JSON.stringify({ submissionKey }),
       });
       const result = await res.json();
+      if (res.status === 202 && result.queued) {
+        // too long to wait for: the encoder on Allen's desktop will do it
+        setSubmissions((current) => current.map((sub) =>
+          sub.submissionKey === submissionKey ? { ...sub, data: { ...sub.data, transcriptStatus: "queued" } } : sub,
+        ));
+        setTranscribeNote((n) => ({ ...n, [submissionKey]: result.message }));
+        return;
+      }
       if (!res.ok) {
         // The route explains its own failures; show what it said rather than
         // a generic message the moderator can do nothing with.
@@ -649,8 +658,10 @@ export default function ReviewDashboard() {
     const busy = transcribingKey === s.submissionKey;
     const note = transcribeNote[s.submissionKey];
     const draft = d.machineTranscript && !hiddenDrafts[s.submissionKey] ? d.machineTranscript : null;
-    if (!busy && !draft && !note && !(d.transcriptStatus === "confirmed" && d.transcriptSource === "machine")) return null;
+    const queued = d.transcriptStatus === "queued";
+    if (!busy && !draft && !note && !queued && !(d.transcriptStatus === "confirmed" && d.transcriptSource === "machine")) return null;
     const status = busy ? "Transcribing…"
+      : queued && !note ? "Queued — the encoder on Allen's desktop transcribes it within about fifteen minutes. Reload to check."
       : d.transcriptStatus === "confirmed" && d.transcriptSource === "machine" && !draft ? "Confirmed — moved into the record"
       : note || (draft ? "draft, not the record" : "");
     return (
@@ -820,8 +831,19 @@ export default function ReviewDashboard() {
             <>
               {!live && <button type="button" className="rv-cta" onClick={() => handleApprove(s.submissionKey)}>Approve &amp; publish<span aria-hidden="true">↗</span></button>}
               <button type="button" className="rv-quiet" onClick={() => startEdit(s)}>Edit</button>
-              {canTranscribe && !d.machineTranscript && (
-                <button type="button" className="rv-quiet" disabled={busy || saving} onClick={() => transcribe(s.submissionKey)}>{busy ? "Transcribing…" : "Transcribe recording"}</button>
+              {/* Always offered when there is audio: once a transcript exists it
+                  becomes "Transcribe again" (it used to vanish). A video gets
+                  its audio track from the encoder, which runs every fifteen
+                  minutes on Allen's desktop; until then the button says so. */}
+              {canTranscribe && (
+                <button type="button" className="rv-quiet" disabled={busy || saving} onClick={() => transcribe(s.submissionKey)}>
+                  {busy ? "Transcribing…" : d.machineTranscript ? "Transcribe again" : "Transcribe recording"}
+                </button>
+              )}
+              {!canTranscribe && d.recordingMode === "video" && (
+                <button type="button" className="rv-quiet" disabled title="The encoder makes an audio track from each video within about fifteen minutes, while Allen's desktop is on. Reload to check.">
+                  Transcribe · audio track pending
+                </button>
               )}
             </>
           )}

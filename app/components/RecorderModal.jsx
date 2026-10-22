@@ -172,7 +172,8 @@ export default function RecorderModal({ onClose }) {
     // A recording is an account in itself. Asking someone to also type it out
     // before they may submit is the work machine transcription removes.
     if (recordingOpen) {
-      setStatus('Please keep or discard your recording first — the buttons are under it.');
+      setStatus('Please choose Keep or Record again under your recording first.');
+      document.querySelector('.rec-decide, .rec-stage')?.scrollIntoView({ block: 'center', behavior: 'smooth' });
       return;
     }
     if (!title.trim() || (!storyText.trim() && !mediaFile)) {
@@ -372,7 +373,18 @@ export default function RecorderModal({ onClose }) {
               <label className="field field-wide"><span>A short title</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="The light above the pines" required /></label>
               <label className="field"><span>Place</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Hudson Valley, NY" /></label>
               <label className="field"><span>Year</span><input value={year} onChange={(event) => setYear(event.target.value)} inputMode="numeric" placeholder="1986" /></label>
-              <label className="field field-wide"><span>Your experience</span><textarea value={storyText} onChange={(event) => setStoryText(event.target.value)} placeholder="Begin wherever feels right…" rows={6} required /></label>
+              {/* Required only for a written story. A recording is the account
+                  itself and becomes the transcript, so for video and audio
+                  this is an optional note (the save still needs words or a
+                  recording, checked in submitExperience). */}
+              <label className="field field-wide">
+                <span>{mode === 'text' ? 'Your experience' : 'A few words about it (optional)'}</span>
+                <textarea
+                  value={storyText} onChange={(event) => setStoryText(event.target.value)} rows={mode === 'text' ? 6 : 3}
+                  placeholder={mode === 'text' ? 'Begin wherever feels right…' : 'Anything you would like to add. Your recording will be transcribed.'}
+                  required={mode === 'text'}
+                />
+              </label>
               <div className="field field-wide tags-container">
                 <span>Tags &amp; Keywords</span>
                 <div className="tag-list">

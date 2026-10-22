@@ -268,11 +268,18 @@ export default function RecordingStage({ mode, mediaFile, onKeep, onDiscard, onP
             <button type="button" className="rec-primary is-live" onClick={stop}>■ Stop</button>
           </>
         )}
+        {/* The one step people missed: nothing can be saved until they
+            choose. So it is a panel of its own that pulses gold (steadily,
+            under reduced motion) and says so, with Keep as the filled
+            button and Record again as the clear second choice. */}
         {phase === 'review' && (
-          <>
-            <button type="button" className="rec-primary" onClick={keep}>✓ Keep this recording</button>
-            <button type="button" onClick={again}>↺ Record again</button>
-          </>
+          <div className="rec-decide" role="group" aria-label="Keep or record again">
+            <span className="rec-decide-label">Choose one to continue</span>
+            <div className="rec-decide-buttons">
+              <button type="button" className="rec-keep" onClick={keep}>✓ Keep this recording</button>
+              <button type="button" className="rec-again" onClick={again}>↺ Record again</button>
+            </div>
+          </div>
         )}
       </div>
     </div>

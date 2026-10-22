@@ -30,7 +30,7 @@ export const MAX_BYTES = Number(process.env.TRANSCRIBE_MAX_BYTES || 25 * 1024 * 
 
 export type TranscriptionResult =
   | { ok: true; text: string; model: string; wordCount: number; warnings: string[] }
-  | { ok: false; reason: "not-configured" | "too-large" | "empty" | "failed"; detail?: string };
+  | { ok: false; reason: "not-configured" | "too-large" | "empty" | "failed" | "timeout"; detail?: string };
 
 type TimedWord = { word?: string; start?: number; end?: number };
 
@@ -113,7 +113,10 @@ export const transcriptionConfigured = () =>
  */
 export async function transcribeAudio(
   bytes: Uint8Array,
-  opts: { model?: string; contentType?: string } = {}
+  // timeoutMs: give up after this long and say so ("timeout"), rather than
+  // let the host cut the request off with a bare 504. Whisper takes about
+  // seven seconds a minute of audio; a site function gets well under thirty.
+  opts: { model?: string; contentType?: string; timeoutMs?: number } = {}
 ): Promise<TranscriptionResult> {
   if (!transcriptionConfigured()) return { ok: false, reason: "not-configured" };
   if (!bytes || bytes.byteLength === 0) return { ok: false, reason: "empty" };
@@ -137,6 +140,7 @@ export async function transcribeAudio(
       },
       // Whisper on Workers AI takes the raw audio bytes as the request body.
       body: bytes as unknown as BodyInit,
+      signal: opts.timeoutMs ? AbortSignal.timeout(opts.timeoutMs) : undefined,
     });
 
     if (!res.ok) {
@@ -181,15 +185,17 @@ export async function transcribeAudio(
       warnings,
     };
   } catch (err) {
+    if (err instanceof Error && (err.name === "TimeoutError" || err.name === "AbortError")) return { ok: false, reason: "timeout" };
     return { ok: false, reason: "failed", detail: err instanceof Error ? err.message : String(err) };
   }
 }
 
 /**
- * Whisper wants audio. A video/webm container is not audio, so a video
- * submission is transcribed from the audio track the recorder captures
- * alongside it (audioKey) rather than from the video itself. This picks the
- * right object and says so when there is nothing to work with.
+ * Whisper wants audio. A video container is not audio, so a video submission
+ * is transcribed from its audio track (audioKey): the one the recorder
+ * captures alongside it, or, for an uploaded file, the one
+ * scripts/encode-approved.mjs extracts. This picks the right object and says
+ * so when there is nothing to work with yet.
  */
 export function mediaKeyForTranscription(record: {
   audioKey?: string;
@@ -201,7 +207,7 @@ export function mediaKeyForTranscription(record: {
   if (record.recordingMode === "video") {
     return {
       key: null,
-      why: "This video has no separate audio track. Recordings made before audio capture was added cannot be transcribed automatically.",
+      why: "This video has no audio track yet. The encoder makes one from each video within about fifteen minutes, while Allen's desktop is on.",
     };
   }
   return { key: null, why: "This submission has no audio to transcribe." };
@@ -214,6 +220,8 @@ export function explainFailure(reason: string, detail?: string): string {
       return "Transcription is not configured on this deployment (CF_ACCOUNT_ID / CF_AI_TOKEN).";
     case "too-large":
       return `Recording is too large to transcribe in one pass. ${detail || ""}`.trim();
+    case "timeout":
+      return "Too long to transcribe while you wait. It is queued: the encoder on Allen's desktop transcribes it within about fifteen minutes.";
     case "empty":
       return "The recording appears to be empty.";
     default:

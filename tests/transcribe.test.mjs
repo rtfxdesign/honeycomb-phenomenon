@@ -82,7 +82,7 @@ function mediaKeyForTranscription(record) {
   if (record.audioKey) return { key: record.audioKey };
   if (record.recordingMode === 'audio' && record.mediaKey) return { key: record.mediaKey };
   if (record.recordingMode === 'video') {
-    return { key: null, why: 'This video has no separate audio track. Recordings made before audio capture was added cannot be transcribed automatically.' };
+    return { key: null, why: "This video has no audio track yet. The encoder makes one from each video within about fifteen minutes, while Allen's desktop is on." };
   }
   return { key: null, why: 'This submission has no audio to transcribe.' };
 }
@@ -191,7 +191,7 @@ test('uses the recording itself for an audio submission', () => {
 test('a video with no audio track explains itself rather than failing silently', () => {
   const r = mediaKeyForTranscription({ recordingMode: 'video', mediaKey: 'video/old.mp4' });
   assert.equal(r.key, null);
-  assert.match(r.why, /no separate audio track/);
+  assert.match(r.why, /no audio track yet/);
 });
 
 test('a text submission has nothing to transcribe', () => {

@@ -704,6 +704,17 @@ audio.rec-playback{width:100%}
 .rec-controls button{min-height:44px;padding:10px 16px;border:1px solid var(--field-line);background:transparent;color:var(--text);cursor:pointer;font-size:12px}
 .rec-controls .rec-primary{border-color:var(--gold);color:var(--cream)}
 .rec-controls .rec-primary.is-live{border-color:#c4463a;background:rgba(196,70,58,.18);color:#ffb3a8}
+/* keep or record again: a required choice, so it pulses until made */
+.rec-decide{flex:1 1 100%;display:grid;gap:10px;max-width:560px;padding:14px 16px;border:1px solid var(--gold);border-radius:3px;
+  background:rgba(242,191,73,.07);animation:rec-decide-pulse 1.8s ease-in-out infinite}
+@keyframes rec-decide-pulse{0%,100%{box-shadow:0 0 0 0 rgba(242,191,73,.0),0 0 0 1px rgba(242,191,73,.25)}50%{box-shadow:0 0 22px 2px rgba(242,191,73,.38),0 0 0 1px rgba(242,191,73,.7)}}
+.rec-decide-label{color:var(--gold);font-family:Montserrat,sans-serif;font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase}
+.rec-decide-buttons{display:flex;flex-wrap:wrap;gap:10px}
+.rec-controls .rec-keep{border:1px solid var(--gold);background:linear-gradient(135deg,#f0b039,#d98a21);color:var(--ink);font-weight:600;min-height:48px;padding:12px 20px}
+.rec-controls .rec-keep:hover,.rec-controls .rec-keep:focus-visible{filter:brightness(1.08)}
+.rec-controls .rec-again{border:1px solid rgba(242,191,73,.75);color:var(--cream);min-height:48px;padding:12px 20px}
+.rec-controls .rec-again:hover,.rec-controls .rec-again:focus-visible{background:rgba(242,191,73,.12)}
+@media (prefers-reduced-motion:reduce){.rec-decide{animation:none;box-shadow:0 0 0 2px rgba(242,191,73,.6)}}
 .form-status{margin:14px 0 0;padding:10px 12px;background:var(--paper-deep);color:var(--text);font-size:12px;line-height:1.5}
 .success-state{padding:25px 0 15px;text-align:center}
 .success-cell{width:118px;aspect-ratio:.93;margin:0 auto 28px;display:grid;place-items:center;clip-path:polygon(25% 4%,75% 4%,100% 50%,75% 96%,25% 96%,0 50%);background:var(--honey);color:var(--ink);font-size:36px}

@@ -70,9 +70,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Could not read the recording" }, { status: 422 });
     }
 
+    // About three minutes of audio transcribes inside the time a site function
+    // is given; a longer recording would be cut off with a bare 504. So it
+    // gets twenty seconds here, and if that is not enough the record is
+    // queued for scripts/encode-approved.mjs, which has no such limit and
+    // leaves the draft exactly where this would have.
     const result = await transcribeAudio(bytes, {
       contentType: media.ContentType || "application/octet-stream",
+      timeoutMs: 20_000,
     });
+
+    if (!result.ok && result.reason === "timeout") {
+      const queued = { ...record, transcriptStatus: "queued", transcriptQueuedAt: new Date().toISOString(), transcriptError: undefined };
+      await client.send(
+        new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: phys(submissionKey),
+          Body: JSON.stringify(queued, null, 2),
+          ContentType: "application/json",
+        })
+      );
+      return NextResponse.json({ queued: true, message: explainFailure("timeout") }, { status: 202 });
+    }
 
     if (!result.ok) {
       // Record the failure on the submission so the dashboard can show why
