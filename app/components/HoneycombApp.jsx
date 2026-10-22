@@ -401,6 +401,17 @@ function CombMark() {
   );
 }
 
+// "15 OCT" along the top of a video-still cell and "16:28" along the bottom
+// (option 4A of the timestamp mock-ups, 2026-10-22): the moment the story
+// came in, in the viewer's own time zone.
+const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+function stampOf(iso) {
+  const d = new Date(iso);
+  if (!iso || Number.isNaN(d.getTime())) return null;
+  const p = (n) => String(n).padStart(2, '0');
+  return { date: `${p(d.getDate())} ${MONTHS[d.getMonth()]}`, time: `${p(d.getHours())}:${p(d.getMinutes())}` };
+}
+
 // Portrait grades for the Tweaks "Portrait grade" control. Applied to every
 // face in the comb through --face-grade (see .hexcell .cell-face in
 // globals.css). "clean" lowers saturation and turns the hue a few degrees
@@ -902,7 +913,10 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
         // stories from one person read as different cells; a story with
         // neither still needs to be findable, so it carries its initials
         const initials = initialsOf(name) || '?';
-        m.set(b.k, { src: exp.photoUrl || exp.stillUrl || null, photo: true, initials, name, person: { name, experience: exp } });
+        // a video still also carries when the story came in: stills from one
+        // person, filmed in one room, look alike; the stamp tells them apart
+        const stamp = !exp.photoUrl && exp.stillUrl ? stampOf(exp.submittedAt || exp.approvedAt || exp.lastModified) : null;
+        m.set(b.k, { src: exp.photoUrl || exp.stillUrl || null, photo: true, initials, name, stamp, person: { name, experience: exp } });
       }
     }
     return m;
@@ -1121,6 +1135,12 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                         src={face.src}
                         alt={face.name}
                       />
+                    )}
+                    {face && face.src && face.stamp && (
+                      <span className="cell-stamp" aria-hidden="true">
+                        <span className="cell-stamp-top">{face.stamp.date}</span>
+                        <span className="cell-stamp-bottom">{face.stamp.time}</span>
+                      </span>
                     )}
                     {face && !face.src && face.initials && (
                       <span className="cell-initials" aria-hidden="true">{face.initials}</span>
