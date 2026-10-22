@@ -189,19 +189,21 @@ button{font:inherit;color:inherit}
   opacity:var(--face-opacity,1);transition:opacity var(--dur-grow) var(--ease-quiet)}
 /* "Faces always visible" off = faces reveal on hover/focus instead of vanishing */
 .hexcell:hover .cell-face,.hexcell:focus-visible .cell-face,.hexcell.cell-focus .cell-face{opacity:1}
-/* the submission date along the top of a video-still cell and the time along
-   the bottom, inside the frame over the portrait (timestamp option 4A): sand
-   type on a thin dark band, the same hexagon as the face so the bands end at
-   its edges */
+/* two bands of text a moderator can put on a cell, along the top and bottom
+   of the portrait inside the frame (timestamp option 4A, made editable):
+   sand type on a thin dark band, the same hexagon as the face so the bands
+   end at its edges; CellStamp shrinks the type to fit the band's width */
 .cell-stamp{position:absolute;left:var(--face-inset,9%);top:50%;transform:translateY(-50%);
   width:calc(100% - 2 * var(--face-inset,9%));aspect-ratio:1.1547;
   clip-path:polygon(25% 0,75% 0,100% 50%,75% 100%,25% 100%,0 50%);z-index:3;pointer-events:none;
   opacity:var(--face-opacity,1);transition:opacity var(--dur-grow) var(--ease-quiet)}
 .cell-stamp span{position:absolute;left:0;right:0;padding:2px 0;text-align:center;background:rgba(0,0,0,.3);
   font-family:Montserrat,sans-serif;font-size:11px;line-height:1.2;letter-spacing:.14em;text-transform:uppercase;white-space:nowrap;
-  color:#e8d3b0;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.7);font-variant-numeric:tabular-nums}
+  color:#e8d3b0;text-shadow:0 1px 3px rgba(0,0,0,.9),0 0 6px rgba(0,0,0,.7);font-variant-numeric:tabular-nums;
+  overflow:hidden;text-overflow:ellipsis}
 .cell-stamp-top{top:0}
 .cell-stamp-bottom{bottom:0}
+.cell-stamp span:empty{display:none}
 @container (max-width:130px){.cell-stamp span{font-size:10px}}
 .hexcell:hover .cell-stamp,.hexcell:focus-visible .cell-stamp,.hexcell.cell-focus .cell-stamp{opacity:1}
 /* a story with no photo still gets a visible, clickable cell */

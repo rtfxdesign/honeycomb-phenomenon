@@ -33,7 +33,11 @@ const EDITABLE_FIELDS = [
   // keep the video still off the comb (a bad frame, or a face that should
   // not be the first thing seen); the still itself is kept
   "stillHidden",
+  // the two bands of text on the cell, top and bottom; blank means none
+  "cellTop",
+  "cellBottom",
 ] as const;
+const BAND_MAX = 40;
 
 export async function POST(request: NextRequest) {
   if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -69,6 +73,9 @@ export async function POST(request: NextRequest) {
             : [];
         } else if (field === "stillHidden") {
           data.stillHidden = updates.stillHidden === true;
+        } else if (field === "cellTop" || field === "cellBottom") {
+          const v = String(updates[field] ?? "").trim().slice(0, BAND_MAX);
+          if (v) data[field] = v; else delete data[field];
         } else {
           data[field] = String(updates[field] ?? "");
         }

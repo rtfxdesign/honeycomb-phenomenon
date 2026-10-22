@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { formatDisplayName, NAME_DISPLAY_OPTIONS } from "../lib/name";
 import { uploadToR2 } from "../lib/upload";
+import { STAMP_FIT } from "../lib/stamp";
 import "./review.css";
 
 /**
@@ -24,6 +25,7 @@ interface SubmissionData {
   lastName?: string;
   nameDisplay?: string;
   consentAt?: string;
+  submittedAt?: string;
   adsOk?: boolean;
   location: string;
   experienceYear: string;
@@ -57,6 +59,9 @@ interface SubmissionData {
   photoKey?: string;
   photoSource?: "contributor" | "moderator-frame" | "moderator-upload";
   photoFrameAt?: number;
+  // the two bands of text on the cell, top and bottom edge of the portrait
+  cellTop?: string;
+  cellBottom?: string;
 }
 
 interface Submission {
@@ -83,6 +88,8 @@ interface EditState {
   privacy: string;
   transcript: string;
   hashtags: string;
+  cellTop: string;
+  cellBottom: string;
 }
 
 interface Person {
@@ -133,6 +140,30 @@ const paragraphs = (t: string) => t.split(/\n\s*\n/).map((p) => p.trim()).filter
 const formatDate = (iso: string) =>
   new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
 const shortDate = (iso: string) => new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+/**
+ * What a cell band label will look like on the comb: at full size, shrunk,
+ * or cut off. Measured the way the comb measures it (STAMP_FIT), with the
+ * canvas standing in for the band.
+ */
+function bandFit(text: string): string {
+  const t = text.trim();
+  if (!t) return "";
+  const c = document.createElement("canvas").getContext("2d");
+  if (!c) return "";
+  const width = (px: number, tracking: number) => { c.font = `${px}px Montserrat, sans-serif`; return c.measureText(t.toUpperCase()).width + tracking * px * t.length; };
+  const sizeFor = (avail: number) => {
+    if (width(STAMP_FIT.px, STAMP_FIT.tracking) <= avail) return STAMP_FIT.px;
+    const tight = width(STAMP_FIT.px, STAMP_FIT.tightTracking);
+    return tight <= avail ? STAMP_FIT.px : Math.max(STAMP_FIT.minPx, STAMP_FIT.px * avail / tight);
+  };
+  const d = sizeFor(STAMP_FIT.desktop), p = sizeFor(STAMP_FIT.phone);
+  const cut = (avail: number, px: number) => px <= STAMP_FIT.minPx && width(px, STAMP_FIT.tightTracking) > avail;
+  if (cut(STAMP_FIT.desktop, d)) return "Too long: it would be cut off on the comb.";
+  if (cut(STAMP_FIT.phone, p)) return `Fits on desktop at ${Math.round(d)}px, but is cut off on a phone.`;
+  if (d >= STAMP_FIT.px && p >= STAMP_FIT.px) return "Fits at full size.";
+  return `Shrinks to about ${Math.round(d)}px on desktop, ${Math.round(p)}px on a phone.`;
+}
 
 function Field({ label, hint, className, children }: { label: string; hint?: React.ReactNode; className?: string; children: React.ReactNode }) {
   return (
@@ -397,6 +428,8 @@ export default function ReviewDashboard() {
       privacy: submission.data.privacy || "public",
       transcript: draft ?? submission.data.transcript ?? "",
       hashtags: (submission.data.hashtags || []).join(", "),
+      cellTop: submission.data.cellTop || "",
+      cellBottom: submission.data.cellBottom || "",
     });
   };
   const stopEdit = () => { setEditingKey(null); setEdit(null); setEditingDraft(false); };
@@ -438,6 +471,8 @@ export default function ReviewDashboard() {
         privacy: edit.privacy,
         transcript: edit.transcript,
         hashtags,
+        cellTop: edit.cellTop,
+        cellBottom: edit.cellBottom,
       };
       if (editingDraft) {
         // an edited machine draft becomes the record, and is tagged like one
@@ -821,6 +856,9 @@ export default function ReviewDashboard() {
                 {s.contactEmail && (
                   <div><dt>Contact</dt><dd><a href={`mailto:${s.contactEmail}?subject=${encodeURIComponent(`Your Honeycomb story ${d.id || ""}`.trim())}`}>{s.contactEmail}</a></dd></div>
                 )}
+                {(d.cellTop || d.cellBottom) && (
+                  <div><dt>Cell bands</dt><dd>{d.cellTop || "—"} <span style={{ color: "var(--muted)" }}>/</span> {d.cellBottom || "—"}</dd></div>
+                )}
               </dl>
               <div className={`rv-content${hasMedia(s) ? " rv-content--media" : ""}`}>
                 <div>
@@ -924,6 +962,27 @@ export default function ReviewDashboard() {
               </Field>
               <Field label="Transcript" className="rv-span">
                 <textarea rows={10} value={edit.transcript} onChange={(e) => setEdit({ ...edit, transcript: e.target.value })} />
+              </Field>
+              {/* The two bands on the cell. Left blank, the cell shows none;
+                  the type shrinks on the comb to fit whatever is written. */}
+              <Field label="Cell band — top" hint={bandFit(edit.cellTop) || "Along the top edge of the portrait. Blank for none."}>
+                <input value={edit.cellTop} maxLength={40} placeholder="15 OCT" onChange={(e) => setEdit({ ...edit, cellTop: e.target.value })} />
+              </Field>
+              <Field
+                label="Cell band — bottom"
+                hint={
+                  <>
+                  {bandFit(edit.cellBottom) && <span style={{ display: "block", marginBottom: 6 }}>{bandFit(edit.cellBottom)}</span>}
+                  <button type="button" className="rv-quiet" onClick={() => {
+                    const d = new Date(s.data.submittedAt || s.lastModified);
+                    const p = (n: number) => String(n).padStart(2, "0");
+                    const M = ["JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC"];
+                    setEdit((cur) => cur && { ...cur, cellTop: `${p(d.getDate())} ${M[d.getMonth()]}`, cellBottom: `${p(d.getHours())}:${p(d.getMinutes())}` });
+                  }}>Fill both from the submission time</button>
+                  </>
+                }
+              >
+                <input value={edit.cellBottom} maxLength={40} placeholder="16:28" onChange={(e) => setEdit({ ...edit, cellBottom: e.target.value })} />
               </Field>
               <Field
                 label="Tags (comma-separated)" className="rv-span"

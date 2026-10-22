@@ -17,6 +17,7 @@ import { PAGES } from '../data/pages';
 import RecorderModal from './RecorderModal';
 import { useCombReveal } from './CombReveal';
 import { cellLabel, initialsOf } from '../lib/name';
+import { STAMP_FIT } from '../lib/stamp';
 import { PRIVACY_PATH, TERMS_PATH, ACCESSIBILITY_PATH } from '../lib/contact';
 
 const TWEAK_DEFAULTS = {
@@ -401,15 +402,50 @@ function CombMark() {
   );
 }
 
-// "15 OCT" along the top of a video-still cell and "16:28" along the bottom
-// (option 4A of the timestamp mock-ups, 2026-10-22): the moment the story
-// came in, in the viewer's own time zone.
-const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-function stampOf(iso) {
-  const d = new Date(iso);
-  if (!iso || Number.isNaN(d.getTime())) return null;
-  const p = (n) => String(n).padStart(2, '0');
-  return { date: `${p(d.getDate())} ${MONTHS[d.getMonth()]}`, time: `${p(d.getHours())}:${p(d.getMinutes())}` };
+// Two bands of text a moderator can put on a cell, along the top and bottom
+// flat edges of the portrait (timestamp option 4A, 2026-10-22, made editable
+// so other labels can be tried). The text shrinks to fit the band: the
+// hexagon is only half as wide at its flat edges as in the middle, so what
+// fits is measured against the width where the band actually sits.
+const STAMP_PX = STAMP_FIT.px;
+const STAMP_MIN_PX = STAMP_FIT.minPx; // below this nothing reads; the band clips instead
+function CellStamp({ top, bottom }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    const host = ref.current;
+    if (!host) return undefined;
+    const fit = () => {
+      const box = host.getBoundingClientRect();
+      if (!box.width) return;
+      for (const span of host.querySelectorAll('span')) {
+        if (!span.textContent) continue;
+        span.style.fontSize = '';
+        span.style.letterSpacing = '';
+        const base = parseFloat(getComputedStyle(span).fontSize) || STAMP_PX;
+        const r = span.getBoundingClientRect();
+        // the hexagon's width at this band's centre line: 50% at the flat
+        // edge, growing to 100% at mid-height
+        const yc = Math.min(r.top + r.height / 2 - box.top, box.bottom - (r.top + r.height / 2));
+        const avail = box.width * (0.5 + yc / box.height) - 8;
+        const measure = () => { const range = document.createRange(); range.selectNodeContents(span); return range.getBoundingClientRect().width; };
+        let textW = measure();
+        // first give up most of the tracking, then the size, down to a floor
+        if (textW > avail) { span.style.letterSpacing = `${STAMP_FIT.tightTracking}em`; textW = measure(); }
+        if (textW > avail) span.style.fontSize = `${Math.max(STAMP_MIN_PX, base * avail / textW).toFixed(2)}px`;
+      }
+    };
+    fit();
+    const ro = new ResizeObserver(fit);
+    ro.observe(host);
+    document.fonts?.ready.then(fit).catch(() => undefined);
+    return () => ro.disconnect();
+  }, [top, bottom]);
+  return (
+    <span ref={ref} className="cell-stamp" aria-hidden="true">
+      <span className="cell-stamp-top">{top}</span>
+      <span className="cell-stamp-bottom">{bottom}</span>
+    </span>
+  );
 }
 
 // Portrait grades for the Tweaks "Portrait grade" control. Applied to every
@@ -913,9 +949,9 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
         // stories from one person read as different cells; a story with
         // neither still needs to be findable, so it carries its initials
         const initials = initialsOf(name) || '?';
-        // a video still also carries when the story came in: stills from one
-        // person, filmed in one room, look alike; the stamp tells them apart
-        const stamp = !exp.photoUrl && exp.stillUrl ? stampOf(exp.submittedAt || exp.approvedAt || exp.lastModified) : null;
+        // the two bands a moderator can write on a cell (top and bottom edge
+        // of the portrait): nothing is filled in by default
+        const stamp = (exp.cellTop || exp.cellBottom) && (exp.photoUrl || exp.stillUrl) ? { top: exp.cellTop || '', bottom: exp.cellBottom || '' } : null;
         m.set(b.k, { src: exp.photoUrl || exp.stillUrl || null, photo: true, initials, name, stamp, person: { name, experience: exp } });
       }
     }
@@ -1136,12 +1172,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
                         alt={face.name}
                       />
                     )}
-                    {face && face.src && face.stamp && (
-                      <span className="cell-stamp" aria-hidden="true">
-                        <span className="cell-stamp-top">{face.stamp.date}</span>
-                        <span className="cell-stamp-bottom">{face.stamp.time}</span>
-                      </span>
-                    )}
+                    {face && face.src && face.stamp && <CellStamp top={face.stamp.top} bottom={face.stamp.bottom} />}
                     {face && !face.src && face.initials && (
                       <span className="cell-initials" aria-hidden="true">{face.initials}</span>
                     )}
