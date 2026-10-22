@@ -1177,17 +1177,33 @@ export default function HoneycombApp() {
     window.location.reload();
   }, []);
 
-  // approved archive submissions join the field as additional bright cells
+  // approved archive submissions join the field as additional bright cells.
+  // The stories need a session, so they are fetched once the gate is open,
+  // not before. A 401 here means the cookie lapsed while the "unlocked" note
+  // in localStorage did not (a moderator's session is twelve hours, the note
+  // thirty days): back to the gate rather than an empty comb.
   useEffect(() => {
+    if (view !== 'archive') return undefined;
+    let cancelled = false;
+    let gated = false;
     fetch('/api/experiences')
-      .then((r) => (r.ok ? r.json() : { experiences: [] }))
-      .then((d) => setExperiences((d.experiences || []).filter((e) => e.privacy !== 'archive')))
+      .then((r) => {
+        if (r.status === 401 && !cancelled) {
+          gated = true;
+          try { localStorage.removeItem('hc-unlocked-until'); } catch { /* private mode */ }
+          setStoriesSettled(false);
+          setView('gate');
+          return null;
+        }
+        return r.ok ? r.json() : { experiences: [] };
+      })
+      .then((d) => { if (d && !cancelled) setExperiences((d.experiences || []).filter((e) => e.privacy !== 'archive')); })
       .catch(() => undefined)
-      .finally(() => setStoriesSettled(true));
+      .finally(() => { if (!cancelled && !gated) setStoriesSettled(true); });
     // a slow archive never keeps the comb hidden for long
     const fallback = setTimeout(() => setStoriesSettled(true), 2500);
-    return () => clearTimeout(fallback);
-  }, []);
+    return () => { cancelled = true; clearTimeout(fallback); };
+  }, [view]);
 
   // community-face info (name, about, video) is editable from /review;
   // the API merges those edits over the built-in defaults

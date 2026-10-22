@@ -3,16 +3,21 @@ import { ListObjectsV2Command, GetObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 import { getSession, canSeeCommunity } from "../../lib/auth";
+import { formatDisplayName } from "../../lib/name";
 
 export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  // The stories are behind the site password, so this is too: the gate on
+  // the page was only ever a curtain while this answered anyone who asked.
+  // "Community only" stories reach members and moderators; visitors never see
+  // them, and nothing marked strictly archived leaves the server at all.
+  const session = getSession(request);
+  if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const community = canSeeCommunity(session);
   if (!r2Configured()) {
     return NextResponse.json({ experiences: [] });
   }
-  // "Community only" stories reach members and moderators; visitors never see
-  // them, and nothing marked strictly archived leaves the server at all.
-  const community = canSeeCommunity(getSession(request));
 
   const client = getR2Client();
 
@@ -70,14 +75,22 @@ export async function GET(request: NextRequest) {
           // not a record of what anybody said. It must not reach a browser and
           // must not stand in for the transcript — same rule as the archived
           // records above: if it should not be shown, it should not be sent.
+          // The same goes for the raw first and last name: a contributor who
+          // chose "J.D." must not have "Jane Doe" in every visitor's network
+          // tab. displayName already carries what they chose to show.
           const {
             machineTranscript: _machineTranscript,
             transcriptError: _transcriptError,
+            firstName: _firstName,
+            lastName: _lastName,
             ...safe
           } = data;
 
           return {
             ...safe,
+            // older records may predate displayName; render it here, once,
+            // from the parts that are no longer sent
+            displayName: data.displayName || formatDisplayName(data.firstName, data.lastName, data.nameDisplay) || undefined,
             mediaUrl,
             photoUrl,
             lastModified: obj.LastModified
