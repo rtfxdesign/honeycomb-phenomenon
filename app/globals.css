@@ -686,7 +686,10 @@ audio.story-media{max-height:none}
 .privacy-list span{display:flex;flex-direction:column;gap:2px}
 .privacy-list b{font-family:Inter,sans-serif;font-size:17px;font-weight:600}
 .privacy-list small{color:var(--text-soft)}
-.form-grid{margin-top:26px;display:grid;grid-template-columns:1fr 150px;gap:14px}
+/* two equal columns: first and last name are the same width. The 150px
+   second column was sized for Year and squeezed Last name into it. */
+.form-grid{margin-top:26px;display:grid;grid-template-columns:1fr 1fr;gap:14px 18px}
+.field-short input{max-width:150px}
 .field{display:flex;flex-direction:column;gap:7px}
 .field-wide{grid-column:1/-1}
 .field>span{color:var(--gold);font-family:Montserrat,sans-serif;font-size:9px;text-transform:uppercase;letter-spacing:.16em;font-weight:600}
@@ -909,7 +912,9 @@ select.twk-field{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http:
 .consent-row input{flex:none;width:18px;height:18px;margin-top:3px;accent-color:var(--gold)}
 .consent-row a{white-space:nowrap}
 /* the email field that opens under "open to being contacted", indented to the checkbox text */
-.contact-field{margin:12px 0 0 30px;max-width:420px}
+.contact-field{margin:18px 0 0;max-width:420px}
+.turnstile{margin:14px 0 0;min-height:0}
+.turnstile:empty{display:none}
 .contact-field .field-hint{display:block;font-size:12.5px;line-height:1.55;color:var(--text-soft)}
 
 /* confirmation: the ID, copyable, and what to do with it */

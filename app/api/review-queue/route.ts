@@ -31,7 +31,11 @@ export async function GET(request: NextRequest) {
 
     // Contact addresses live apart from the records (see lib/contact.js);
     // moderators are the one audience that sees them, so they join here.
+    // contactOk: whether the person said the team may write to them. Records
+    // from before the receipt email existed have no flag; an address was only
+    // ever stored with the box ticked, so a missing flag means yes.
     const contacts = new Map<string, string>();
+    const contactOks = new Map<string, boolean>();
     // Not worth failing the whole queue over: without them it still loads.
     const contactList = await client.send(new ListObjectsV2Command({ Bucket: BUCKET, Prefix: phys("contacts/") })).catch((err) => {
       console.error("Failed to list contacts", err);
@@ -40,7 +44,7 @@ export async function GET(request: NextRequest) {
     await Promise.all((contactList.Contents || []).filter((o) => o.Key?.endsWith(".json")).map(async (o) => {
       try {
         const c = JSON.parse(await (await client.send(new GetObjectCommand({ Bucket: BUCKET, Key: o.Key }))).Body!.transformToString());
-        if (c.id && c.email) contacts.set(c.id, c.email);
+        if (c.id && c.email) { contacts.set(c.id, c.email); contactOks.set(c.id, c.contactOk !== false); }
       } catch (err) {
         console.error(`Failed to read contact ${o.Key}`, err);
       }
@@ -103,6 +107,7 @@ export async function GET(request: NextRequest) {
             photoUrl,
             stillUrl,
             contactEmail: (data.id && contacts.get(data.id)) || null,
+            contactOk: data.id ? contactOks.get(data.id) ?? null : null,
             lastModified: obj.LastModified
           };
         } catch (err) {

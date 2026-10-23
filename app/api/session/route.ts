@@ -7,7 +7,8 @@ export const dynamic = "force-dynamic";
 export async function GET(request: NextRequest) {
   const session = getSession(request);
   if (!session) return NextResponse.json({ role: null });
-  return NextResponse.json({ role: session.role, name: session.name ?? null });
+  // id lets the review dashboard tell a signature of yours from somebody else's
+  return NextResponse.json({ role: session.role, name: session.name ?? null, id: session.id ?? null });
 }
 
 /** Sign out. */

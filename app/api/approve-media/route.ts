@@ -2,16 +2,30 @@ import { NextRequest, NextResponse } from "next/server";
 import { isModerator } from "../../lib/auth";
 import { CopyObjectCommand, DeleteObjectCommand, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
-import { recordAudit } from "../../lib/audit";
+import { recordAudit, actor } from "../../lib/audit";
+import { type Approval, signerId, signerName, signaturesNeeded, hasEnough } from "../../lib/approvals";
 import sharp from "sharp";
 
+/**
+ * Sign off on a story. A story publishes when enough moderators have signed
+ * — two, or three when a reviewer has asked for a third — so this route
+ * records a signature and only moves the record to approved/ once the bar
+ * is met. Until then the signatures live on the pending record.
+ *
+ * body: { submissionKey, action?: "sign" | "unsign" | "require-third", value?: boolean }
+ *   sign           add my signature (the default)
+ *   unsign         take my signature back
+ *   require-third  set or clear the "needs a third review" flag (value)
+ */
 export async function POST(request: NextRequest) {
   if (!isModerator(request)) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   if (!r2Configured()) {
     return NextResponse.json({ error: "R2 is not configured" }, { status: 503 });
   }
   try {
-    const { submissionKey } = await request.json();
+    const body = await request.json();
+    const submissionKey: string = body.submissionKey;
+    const action: string = body.action || "sign";
 
     if (!submissionKey || !submissionKey.startsWith("submissions/")) {
       return NextResponse.json({ error: "Invalid submission key" }, { status: 400 });
@@ -29,6 +43,47 @@ export async function POST(request: NextRequest) {
     if (!bodyStr) throw new Error("Empty submission file");
 
     const data = JSON.parse(bodyStr);
+
+    // 1b. Apply the signature (or the flag) to the pending record
+    const me = actor(request);
+    const myId = signerId(me);
+    const approvals: Approval[] = Array.isArray(data.approvals) ? data.approvals : [];
+    if (action === "sign") {
+      if (!approvals.some((a) => a.id === myId)) {
+        approvals.push({ id: myId, name: signerName(me), at: new Date().toISOString() });
+      }
+    } else if (action === "unsign") {
+      const i = approvals.findIndex((a) => a.id === myId);
+      if (i >= 0) approvals.splice(i, 1);
+    } else if (action === "require-third") {
+      data.requiresThird = body.value === true;
+    } else {
+      return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+    }
+    data.approvals = approvals;
+
+    const summary = {
+      approvals,
+      needed: signaturesNeeded(data),
+      requiresThird: Boolean(data.requiresThird),
+      mine: approvals.some((a) => a.id === myId),
+    };
+
+    if (!hasEnough(data)) {
+      // Not there yet: save the signatures on the pending record and stop.
+      await client.send(new PutObjectCommand({
+        Bucket: BUCKET,
+        Key: phys(submissionKey),
+        Body: JSON.stringify(data, null, 2),
+        ContentType: "application/json",
+      }));
+      await recordAudit(request, action as "sign" | "unsign" | "require-third", submissionKey, {
+        signatures: approvals.length, needed: summary.needed,
+      });
+      return NextResponse.json({ success: true, approved: false, submissionKey, ...summary });
+    }
+
+    // Enough signatures: publish. Everything below is the original approval.
 
     // Helper to move a media file to approved
     const moveMediaToApproved = async (oldKey: string) => {
@@ -119,9 +174,12 @@ export async function POST(request: NextRequest) {
       Key: phys(submissionKey),
     }));
 
-    await recordAudit(request, "approve", submissionKey, { to: newSubmissionKey, privacy: data.privacy });
+    await recordAudit(request, "approve", submissionKey, {
+      to: newSubmissionKey, privacy: data.privacy,
+      signedBy: approvals.map((a) => a.name),
+    });
 
-    return NextResponse.json({ success: true, newSubmissionKey });
+    return NextResponse.json({ success: true, approved: true, newSubmissionKey, ...summary });
   } catch (error) {
     console.error("Failed to approve submission:", error);
     return NextResponse.json({ error: "Failed to approve" }, { status: 500 });

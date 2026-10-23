@@ -8,6 +8,7 @@
 
 import React, { useState, useRef, useEffect, useMemo, useCallback, useSyncExternalStore } from 'react';
 import { HoneycombMark, Input, Button } from './ds';
+import Turnstile, { TURNSTILE_SITE_KEY } from './Turnstile';
 import {
   useTweaks, TweaksPanel, TweakSection, TweakSlider, TweakToggle,
   TweakRadio, TweakSelect, TweakColor, TweakButton,
@@ -776,6 +777,8 @@ function Gate({ onEnter, size }) {
   const [pw, setPw] = useState('');
   const [checking, setChecking] = useState(false);
   const [wrong, setWrong] = useState(false);
+  // the bot check's token; null until the widget has run (or when no key is set)
+  const [botToken, setBotToken] = useState(null);
   const submit = async (e) => {
     e.preventDefault();
     setChecking(true);
@@ -784,7 +787,7 @@ function Gate({ onEnter, size }) {
       const res = await fetch('/api/unlock', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pw }),
+        body: JSON.stringify({ password: pw, turnstileToken: botToken || undefined }),
       });
       if (res.ok) {
         const data = await res.json().catch(() => ({}));
@@ -809,7 +812,8 @@ function Gate({ onEnter, size }) {
           <form className="gate-form" onSubmit={submit}>
             <Input label="Password or access code" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
                    hint={wrong ? 'That password or code was not recognized.' : undefined} invalid={wrong} autoFocus />
-            <Button type="submit" disabled={checking}>{checking ? 'Checking…' : 'Enter'}</Button>
+            <Turnstile action="unlock" onToken={setBotToken} />
+            <Button type="submit" disabled={checking || (TURNSTILE_SITE_KEY && !botToken)}>{checking ? 'Checking…' : TURNSTILE_SITE_KEY && !botToken ? 'One moment…' : 'Enter'}</Button>
           </form>
           <p className="gate-note"><span>✦</span> The session stays unlocked for 30 days on this device.</p>
           <p className="gate-note gate-terms">

@@ -1,0 +1,52 @@
+[
+  {
+    "text": "Two-moderator sign-off: Evie reviews first, any other moderator can give the second approval, and Evie can flag a story as needing a third",
+    "askedBy": "Matthew",
+    "owner": "Allen",
+    "priority": "now",
+    "area": "build",
+    "notes": "Design: each record carries an approvals list (who, when) and a requiresThird flag. \"Approved\" becomes a computed state — two signatures, or three when flagged — rather than a status someone sets. The dashboard shows where each story is: \"Reviewed by Evie, waiting for one more.\"\n\nOpen question for the team: when Evie is away, does anyone else get to do the first review, or does the queue wait? Proposed: first review is hers by default, any moderator can take it, and the log shows who did."
+  },
+  {
+    "text": "Stop bot and spoof submissions: add Cloudflare Turnstile to the submit button and the gate",
+    "askedBy": "Matthew",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "build",
+    "answer": "A captcha helps, and the right one is nearly free for us. Turnstile is Cloudflare's — we are already there — and it is invisible to real people: no puzzles, one script on the page and one check on the server when a story is submitted. The moderation queue is still the real defence (nothing publishes without a person); Turnstile keeps the queue from filling with junk.",
+    "notes": "Also worth adding: a per-IP rate limit on /api/submit, and a size cap that already exists on uploads."
+  },
+  {
+    "text": "Shorter removal code, and email it to the contributor by default",
+    "askedBy": "Matthew",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "build",
+    "answer": "Shorter is easy. Emailing by default means asking for an email on every submission, and today email is optional and only collected when someone ticks \"the team can contact me\" — that was a deliberate privacy choice. Proposed middle: the email field is always visible, labelled \"so we can send you your removal code\", still optional; if they skip it the code shows on screen as now. Nobody has to hand over an email to tell their story.",
+    "notes": "Needs an outbound email path we do not have yet (Resend or Postmark; a few dollars a month). Same path would carry the \"your story is live\" note later."
+  },
+  {
+    "text": "A very basic video editor in the recorder: add to a recording at a point you choose, or cut a stretch out of it",
+    "askedBy": "Allen",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "build",
+    "notes": "Matthew asked for guided, CapCut-style submissions. Scoped down to two operations that cover most of what people actually need after a first take: insert (record a new segment and drop it in at the playhead — \"I forgot to say\") and cut (drag a start and end on the timeline, remove it — \"ignore that bit\"). No transitions, no captions, no music.\n\nHow it would work: every take is kept as its own clip; the editor is a list of clips with in/out points under a single scrub bar. Playback stitches them in the browser. On \"Add to the archive\" the clips are rendered to one file in the browser (ffmpeg.wasm, ~30MB loaded once at that moment) so the archive, the transcription and the player all still get a single recording. Retake-from-here falls out of this for free.\n\nAudio submissions get the same two operations with the same code."
+  },
+  {
+    "text": "Name fields: the first-name box is too wide and the gap between first and last name is wrong",
+    "askedBy": "Matthew",
+    "owner": "Allen",
+    "priority": "soon",
+    "area": "design",
+    "notes": "Both names are single-column fields in the form grid, so on a wide modal they stretch. Cap each at a sensible width and tighten the gap. Fifteen minutes; goes out with the next push."
+  },
+  {
+    "text": "Guided submissions: prompts beside the recorder (\"Where were you? What did you see first?\") so people know what to say",
+    "askedBy": "Matthew",
+    "owner": "Allen",
+    "priority": "later",
+    "area": "question",
+    "notes": "The other half of Matthew's CapCut note. Cheap on its own: a small card of prompts next to the recorder, optional, that the contributor can step through. Worth deciding whether the prompts are the team's questions (what an interviewer would ask) or a loose structure (beginning, what happened, afterwards). Needs Matthew and Evie's words, not mine."
+  }
+]

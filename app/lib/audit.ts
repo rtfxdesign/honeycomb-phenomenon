@@ -19,7 +19,7 @@ import { getSession } from "./auth";
  * missing line is then visible as a gap in the series.
  */
 export type AuditAction =
-  | "approve" | "decline" | "delete" | "update" | "photo"
+  | "approve" | "sign" | "unsign" | "require-third" | "decline" | "delete" | "update" | "photo"
   | "member.create" | "member.update" | "member.regenerate" | "member.delete";
 
 export interface AuditEvent {

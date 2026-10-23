@@ -3,6 +3,7 @@ import {
   roleForPassword, createSessionToken, AUTH_COOKIE, maxAgeFor, Role,
 } from "../../lib/auth";
 import { memberForCode, touchLastSeen } from "../../lib/members";
+import { verifyTurnstile } from "../../lib/turnstile";
 
 /**
  * One field, three outcomes: the moderator password, the visitor password, or
@@ -10,9 +11,15 @@ import { memberForCode, touchLastSeen } from "../../lib/members";
  */
 export async function POST(request: NextRequest) {
   try {
-    const { password } = await request.json();
+    const { password, turnstileToken } = await request.json();
     if (typeof password !== "string" || !password.trim()) {
       return NextResponse.json({ error: "Enter a password or access code" }, { status: 400 });
+    }
+    // the bot check runs before the password is even looked at, so a script
+    // guessing passwords gets nothing back about them
+    const bot = await verifyTurnstile(request, turnstileToken);
+    if (!bot.ok) {
+      return NextResponse.json({ error: "We could not confirm this is a person. Reload and try again." }, { status: 403 });
     }
 
     let token: string | null = null;

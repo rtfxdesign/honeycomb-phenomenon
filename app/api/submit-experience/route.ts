@@ -4,6 +4,8 @@ import { getR2Client, BUCKET, phys, r2Configured } from "../../lib/r2";
 import { formatDisplayName, NAME_DISPLAY_LEVELS } from "../../lib/name";
 import { generateSubmissionId } from "../../lib/submission-id";
 import { POLICY_VERSION, CONSENT_VERSION, EMAIL_RE, contactKey } from "../../lib/contact";
+import { verifyTurnstile } from "../../lib/turnstile";
+import { sendSubmissionReceipt } from "../../lib/mail";
 
 const PRIVACY_LEVELS = ["public", "community", "archive"];
 const RECORDING_MODES = ["video", "audio", "text"];
@@ -45,11 +47,25 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    const bot = await verifyTurnstile(request, data.turnstileToken);
+    if (!bot.ok) {
+      return NextResponse.json(
+        { error: "We could not confirm this came from a person. Reload the page and try again." },
+        { status: 403 }
+      );
+    }
 
-    // Optional, and only with an address that looks like one: a ticked box
-    // with no way to reach the person is no use to the team.
-    const contactEmail = data.contactOk === true ? str(data.contactEmail, 254) : "";
-    if (data.contactOk === true && !EMAIL_RE.test(contactEmail)) {
+    // The email is optional and does two things: the submission ID is sent
+    // to it, and — only if the contact box is ticked — the team may write to
+    // the person about their story. An address that does not look like one is
+    // refused rather than quietly dropped, so nobody thinks a receipt is
+    // coming when it is not.
+    const contactEmail = str(data.contactEmail, 254);
+    const contactOk = data.contactOk === true;
+    if (contactEmail && !EMAIL_RE.test(contactEmail)) {
+      return NextResponse.json({ error: "That email address does not look right" }, { status: 400 });
+    }
+    if (contactOk && !contactEmail) {
       return NextResponse.json(
         { error: "Please add an email address we can reach you at, or untick the contact box" },
         { status: 400 }
@@ -133,7 +149,9 @@ export async function POST(request: NextRequest) {
         new PutObjectCommand({
           Bucket: BUCKET,
           Key: phys(contactKey(submissionId)),
-          Body: JSON.stringify({ id: submissionId, email: contactEmail, consentAt: now, consentVersion: CONSENT_VERSION }, null, 2),
+          // contactOk says whether the team may write to them about the story;
+          // without it the address is only for the receipt
+          Body: JSON.stringify({ id: submissionId, email: contactEmail, contactOk, consentAt: now, consentVersion: CONSENT_VERSION }, null, 2),
           ContentType: "application/json",
         })
       );
@@ -155,7 +173,14 @@ export async function POST(request: NextRequest) {
       throw error;
     }
 
-    return NextResponse.json({ success: true, id: submissionId });
+    // The receipt with the submission ID. Sent after the record is safe and
+    // never allowed to fail the submission: the ID is on screen either way.
+    let emailed = false;
+    if (contactEmail) {
+      emailed = await sendSubmissionReceipt(contactEmail, submissionId, title).catch(() => false);
+    }
+
+    return NextResponse.json({ success: true, id: submissionId, emailed });
   } catch (error) {
     console.error("Failed to submit experience:", error);
     return NextResponse.json({ error: "Failed to save submission" }, { status: 500 });

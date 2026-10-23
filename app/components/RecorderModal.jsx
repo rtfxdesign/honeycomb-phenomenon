@@ -15,6 +15,7 @@ import { uploadToR2 } from '../lib/upload';
 import RecordingStage, { extFor } from './RecordingStage';
 import { REMOVAL_EMAIL, PRIVACY_PATH, EMAIL_RE } from '../lib/contact';
 import { NAME_DISPLAY_OPTIONS, formatDisplayName } from '../lib/name';
+import Turnstile, { TURNSTILE_SITE_KEY } from './Turnstile';
 
 function formatBytes(bytes) {
   if (bytes === 0) return '0 B';
@@ -74,7 +75,11 @@ export default function RecorderModal({ onClose }) {
   // address is kept apart from the record and never shown on the site.
   const [contactOk, setContactOk] = useState(false);
   const [contactEmail, setContactEmail] = useState('');
+  // the bot check's token (null until the widget has run, or when no key is set)
+  const [botToken, setBotToken] = useState(null);
   const [submissionId, setSubmissionId] = useState('');
+  // whether the receipt with the ID went to the address they gave
+  const [emailed, setEmailed] = useState(false);
   const [copied, setCopied] = useState(false);
   const speechRef = useRef(null);
   const idRef = useRef(null);
@@ -253,7 +258,8 @@ export default function RecorderModal({ onClose }) {
       consent: true,
       adsOk,
       contactOk,
-      contactEmail: contactOk ? contactEmail.trim() : undefined,
+      contactEmail: contactEmail.trim() || undefined,
+      turnstileToken: botToken || undefined,
     };
 
     try {
@@ -265,6 +271,7 @@ export default function RecorderModal({ onClose }) {
       if (!response.ok) throw new Error('Unable to preserve this experience right now.');
       const result = await response.json();
       setSubmissionId(result.id || '');
+      setEmailed(Boolean(result.emailed));
       setStep(4);
       setStatus('Your experience has been preserved privately and added to the review queue. Nothing is published automatically.');
     } catch (error) {
@@ -372,7 +379,7 @@ export default function RecorderModal({ onClose }) {
               </div>
               <label className="field field-wide"><span>A short title</span><input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="The light above the pines" required /></label>
               <label className="field"><span>Place</span><input value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Hudson Valley, NY" /></label>
-              <label className="field"><span>Year</span><input value={year} onChange={(event) => setYear(event.target.value)} inputMode="numeric" placeholder="1986" /></label>
+              <label className="field field-short"><span>Year</span><input value={year} onChange={(event) => setYear(event.target.value)} inputMode="numeric" placeholder="1986" /></label>
               {/* Required only for a written story. A recording is the account
                   itself and becomes the transcript, so for video and audio
                   this is an optional note (the save still needs words or a
@@ -426,23 +433,25 @@ export default function RecorderModal({ onClose }) {
               <input type="checkbox" checked={adsOk} onChange={(event) => setAdsOk(event.target.checked)} />
               <span>Optional: I would be willing to have my story or profile photo shared in Honeycomb&rsquo;s advertisements.</span>
             </label>
+            {/* The email is optional and does two things: the submission ID is
+                sent to it, and — only if the box below is ticked — the team may
+                write about the story. Nobody has to hand over an address to
+                tell their story; without one the ID is simply shown on screen. */}
+            <label className="field contact-field">
+              <span>Email (optional) &mdash; we&rsquo;ll send your submission ID here</span>
+              <input
+                type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)}
+                autoComplete="email" placeholder="you@example.com" required={contactOk}
+              />
+              <small className="field-hint">
+                Kept separately from your story and never shown on the site. Used once, to send you the ID that
+                removes your story. To withdraw it, email {REMOVAL_EMAIL}. <HandlingLink>Details</HandlingLink>
+              </small>
+            </label>
             <label className="consent-row consent-row--optional">
               <input type="checkbox" checked={contactOk} onChange={(event) => setContactOk(event.target.checked)} />
-              <span>Optional: I&rsquo;m open to the Honeycomb team contacting me about my story.</span>
+              <span>Optional: I&rsquo;m open to the Honeycomb team contacting me at this address about my story.</span>
             </label>
-            {contactOk && (
-              <label className="field contact-field">
-                <span>Email</span>
-                <input
-                  type="email" value={contactEmail} onChange={(event) => setContactEmail(event.target.value)}
-                  autoComplete="email" placeholder="you@example.com" required
-                />
-                <small className="field-hint">
-                  Kept separately from your story and never shown on the site. Only the moderators see it, and only to
-                  write to you about this story. To withdraw it, email {REMOVAL_EMAIL}. <HandlingLink>Details</HandlingLink>
-                </small>
-              </label>
-            )}
             <label className="consent-row">
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} required />
               <span>
@@ -453,9 +462,12 @@ export default function RecorderModal({ onClose }) {
               </span>
             </label>
             {status && <p className="form-status" role="status">{status}</p>}
+            <Turnstile action="submit" onToken={setBotToken} className="turnstile--submit" />
             <div className="modal-actions">
               <button type="button" className="back-action" onClick={() => setStep(2)}>← Back</button>
-              <button className="primary-action" disabled={submitting || !consent}>{submitting ? 'Saving…' : 'Add to the archive'} <span>↗</span></button>
+              <button className="primary-action" disabled={submitting || !consent || (TURNSTILE_SITE_KEY && !botToken)}>
+                {submitting ? 'Saving…' : TURNSTILE_SITE_KEY && !botToken ? 'One moment…' : 'Add to the archive'} <span>↗</span>
+              </button>
             </div>
           </form>
         )}
@@ -473,6 +485,7 @@ export default function RecorderModal({ onClose }) {
                   <code className="submission-id" ref={idRef}>{submissionId}</code>
                   <button type="button" className="copy-id" onClick={copyId} aria-live="polite">{copied ? 'Copied ✓' : 'Copy'}</button>
                 </div>
+                {emailed && <p className="media-ready">✓ Sent to {contactEmail.trim()}</p>}
                 <p>
                   This ID was generated at random for your submission. Please note it for your records: it is the
                   easiest way to have your submission removed. Email <a href={`mailto:${REMOVAL_EMAIL}?subject=${encodeURIComponent(`Remove ${submissionId}`)}`}>{REMOVAL_EMAIL}</a> with

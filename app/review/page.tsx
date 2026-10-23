@@ -5,6 +5,7 @@ import Link from "next/link";
 import { formatDisplayName, NAME_DISPLAY_OPTIONS } from "../lib/name";
 import { uploadToR2 } from "../lib/upload";
 import { STAMP_FIT } from "../lib/stamp";
+import { SIGNATURES_NEEDED } from "../lib/approvals";
 import "./review.css";
 
 /**
@@ -62,6 +63,9 @@ interface SubmissionData {
   // the two bands of text on the cell, top and bottom edge of the portrait
   cellTop?: string;
   cellBottom?: string;
+  // sign-off: a story publishes when enough moderators have signed
+  approvals?: Array<{ id: string; name: string; at: string }>;
+  requiresThird?: boolean;
 }
 
 interface Submission {
@@ -227,6 +231,7 @@ export default function ReviewDashboard() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [me, setMe] = useState<{ id: string; name: string }>({ id: "shared", name: "" });
   const [faceKey, setFaceKey] = useState<string | null>(null);
 
   // Read after mount so the server and the client render the same first frame:
@@ -281,6 +286,11 @@ export default function ReviewDashboard() {
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => { if (data?.people) setPeople(data.people); })
       .catch((err) => console.error(err));
+    // who am I, so a signature of mine reads as mine
+    fetch("/api/session")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => { if (data) setMe({ id: data.id || "shared", name: data.name || "" }); })
+      .catch(() => undefined);
     loadMembers();
   };
 
@@ -374,23 +384,29 @@ export default function ReviewDashboard() {
     }
   };
 
-  const handleApprove = async (submissionKey: string) => {
+  // Sign off, take a signature back, or ask for a third review. The story
+  // publishes on the server once enough signatures are in; until then the
+  // reply carries who has signed so far.
+  const handleApprove = async (submissionKey: string, action: "sign" | "unsign" | "require-third" = "sign", value?: boolean) => {
     try {
       const res = await fetch("/api/approve-media", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ submissionKey }),
+        body: JSON.stringify({ submissionKey, action, value }),
       });
-      if (!res.ok) throw new Error("Failed to approve");
+      if (!res.ok) throw new Error("Failed to sign off");
       const data = await res.json();
-      setSubmissions((current) => current.map((sub) =>
-        sub.submissionKey === submissionKey
-          ? { ...sub, submissionKey: data.newSubmissionKey, data: { ...sub.data, status: "approved" } }
-          : sub,
-      ));
+      setSubmissions((current) => current.map((sub) => {
+        if (sub.submissionKey !== submissionKey) return sub;
+        const signed = { approvals: data.approvals, requiresThird: data.requiresThird };
+        return data.approved
+          ? { ...sub, submissionKey: data.newSubmissionKey, data: { ...sub.data, ...signed, status: "approved" } }
+          : { ...sub, data: { ...sub.data, ...signed } };
+      }));
+      if (selectedKey === submissionKey && data.approved) setSelectedKey(data.newSubmissionKey);
     } catch (err) {
       console.error(err);
-      alert("Failed to approve submission. Check console.");
+      alert("Could not record the sign-off. Check console.");
     }
   };
 
@@ -828,12 +844,20 @@ export default function ReviewDashboard() {
     const canTranscribe = Boolean(d.audioKey || d.recordingMode === "audio");
     const busy = transcribingKey === s.submissionKey;
     const named = Boolean(edit && (edit.firstName || edit.lastName));
+    // sign-off state: who has signed, how many it takes, whether I am one of them
+    const signed = d.approvals || [];
+    const needed = (d.requiresThird ? 1 : 0) + SIGNATURES_NEEDED;
+    const mine = signed.some((a) => a.id === me.id);
+    const pendingLabel = signed.length === 0
+      ? "Pending review"
+      : `Reviewed by ${signed.map((a) => a.name).join(", ")} · ${needed - signed.length} more to publish`;
     return (
       <article className="rv-detail">
         <div className="rv-detail-body rv-thin">
           <div className="rv-detail-head">
             <p className="rv-eyebrow">
-              <span>{live ? (d.privacy === "archive" ? "Approved · hidden" : "Approved · live") : "Pending review"}</span>
+              <span>{live ? (d.privacy === "archive" ? "Approved · hidden" : "Approved · live") : pendingLabel}</span>
+              {!live && d.requiresThird && <span className="rv-badge" title="A reviewer asked for a third signature on this story">Third review required</span>}
               {d.id && <code title="Submission ID — what a contributor quotes to have this removed">{d.id}</code>}
               {d.privacy === "community" && <span className="rv-badge">Community only</span>}
               {d.adsOk && <span className="rv-badge" title="The contributor is willing to have this story or photo used in Honeycomb advertising">OK for advertising</span>}
@@ -1008,7 +1032,25 @@ export default function ReviewDashboard() {
             </>
           ) : (
             <>
-              {!live && <button type="button" className="rv-cta" onClick={() => handleApprove(s.submissionKey)}>Approve &amp; publish<span aria-hidden="true">↗</span></button>}
+              {/* A story publishes when enough moderators have signed. The button
+                  says how far along it is; the last signature is the one that
+                  publishes, and it says so. */}
+              {!live && !mine && (
+                <button type="button" className="rv-cta" onClick={() => handleApprove(s.submissionKey, "sign")}>
+                  {signed.length + 1 >= needed ? <>Sign off &amp; publish<span aria-hidden="true">↗</span></> : <>Sign off ({signed.length + 1} of {needed})</>}
+                </button>
+              )}
+              {!live && mine && (
+                <button type="button" className="rv-quiet" onClick={() => handleApprove(s.submissionKey, "unsign")} title="Take your signature back">
+                  Signed ✓ · withdraw
+                </button>
+              )}
+              {!live && (
+                <label className="rv-quiet rv-check" title="Ask for a third moderator before this publishes">
+                  <input type="checkbox" checked={Boolean(d.requiresThird)} onChange={(e) => handleApprove(s.submissionKey, "require-third", e.target.checked)} />
+                  Needs a third review
+                </label>
+              )}
               <button type="button" className="rv-quiet" onClick={() => startEdit(s)}>Edit</button>
               {/* Always offered when there is audio: once a transcript exists it
                   becomes "Transcribe again" (it used to vanish). A video gets
