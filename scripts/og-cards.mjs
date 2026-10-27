@@ -5,6 +5,7 @@
 // logos and colours and can be redrawn after any change:
 //
 //   node scripts/og-cards.mjs
+//   CHROME=/path/to/chromium node scripts/og-cards.mjs   (macOS, Linux)
 //
 // The comb on each card is the gate's ground (lib/honeycomb-hover.js) caught
 // mid-assembly: settled edges, a few still arriving, honey at the joins.
@@ -14,7 +15,8 @@ import os from "node:os";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
-const CHROME = "C:/Program Files/Google/Chrome/Application/chrome.exe";
+// Chrome on Windows by default; CHROME=/path/to/chrome-or-chromium on macOS or Linux.
+const CHROME = process.env.CHROME || "C:/Program Files/Google/Chrome/Application/chrome.exe";
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const PUB = path.join(ROOT, "public");
 const asset = (p) => pathToFileURL(path.join(PUB, p)).href;
@@ -69,9 +71,9 @@ function comb({ color, glow, honey, seed }) {
 }
 
 const FONTS = `
-@font-face{font-family:'Lora';font-style:normal;font-weight:400 700;src:url(${asset("fonts/lora-normal-400-700.woff2")}) format('woff2')}
-@font-face{font-family:'Lora';font-style:italic;font-weight:400 700;src:url(${asset("fonts/lora-italic-400-700.woff2")}) format('woff2')}
-@font-face{font-family:'Montserrat';font-weight:400 700;src:url(${asset("fonts/montserrat-normal-400-700.woff2")}) format('woff2')}
+@font-face{font-family:'Fraunces';font-style:normal;font-weight:400 700;src:url(${asset("fonts/fraunces-normal-400-700.woff2")}) format('woff2')}
+@font-face{font-family:'Fraunces';font-style:italic;font-weight:400 700;src:url(${asset("fonts/fraunces-italic-400-700.woff2")}) format('woff2')}
+@font-face{font-family:'Manrope';font-weight:400 700;src:url(${asset("fonts/manrope-normal-400-700.woff2")}) format('woff2')}
 @font-face{font-family:'Public Sans';font-weight:400 700;src:url(${asset("fonts/public-sans-normal-400-700.woff2")}) format('woff2')}
 @font-face{font-family:'Nunito';font-weight:400 700;src:url(${asset("fonts/nunito-normal-400-700.woff2")}) format('woff2')}
 @font-face{font-family:'Source Serif 4';font-style:normal;font-weight:400 700;src:url(${asset("fonts/source-serif-4-normal-400-700.woff2")}) format('woff2')}
@@ -82,11 +84,11 @@ const page = ({ ground, combOpts, top, title, sub, foot, css }) => `<!doctype ht
 body{position:relative;background:${ground};-webkit-font-smoothing:antialiased}
 .comb{position:absolute;inset:0;opacity:.7;-webkit-mask-image:linear-gradient(90deg,#000 0,#000 17%,rgba(0,0,0,.28) 29%,rgba(0,0,0,.28) 71%,#000 83%,#000 100%)}
 .c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:0 250px}
-.wm{font:600 17px/1 'Montserrat',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#f2bf49;white-space:nowrap}
-.lock{display:flex;align-items:center;gap:22px}.x{font:400 24px/1 'Montserrat',sans-serif;color:var(--muted)}
+.wm{font:600 17px/1 'Manrope',sans-serif;letter-spacing:.16em;text-transform:uppercase;color:#f2bf49;white-space:nowrap}
+.lock{display:flex;align-items:center;gap:22px}.x{font:400 24px/1 'Manrope',sans-serif;color:var(--muted)}
 h1{margin-top:38px;font-size:70px;line-height:1.05;letter-spacing:-.015em;white-space:nowrap}
 p{margin-top:22px;font-size:23px;line-height:1.45;color:var(--body);max-width:640px;text-wrap:balance}
-.foot{position:absolute;left:0;right:0;bottom:44px;text-align:center;font:600 13px/1 'Montserrat',sans-serif;letter-spacing:.24em;text-transform:uppercase;color:var(--muted)}
+.foot{position:absolute;left:0;right:0;bottom:44px;text-align:center;font:600 13px/1 'Manrope',sans-serif;letter-spacing:.24em;text-transform:uppercase;color:var(--muted)}
 ${css}</style></head><body>${comb(combOpts)}<div class="c">${top}<h1>${title}</h1><p>${sub}</p></div><div class="foot">${foot}</div></body></html>`;
 
 const cards = [
@@ -99,7 +101,7 @@ const cards = [
       title: `Enter the <em>Honeycomb.</em>`,
       sub: "A living archive of the unexplained, shared by invitation.",
       foot: "Your experience · Our collective history",
-      css: `:root{--body:#cbb58e;--muted:#a08a66}h1{font-family:'Lora',serif;font-weight:500;color:#f4ead4}h1 em{color:#e3a444}p{font-family:'Lora',serif}`,
+      css: `:root{--body:#cbb58e;--muted:#a08a66}h1{font-family:'Fraunces',serif;font-weight:500;color:#f4ead4}h1 em{color:#e3a444}p{font-family:'Fraunces',serif}`,
     }),
   },
   {

@@ -1,14 +1,14 @@
 /* Consent forms (/release, /listing-consent): the /privacy document look, plus inputs. */
 .cf-form{display:flex;flex-direction:column;gap:22px;margin-top:8px}
 .cf-field{display:flex;flex-direction:column;gap:6px}
-.cf-label{font-family:Montserrat,sans-serif;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
+.cf-label{font-family:var(--font-ui);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--gold)}
 .cf-req{color:var(--amber)}
 .cf-hint{font-size:14px;color:var(--muted)}
 .cf-input,.cf-textarea{width:100%;box-sizing:border-box;padding:12px 14px;font:inherit;font-size:17px;color:var(--cream);
   background:rgba(255,247,232,.04);border:1px solid var(--line);border-radius:0}
 .cf-input:focus-visible,.cf-textarea:focus-visible{outline:2px solid var(--gold);outline-offset:2px}
 .cf-input[aria-invalid="true"]{border-color:var(--status-live)}
-.cf-input--sig{font-family:Lora,Georgia,serif;font-style:italic;font-size:22px}
+.cf-input--sig{font-family:var(--font-display);font-style:italic;font-size:22px}
 .cf-textarea{min-height:140px;resize:vertical}
 .cf-group{display:flex;flex-direction:column;gap:10px;margin:0;padding:0;border:0}
 .cf-group legend{padding:0;margin-bottom:8px}
@@ -16,14 +16,14 @@
 .cf-choice input{margin-top:5px;flex:none;accent-color:var(--gold);width:18px;height:18px}
 .cf-sign{display:flex;flex-direction:column;gap:14px;padding:20px;border:1px solid var(--line);background:rgba(78,42,14,.14)}
 .cf-actions{display:flex;flex-wrap:wrap;gap:14px;align-items:center;margin-top:6px}
-.cf-submit{font-family:Montserrat,sans-serif;font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
+.cf-submit{font-family:var(--font-ui);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;
   padding:14px 26px;color:#1a0e04;background:var(--cta-gradient);border:0;cursor:pointer}
 .cf-submit:disabled{opacity:.55;cursor:default}
 .cf-error{color:var(--status-live-text);font-size:15px}
 .cf-link{font:inherit;color:var(--gold);background:none;border:0;padding:0;cursor:pointer;border-bottom:1px solid rgba(242,191,73,.4)}
 .cf-done h2{margin-top:0}
 .cf-summary{display:grid;grid-template-columns:minmax(120px,max-content) 1fr;gap:8px 18px;margin:0 0 18px}
-.cf-summary dt{font-family:Montserrat,sans-serif;font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding-top:3px}
+.cf-summary dt{font-family:var(--font-ui);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);padding-top:3px}
 .cf-summary dd{margin:0}
 .cf-ro{font-size:15px;color:var(--muted)}
 @media print{
