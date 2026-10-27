@@ -20,7 +20,7 @@ export async function generateMetadata({ params }: { params: Promise<{ partner: 
   // drawn by scripts/og-cards.mjs). The ?v= changes whenever the card is
   // redrawn, because messaging apps cache a card by its URL.
   const title = `Project Honeycomb × ${p.name}`;
-  const image = { url: `/og-${p.slug}.png?v=2`, width: 1200, height: 630, alt: `Project Honeycomb × ${p.name}: Welcome to the Honeycomb.` };
+  const image = { url: `/og-${p.slug}.png?v=3`, width: 1200, height: 630, alt: `Project Honeycomb × ${p.name}: Welcome to the Honeycomb.` };
   return {
     title: `Honeycomb × ${p.name}`,
     description: p.shareLine,

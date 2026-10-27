@@ -160,7 +160,7 @@ function bandFit(text: string): string {
   if (!t) return "";
   const c = document.createElement("canvas").getContext("2d");
   if (!c) return "";
-  const width = (px: number, tracking: number) => { c.font = `${px}px Montserrat, sans-serif`; return c.measureText(t.toUpperCase()).width + tracking * px * t.length; };
+  const width = (px: number, tracking: number) => { c.font = `${px}px Manrope, sans-serif`; return c.measureText(t.toUpperCase()).width + tracking * px * t.length; };
   const sizeFor = (avail: number) => {
     if (width(STAMP_FIT.px, STAMP_FIT.tracking) <= avail) return STAMP_FIT.px;
     const tight = width(STAMP_FIT.px, STAMP_FIT.tightTracking);
