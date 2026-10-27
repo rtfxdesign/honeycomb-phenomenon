@@ -21,6 +21,7 @@ import { cellLabel, initialsOf } from '../lib/name';
 import { STAMP_FIT } from '../lib/stamp';
 import { PRIVACY_PATH, TERMS_PATH, ACCESSIBILITY_PATH } from '../lib/contact';
 import { partnerFor } from '../lib/partners';
+import { attach as attachHover } from '../lib/honeycomb-hover';
 
 const TWEAK_DEFAULTS = {
   // the settings the review settled on, 2026-09-18, revised by Allen 2026-09-29
@@ -220,7 +221,6 @@ function genField(cols, rows, count, mode, brightShare, gaps, rng) {
   return picked.map((s) => [s[0], s[1], brightSet.has(key(s)) ? 'b' : 'd']);
 }
 
-const GATE_CELLS = [[0, 2, 'd'], [1, 1, 'd'], [1, 5, 'd'], [2, 6, 'd'], [8, 1, 'd'], [8, 5, 'd'], [9, 2, 'b'], [9, 4, 'd'], [10, 3, 'd'], [0, 4, 'b']];
 
 // Everything a cell can be found by. Community faces search their name and
 // panel text; archive submissions search their whole record.
@@ -342,15 +342,6 @@ function gatherMatches(base, matchKeys, cols, rows, cx, cy, size, W, H, push) {
     match: matchKeys.has(b.k),
     ...(result.get(b.k) || {}),
   }));
-}
-
-function Cells({ list, size }) {
-  const cx = size * 0.751, cy = size * 0.428;
-  return list.map(([c, r, t], i) => (
-    <div key={c + ',' + r} className="cell" style={{ left: c * cx, top: r * cy, width: size, '--i': i }}>
-      <img src="/assets/cell-gold.png" alt="" className={t === 'b' ? 'cell-bright' : 'cell-dormant'} style={{ width: '100%' }} />
-    </div>
-  ));
 }
 
 // ── the comb mark, as a magnifier ───────────────────────────────────────────
@@ -742,8 +733,16 @@ function PanelFooter() {
 
 // ── gate (from the design project) ──────────────────────────────────────────
 
-function Gate({ onEnter, size, partner }) {
+function Gate({ onEnter, partner }) {
   const p = partnerFor(partner);
+  // The ground of every gate is the comb that assembles itself around the
+  // pointer (the Claude Design hover exploration), tinted on a partner's gate.
+  const groundRef = useRef(null);
+  useEffect(() => {
+    if (!groundRef.current) return undefined;
+    const fx = attachHover(groundRef.current, p ? p.fx : undefined);
+    return () => fx.destroy();
+  }, [p]);
   // Request Access: a short form under the password field. It goes to the
   // Netlify form "request-access" (defined in public/__forms.html), whose
   // notification reaches Paul with a link that opens /review with the name
@@ -802,13 +801,20 @@ function Gate({ onEnter, size, partner }) {
     }
   };
   return (
-    <div>
-      <div className="gate-hexes" aria-hidden="true" style={{ position: 'absolute', left: '50%', top: '50%', transform: 'translate(-50%,-50%)', width: 10 * size * 0.751 + size, height: 6 * size * 0.428 + size, opacity: 0.72, zIndex: 2 }}>
-        <Cells list={GATE_CELLS} size={size} />
-      </div>
+    <div className="gate" ref={groundRef} data-partner={p ? p.slug : undefined}>
       <div className="gate-center">
         <div className="gate-stack">
-          <div className="gate-mark" aria-hidden="true"><CombMark /></div>
+          {p ? (
+            <div className="gate-lockup">
+              <div className="gate-mark gate-mark-sm" aria-hidden="true"><CombMark /></div>
+              <span className="gate-lockup-x" aria-hidden="true">×</span>
+              <div className={p.logoPlate ? 'gate-logo gate-logo-plate' : 'gate-logo'}>
+                <img src={p.logo} alt={p.logoAlt} />
+              </div>
+            </div>
+          ) : (
+            <div className="gate-mark" aria-hidden="true"><CombMark /></div>
+          )}
           {p && (
             <p className="gate-eyebrow gate-partner">
               Project Honeycomb <span aria-hidden="true">×</span> {p.name}{p.org ? <><span className="gate-partner-org"> · {p.org}</span></> : null}
@@ -1369,7 +1375,7 @@ export default function HoneycombApp({ partner = null }) {
       {t.vignette && <div className="hc-vignette"></div>}
       {(t.warmth ?? 0) > 0 && <div className="hc-warm" style={{ opacity: (t.warmth ?? 0) / 100 }} aria-hidden="true"></div>}
       <div className="hc-view" style={{ opacity: view === 'gate' ? 1 : 0, pointerEvents: view === 'gate' ? 'auto' : 'none' }}>
-        <Gate onEnter={enter} size={t.cellSize} partner={partner} />
+        <Gate onEnter={enter} partner={partner} />
       </div>
       <div className="hc-view" style={{ opacity: view === 'archive' ? 1 : 0, pointerEvents: view === 'archive' ? 'auto' : 'none' }}>
         {view === 'archive' && (

@@ -23,6 +23,16 @@ export const PARTNERS = {
       'This entrance was made for the Archives of the Impossible at Rice University. Enter the password you were given to continue.',
     // the badge shown on their submissions in /review
     label: 'Rice · Archives of the Impossible',
+    // Their gate wears their identity: the Woodson Research Center lockup
+    // (Rice Fondren Library, Center of the Impossible) as published on
+    // impossiblearchives.org, unaltered on a white plate; Rice's shield navy
+    // and the Center's gold; Public Sans, the Center's typeface. Colours and
+    // type are set in globals.css under .gate[data-partner="rice"].
+    logo: '/partners/rice-woodson-center-for-the-impossible.jpg',
+    logoAlt: 'Rice Fondren Library, Woodson Research Center, Center of the Impossible',
+    logoPlate: true,
+    // the comb lines drawn behind the gate (lib/honeycomb-hover.js)
+    fx: { color: '#f6c924', glow: '#3f5bd1', honey: '#fff1b0' },
   },
   'john-mack': {
     slug: 'john-mack',
@@ -34,6 +44,13 @@ export const PARTNERS = {
       'Project Honeycomb is a living archive of first-hand encounters with the unexplained, told by the people who had them. ' +
       'This entrance was made for the John E. Mack Institute. Enter the password you were given to continue.',
     label: 'John E. Mack Institute',
+    // Their wordmark from johnemackinstitute.org (made for a dark header, so
+    // it sits straight on the gate), their violet, and their typefaces:
+    // Source Serif for headings, Nunito for text.
+    logo: '/partners/john-mack-institute.png',
+    logoAlt: 'John Mack Institute',
+    logoPlate: false,
+    fx: { color: '#c39bff', glow: '#7f37ba', honey: '#efe3ff' },
   },
 };
 

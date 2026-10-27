@@ -138,6 +138,43 @@ button{font:inherit;color:inherit}
 }
 .gate-eyebrow{font-family:var(--font-ui);font-weight:var(--weight-label);font-size:var(--type-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--text-gold);margin:36px 0 20px}
 .gate-partner{margin:30px 0 14px;text-wrap:balance}.gate-partner span[aria-hidden]{color:var(--text-muted);margin:0 .4em}.gate-partner-org{color:var(--text-muted)}
+/* Every gate stands on the comb that assembles itself around the pointer
+   (lib/honeycomb-hover.js draws it on a canvas at z-index 0 inside .gate). */
+.gate{position:absolute;inset:0;overflow:hidden;cursor:crosshair;background:radial-gradient(60% 70% at 50% 40%,rgba(252,146,38,.08),transparent 70%),#000}
+.gate input,.gate button,.gate a{cursor:auto}.gate button,.gate a{cursor:pointer}
+
+/* A partner's gate: Honeycomb's mark beside the partner's own logo. */
+.gate-lockup{display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;max-width:min(640px,92vw)}
+.gate-mark-sm{width:min(150px,34vw)}
+.gate-lockup-x{font-family:var(--font-ui);font-size:20px;color:var(--text-muted)}
+.gate-logo img{display:block;height:auto}
+.gate-logo-plate{background:#fff;padding:14px 18px;border-radius:3px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
+.gate-logo-plate img{width:min(330px,72vw)}
+@media (max-width:600px){.gate-lockup{flex-direction:column;gap:16px}.gate-lockup-x{display:none}.gate-mark-sm{width:min(120px,34vw)}}
+.gate[data-partner="john-mack"] .gate-logo img{width:min(320px,72vw)}
+.gate[data-partner] .gate-mark-sm+.gate-title,.gate-lockup+.gate-partner{margin-top:30px}
+
+/* Rice: the shield's navy, the Center for the Impossible's gold, Public Sans. */
+.gate[data-partner="rice"]{
+  --font-display:'Public Sans',system-ui,sans-serif;--font-story:'Public Sans',system-ui,sans-serif;--font-ui:'Public Sans',system-ui,sans-serif;
+  --text-display:#ffffff;--text-body:#ccd2e6;--text-muted:#9aa3c4;--text-gold:#f6c924;--hc-gold:#f6c924;
+  --interactive:#f6c924;--interactive-hover:#ffd94f;--interactive-press:#d9ae12;--text-on-gold:#0b1238;
+  --surface-deep:rgba(255,255,255,.06);--border-strong:#3f4b8c;--border-frame:#6773b4;--border-gold:#f6c924;--focus-ring:rgba(246,201,36,.6);
+  background:radial-gradient(70% 65% at 50% 38%,#1f2b6e 0%,#0d1645 52%,#060b26 100%);
+}
+.gate[data-partner="rice"] .gate-title{font-weight:700;letter-spacing:-.02em}
+.gate[data-partner="rice"] .gate-title em{font-style:normal}
+.gate[data-partner="rice"] .hc-input:focus{box-shadow:0 0 0 3px rgba(246,201,36,.22)}
+
+/* John Mack Institute: their violet, Source Serif for headings, Nunito for text. */
+.gate[data-partner="john-mack"]{
+  --font-display:'Source Serif 4',Georgia,serif;--font-story:'Nunito',system-ui,sans-serif;--font-ui:'Nunito',system-ui,sans-serif;
+  --text-display:#f7f2ff;--text-body:#d8cfe8;--text-muted:#a99bc2;--text-gold:#c9a6ff;--hc-gold:#c9a6ff;
+  --interactive:#7f37ba;--interactive-hover:#9447d6;--interactive-press:#6a2b9e;--text-on-gold:#ffffff;
+  --surface-deep:rgba(255,255,255,.05);--border-strong:#4b2f73;--border-frame:#7a55a8;--border-gold:#a544f5;--focus-ring:rgba(165,68,245,.6);
+  background:radial-gradient(70% 65% at 50% 38%,#2c1052 0%,#14072d 52%,#07020f 100%);
+}
+.gate[data-partner="john-mack"] .hc-input:focus{box-shadow:0 0 0 3px rgba(165,68,245,.25)}
 .gate-title{font-family:var(--font-display);font-weight:var(--weight-display);font-size:56px;line-height:var(--leading-display);color:var(--text-display);margin:0 0 20px;text-wrap:balance}
 .gate-title em{font-style:italic;color:var(--hc-gold)}
 .gate-body{font-family:var(--font-display);font-size:17px;line-height:var(--leading-body);color:var(--text-body);margin:0 0 36px;max-width:420px}
