@@ -20,6 +20,7 @@ import { useCombReveal } from './CombReveal';
 import { cellLabel, initialsOf } from '../lib/name';
 import { STAMP_FIT } from '../lib/stamp';
 import { PRIVACY_PATH, TERMS_PATH, ACCESSIBILITY_PATH } from '../lib/contact';
+import { partnerFor } from '../lib/partners';
 
 const TWEAK_DEFAULTS = {
   // the settings the review settled on, 2026-09-18, revised by Allen 2026-09-29
@@ -741,7 +742,8 @@ function PanelFooter() {
 
 // ── gate (from the design project) ──────────────────────────────────────────
 
-function Gate({ onEnter, size }) {
+function Gate({ onEnter, size, partner }) {
+  const p = partnerFor(partner);
   // Request Access: a short form under the password field. It goes to the
   // Netlify form "request-access" (defined in public/__forms.html), whose
   // notification reaches Paul with a link that opens /review with the name
@@ -764,7 +766,7 @@ function Gate({ onEnter, size }) {
     try {
       const origin = window.location.origin;
       const review = `${origin}/review?member=${encodeURIComponent(name)}&email=${encodeURIComponent(email)}`;
-      const body = new URLSearchParams({ 'form-name': 'request-access', 'bot-field': '', name, email, site: origin, review });
+      const body = new URLSearchParams({ 'form-name': 'request-access', 'bot-field': '', name, email, site: origin, review, partner: p ? p.label : '' });
       const res = await fetch('/__forms.html', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: body.toString() });
       if (!res.ok) throw new Error(String(res.status));
       setSent(true);
@@ -807,11 +809,16 @@ function Gate({ onEnter, size }) {
       <div className="gate-center">
         <div className="gate-stack">
           <div className="gate-mark" aria-hidden="true"><CombMark /></div>
-          <h1 className="gate-title">Enter the <em>Honeycomb.</em></h1>
-          <p className="gate-body">This living archive is shared by invitation. Enter the password, or your member access code, to continue.</p>
+          {p && (
+            <p className="gate-eyebrow gate-partner">
+              Project Honeycomb <span aria-hidden="true">×</span> {p.name}{p.org ? <><span className="gate-partner-org"> · {p.org}</span></> : null}
+            </p>
+          )}
+          <h1 className="gate-title">{p ? <>Welcome to the <em>Honeycomb.</em></> : <>Enter the <em>Honeycomb.</em></>}</h1>
+          <p className="gate-body">{p ? p.welcome : 'This living archive is shared by invitation. Enter the password, or your member access code, to continue.'}</p>
           <form className="gate-form" onSubmit={submit}>
-            <Input label="Password or access code" type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
-                   hint={wrong ? 'That password or code was not recognized.' : undefined} invalid={wrong} autoFocus />
+            <Input label={p ? 'Password' : 'Password or access code'} type="password" value={pw} onChange={(e) => setPw(e.target.value)} placeholder=""
+                   hint={wrong ? (p ? 'That password was not recognized.' : 'That password or code was not recognized.') : undefined} invalid={wrong} autoFocus />
             <Turnstile action="unlock" onToken={setBotToken} />
             <Button type="submit" disabled={checking || (TURNSTILE_SITE_KEY && !botToken)}>{checking ? 'Checking…' : TURNSTILE_SITE_KEY && !botToken ? 'One moment…' : 'Enter'}</Button>
           </form>
@@ -1204,7 +1211,7 @@ function Archive({ t, panelOpen, focusKey, setFocusKey, onPersonSelect, experien
 
 // ── app shell ───────────────────────────────────────────────────────────────
 
-export default function HoneycombApp() {
+export default function HoneycombApp({ partner = null }) {
   const [view, setView] = useState('gate');
   // the tweaks panel is a working tool: it exists on the preview site and on a
   // local build, never on the live site, where every visitor sees the defaults
@@ -1229,9 +1236,15 @@ export default function HoneycombApp() {
   useEffect(() => {
     fetch('/api/session')
       .then((r) => (r.ok ? r.json() : null))
-      .then((d) => { if (d) setSession({ role: d.role, name: d.name }); })
+      .then((d) => {
+        if (!d) return;
+        setSession({ role: d.role, name: d.name });
+        // on a partner's page the gate opens by itself only for a session that
+        // already came through that partner's password
+        if (partner && d.role && d.origin === partner) setView('archive');
+      })
       .catch(() => undefined);
-  }, []);
+  }, [partner]);
 
   const signOut = useCallback(async () => {
     await fetch('/api/session', { method: 'DELETE' }).catch(() => undefined);
@@ -1281,13 +1294,16 @@ export default function HoneycombApp() {
     [people]
   );
 
-  // restore unlocked session (30 days) on the client only
+  // restore unlocked session (30 days) on the client only. Not on a partner's
+  // page: there the partner's password is what marks their submissions, so
+  // an older session from the main gate does not skip it (see /api/session above).
   useEffect(() => {
+    if (partner) return;
     try {
       const until = Number(localStorage.getItem('hc-unlocked-until') || 0);
       if (until > Date.now()) setView('archive');
     } catch { /* private mode */ }
-  }, []);
+  }, [partner]);
 
   const enter = (data) => {
     setView('archive');
@@ -1353,7 +1369,7 @@ export default function HoneycombApp() {
       {t.vignette && <div className="hc-vignette"></div>}
       {(t.warmth ?? 0) > 0 && <div className="hc-warm" style={{ opacity: (t.warmth ?? 0) / 100 }} aria-hidden="true"></div>}
       <div className="hc-view" style={{ opacity: view === 'gate' ? 1 : 0, pointerEvents: view === 'gate' ? 'auto' : 'none' }}>
-        <Gate onEnter={enter} size={t.cellSize} />
+        <Gate onEnter={enter} size={t.cellSize} partner={partner} />
       </div>
       <div className="hc-view" style={{ opacity: view === 'archive' ? 1 : 0, pointerEvents: view === 'archive' ? 'auto' : 'none' }}>
         {view === 'archive' && (

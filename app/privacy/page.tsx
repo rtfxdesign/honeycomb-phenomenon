@@ -54,6 +54,7 @@ export default function PrivacyPage() {
           <li><strong>The visibility you chose</strong>: public, community only, or strictly archived.</li>
           <li><strong>The moment you submitted and confirmed</strong> the account was yours to share.</li>
           <li><strong>A submission ID</strong>, generated for you and shown once, which is how you refer to the record later.</li>
+          <li><strong>Which partner&rsquo;s entrance you came through</strong>, if you entered with a password a partner institution gave you (for example the Archives of the Impossible at Rice University). Your story is marked with that partner, and carries its tag where the story is shown. Nothing else about how you arrived is kept.</li>
           <li><strong>Your email address — only if you tick</strong> that you are open to the team contacting you. See below.</li>
         </ul>
         <p>

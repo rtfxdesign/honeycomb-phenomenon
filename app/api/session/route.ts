@@ -8,7 +8,7 @@ export async function GET(request: NextRequest) {
   const session = getSession(request);
   if (!session) return NextResponse.json({ role: null });
   // id lets the review dashboard tell a signature of yours from somebody else's
-  return NextResponse.json({ role: session.role, name: session.name ?? null, id: session.id ?? null });
+  return NextResponse.json({ role: session.role, name: session.name ?? null, id: session.id ?? null, origin: session.origin ?? null });
 }
 
 /** Sign out. */

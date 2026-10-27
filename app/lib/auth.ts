@@ -1,5 +1,6 @@
 import { createHash, createHmac, timingSafeEqual } from "node:crypto";
 import { NextRequest } from "next/server";
+import { PARTNERS, partnerFor } from "./partners.js";
 
 /**
  * Three tiers of access to the archive.
@@ -19,6 +20,9 @@ import { NextRequest } from "next/server";
  *                                 password also grants moderator, which is how
  *                                 the site behaved before members existed
  *   HONEYCOMB_SESSION_SECRET      optional; signs session cookies
+ *   HONEYCOMB_PARTNER_*_PASSWORD  one per partner in lib/partners.js; opens the
+ *                                 archive as a visitor whose session carries
+ *                                 the partner as its origin
  */
 
 export type Role = "visitor" | "member" | "moderator";
@@ -29,6 +33,8 @@ export interface Session {
   id?: string;
   /** member display name, for the "signed in as" line */
   name?: string;
+  /** partner slug, when the session was opened with a partner's password */
+  origin?: string;
   exp: number;
 }
 
@@ -87,6 +93,7 @@ export function readSessionToken(token: string | undefined): Session | null {
     const session = JSON.parse(Buffer.from(body, "base64url").toString()) as Session;
     if (!session.exp || session.exp < Date.now()) return null;
     if (session.role !== "visitor" && session.role !== "member" && session.role !== "moderator") return null;
+    if (session.origin !== undefined && !partnerFor(session.origin)) delete session.origin;
     return session;
   } catch {
     return null;
@@ -117,4 +124,19 @@ export function roleForPassword(password: unknown): Role | null {
   // No separate moderator password configured: the one password still does
   // everything, exactly as before members existed.
   return matchesAny(password, VISITOR_PASSWORDS) ? "moderator" : null;
+}
+
+/**
+ * Which partner a password belongs to, or null. Every partner is compared,
+ * so timing does not say which one matched; a partner with no password set
+ * can never match.
+ */
+export function partnerForPassword(password: unknown): string | null {
+  if (typeof password !== "string" || !password) return null;
+  let hit: string | null = null;
+  for (const p of Object.values(PARTNERS)) {
+    const candidates = list(process.env[p.passwordEnv] || "");
+    if (matchesAny(password, candidates) && !hit) hit = p.slug;
+  }
+  return hit;
 }

@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
-  roleForPassword, createSessionToken, AUTH_COOKIE, maxAgeFor, Role,
+  roleForPassword, partnerForPassword, createSessionToken, AUTH_COOKIE, maxAgeFor, Role,
 } from "../../lib/auth";
 import { memberForCode, touchLastSeen } from "../../lib/members";
 import { verifyTurnstile } from "../../lib/turnstile";
 
 /**
- * One field, three outcomes: the moderator password, the visitor password, or
- * a member's access code.
+ * One field, four outcomes: the moderator password, the visitor password, a
+ * partner's password (a visitor session marked with that partner), or a
+ * member's access code.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -25,11 +26,20 @@ export async function POST(request: NextRequest) {
     let token: string | null = null;
     let role: Role | null = null;
     let name: string | undefined;
+    let origin: string | undefined;
 
     const passwordRole = roleForPassword(password);
+    const partner = passwordRole ? null : partnerForPassword(password);
     if (passwordRole) {
       role = passwordRole;
       token = createSessionToken({ role: passwordRole });
+    } else if (partner) {
+      // A partner's password opens the archive as a visitor, and the session
+      // remembers which partner it came through: whatever is submitted in it
+      // is stamped with that origin.
+      role = "visitor";
+      origin = partner;
+      token = createSessionToken({ role, origin });
     } else {
       const member = await memberForCode(password);
       if (member) {
@@ -50,7 +60,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Not recognized" }, { status: 401 });
     }
 
-    const response = NextResponse.json({ success: true, role, name });
+    const response = NextResponse.json({ success: true, role, name, origin: origin ?? null });
     response.cookies.set(AUTH_COOKIE, token, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",

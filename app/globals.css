@@ -137,6 +137,7 @@ button{font:inherit;color:inherit}
   .site-header.site-header--gate{display:flex;justify-content:center}
 }
 .gate-eyebrow{font-family:var(--font-ui);font-weight:var(--weight-label);font-size:var(--type-label);letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--text-gold);margin:36px 0 20px}
+.gate-partner{margin:30px 0 14px;text-wrap:balance}.gate-partner span[aria-hidden]{color:var(--text-muted);margin:0 .4em}.gate-partner-org{color:var(--text-muted)}
 .gate-title{font-family:var(--font-display);font-weight:var(--weight-display);font-size:56px;line-height:var(--leading-display);color:var(--text-display);margin:0 0 20px;text-wrap:balance}
 .gate-title em{font-style:italic;color:var(--hc-gold)}
 .gate-body{font-family:var(--font-display);font-size:17px;line-height:var(--leading-body);color:var(--text-body);margin:0 0 36px;max-width:420px}

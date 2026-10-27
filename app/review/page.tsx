@@ -6,6 +6,7 @@ import { formatDisplayName, NAME_DISPLAY_OPTIONS } from "../lib/name";
 import { uploadToR2 } from "../lib/upload";
 import { STAMP_FIT } from "../lib/stamp";
 import { SIGNATURES_NEEDED } from "../lib/approvals";
+import { PARTNERS, partnerFor } from "../lib/partners.js";
 import "./review.css";
 
 /**
@@ -28,6 +29,8 @@ interface SubmissionData {
   consentAt?: string;
   submittedAt?: string;
   adsOk?: boolean;
+  /** partner gate it came through, e.g. "rice" */
+  origin?: string;
   location: string;
   experienceYear: string;
   experienceType?: string;
@@ -121,11 +124,13 @@ interface MemberRecord {
 }
 
 type Tab = "queue" | "live" | "faces" | "members";
-type Filter = "all" | "public" | "community" | "archive" | "media" | "transcript";
+// "via:<slug>" shows what came in through one partner's gate (lib/partners.js)
+type Filter = "all" | "public" | "community" | "archive" | "media" | "transcript" | `via:${string}`;
 
 const TABS: Array<[Tab, string]> = [["queue", "Queue"], ["live", "Live"], ["faces", "Faces"], ["members", "Members"]];
 const FILTERS: Array<[Filter, string]> = [
   ["all", "All"], ["public", "Public"], ["community", "Community"], ["archive", "Archived"], ["media", "Has media"], ["transcript", "Needs transcript"],
+  ...Object.values(PARTNERS).map((p): [Filter, string] => [`via:${p.slug}`, `Via ${p.slug === "rice" ? "Rice" : p.name}`]),
 ];
 const PRIV: Record<string, [string, string]> = {
   public: ["Public", "rv-priv-public"],
@@ -746,6 +751,7 @@ export default function ReviewDashboard() {
       if (filter === "all") return true;
       if (filter === "media") return hasMedia(s);
       if (filter === "transcript") return hasMedia(s) && !s.data.transcript;
+      if (filter.startsWith("via:")) return s.data.origin === filter.slice(4);
       return (s.data.privacy || "public") === filter;
     })
     .filter((s) => !q || hay(s).includes(q)), [tab, live, pending, filter, q]);
@@ -860,6 +866,7 @@ export default function ReviewDashboard() {
               {!live && d.requiresThird && <span className="rv-badge" title="A reviewer asked for a third signature on this story">Third review required</span>}
               {d.id && <code title="Submission ID — what a contributor quotes to have this removed">{d.id}</code>}
               {d.privacy === "community" && <span className="rv-badge">Community only</span>}
+              {partnerFor(d.origin) && <span className="rv-badge" title="Submitted through this partner's own entrance and password">Via {partnerFor(d.origin)!.label}</span>}
               {d.adsOk && <span className="rv-badge" title="The contributor is willing to have this story or photo used in Honeycomb advertising">OK for advertising</span>}
               {s.contactEmail && <span className="rv-badge" title="The contributor left an email and is open to the team writing to them about this story">Open to contact</span>}
               {d.recordingMode === "video" && d.mediaKey && (/-web\.mp4$/i.test(d.mediaKey)

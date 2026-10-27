@@ -6,6 +6,8 @@ import { generateSubmissionId } from "../../lib/submission-id";
 import { POLICY_VERSION, CONSENT_VERSION, EMAIL_RE, contactKey } from "../../lib/contact";
 import { verifyTurnstile } from "../../lib/turnstile";
 import { sendSubmissionReceipt } from "../../lib/mail";
+import { getSession } from "../../lib/auth";
+import { partnerFor } from "../../lib/partners.js";
 
 const PRIVACY_LEVELS = ["public", "community", "archive"];
 const RECORDING_MODES = ["video", "audio", "text"];
@@ -81,6 +83,12 @@ export async function POST(request: NextRequest) {
       ? data.hashtags.map((t: unknown) => str(t, 40).replace(/^#/, "")).filter(Boolean).slice(0, 30)
       : [];
 
+    // Where the submission came in. Read from the signed session cookie, never
+    // from the request body, so a submission cannot claim a partner it did not
+    // come through. A partner's stories also carry its tag, in public.
+    const partner = partnerFor(getSession(request)?.origin);
+    if (partner && !hashtags.some((t: string) => t.toLowerCase() === partner.tag)) hashtags.push(partner.tag);
+
     const client = getR2Client();
 
     // The ID is the storage key, so it must be unused. Four characters from a
@@ -131,6 +139,8 @@ export async function POST(request: NextRequest) {
       policyVersion: POLICY_VERSION,
       // optional: willing to have the story or photo used in Honeycomb's advertising
       adsOk: data.adsOk === true,
+      // the partner gate this came through (lib/partners.js), if any
+      origin: partner ? partner.slug : undefined,
       submittedAt: now,
       status: "pending",
       // Where the words came from, and whether a machine still owes us any.
