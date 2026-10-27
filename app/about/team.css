@@ -33,6 +33,9 @@
    page to stay inside the comb; everyone else falls back */
 .tp-cell[data-on].tp-cell--sel{z-index:3;filter:drop-shadow(0 0 24px rgba(242,191,73,.35))}
 .tp-cell[data-on].tp-cell--big{transform:translate(var(--tp-dx,0px),var(--tp-dy,0px)) scale(var(--tp-s,2.2))}
+/* no glow while grown: the gold rim already marks it, and a 24px drop-shadow
+   repainted at 2.2x on every frame of the grow is what made it stutter */
+.tp-cell[data-on].tp-cell--sel.tp-cell--big{filter:none}
 .tp-cell.tp-cell--big .tp-tag{opacity:1;transform:scale(calc(1 / var(--tp-s,2.2)));transform-origin:50% 100%}
 .tp-full{position:absolute;inset:0;opacity:0;transition:opacity .45s ease}
 .tp-cell--big .tp-full{opacity:1}
