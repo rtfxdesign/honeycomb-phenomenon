@@ -737,19 +737,33 @@ function Gate({ onEnter, partner }) {
   const p = partnerFor(partner);
   // The ground of every gate is the comb that assembles itself around the
   // pointer (the Claude Design hover exploration), tinted on a partner's gate.
-  // The comb is kept out of the box around the words and the form, so it is
-  // drawn around them and never behind them.
+  // Behind the words the comb fades back, with soft edges: to 20% behind the
+  // logo and behind the text and form, to 50% behind the title. The canvas
+  // itself sits at 70% (globals.css), so `keep` is each of those over 0.7.
   const groundRef = useRef(null);
   const stackRef = useRef(null);
   useEffect(() => {
     if (!groundRef.current) return undefined;
-    const avoid = () => {
+    const CANVAS = 0.7, pad = 18;
+    const groups = [
+      { sel: '.gate-lockup, .gate-mark', keep: 0.2 / CANVAS },
+      { sel: '.gate-partner, .gate-title', keep: 0.5 / CANVAS },
+      { sel: '.gate-body, .gate-form, .gate-note, .gate-request', keep: 0.2 / CANVAS },
+    ];
+    const dim = () => {
       const g = groundRef.current, s = stackRef.current;
       if (!g || !s) return null;
-      const a = g.getBoundingClientRect(), b = s.getBoundingClientRect(), pad = 28;
-      return [{ x: b.left - a.left - pad, y: b.top - a.top - pad, w: b.width + pad * 2, h: b.height + pad * 2 }];
+      const a = g.getBoundingClientRect();
+      return groups.map(({ sel, keep }) => {
+        const els = [...s.querySelectorAll(sel)].filter((el) => el.parentElement === s);
+        if (!els.length) return null;
+        const rs = els.map((el) => el.getBoundingClientRect());
+        const l = Math.min(...rs.map((r) => r.left)), t = Math.min(...rs.map((r) => r.top));
+        const rr = Math.max(...rs.map((r) => r.right)), b = Math.max(...rs.map((r) => r.bottom));
+        return { x: l - a.left - pad, y: t - a.top - pad, w: rr - l + pad * 2, h: b - t + pad * 2, keep };
+      }).filter(Boolean);
     };
-    const fx = attachHover(groundRef.current, { ...(p ? p.fx : {}), avoid });
+    const fx = attachHover(groundRef.current, { ...(p ? p.fx : {}), dim });
     return () => fx.destroy();
   }, [p]);
   // Request Access: a short form under the password field. It goes to the
