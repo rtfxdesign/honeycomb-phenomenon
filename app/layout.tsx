@@ -34,13 +34,13 @@ export async function generateMetadata(): Promise<Metadata> {
       description,
       type: "website",
       url: "/",
-      images: [{ url: "/og.png", width: 1200, height: 630, alt: "Project Honeycomb — Enter the Honeycomb. A living archive of the unexplained, shared by invitation." }],
+      images: [{ url: "/og.png?v=2", width: 1200, height: 630, alt: "Project Honeycomb — Enter the Honeycomb. A living archive of the unexplained, shared by invitation." }],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
-      images: ["/og.png"],
+      images: ["/og.png?v=2"],
     },
   };
 }

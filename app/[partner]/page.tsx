@@ -16,9 +16,17 @@ export function generateStaticParams() {
 export async function generateMetadata({ params }: { params: Promise<{ partner: string }> }): Promise<Metadata> {
   const p = partnerFor((await params).partner);
   if (!p) return {};
+  // The link a partner is sent unfurls as their own card (public/og-<slug>.png,
+  // drawn by scripts/og-cards.mjs). The ?v= changes whenever the card is
+  // redrawn, because messaging apps cache a card by its URL.
+  const title = `Project Honeycomb × ${p.name}`;
+  const image = { url: `/og-${p.slug}.png?v=2`, width: 1200, height: 630, alt: `Project Honeycomb × ${p.name}: Welcome to the Honeycomb.` };
   return {
     title: `Honeycomb × ${p.name}`,
+    description: p.shareLine,
     robots: { index: false, follow: false },
+    openGraph: { title, description: p.shareLine, type: "website", url: `/${p.slug}`, images: [image] },
+    twitter: { card: "summary_large_image", title, description: p.shareLine, images: [image.url] },
   };
 }
 

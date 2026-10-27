@@ -23,6 +23,8 @@ export const PARTNERS = {
       'This entrance was made for the Archives of the Impossible at Rice University. Enter the password you were given to continue.',
     // the badge shown on their submissions in /review
     label: 'Rice · Archives of the Impossible',
+    // the line under the title when their link is shared
+    shareLine: 'A private entrance for the Archives of the Impossible at Rice University.',
     // Their gate wears their identity: the Woodson Research Center lockup
     // (Rice Fondren Library, Center of the Impossible) as published on
     // impossiblearchives.org, unaltered on a white plate; Rice's shield navy
@@ -44,6 +46,7 @@ export const PARTNERS = {
       'Project Honeycomb is a living archive of first-hand encounters with the unexplained, told by the people who had them. ' +
       'This entrance was made for the John E. Mack Institute. Enter the password you were given to continue.',
     label: 'John E. Mack Institute',
+    shareLine: 'A private entrance for the John E. Mack Institute.',
     // Their wordmark from johnemackinstitute.org (made for a dark header, so
     // it sits straight on the gate), their violet, and their typefaces:
     // Source Serif for headings, Nunito for text.
