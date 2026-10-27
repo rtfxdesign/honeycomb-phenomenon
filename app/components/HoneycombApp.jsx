@@ -737,10 +737,19 @@ function Gate({ onEnter, partner }) {
   const p = partnerFor(partner);
   // The ground of every gate is the comb that assembles itself around the
   // pointer (the Claude Design hover exploration), tinted on a partner's gate.
+  // The comb is kept out of the box around the words and the form, so it is
+  // drawn around them and never behind them.
   const groundRef = useRef(null);
+  const stackRef = useRef(null);
   useEffect(() => {
     if (!groundRef.current) return undefined;
-    const fx = attachHover(groundRef.current, p ? p.fx : undefined);
+    const avoid = () => {
+      const g = groundRef.current, s = stackRef.current;
+      if (!g || !s) return null;
+      const a = g.getBoundingClientRect(), b = s.getBoundingClientRect(), pad = 28;
+      return [{ x: b.left - a.left - pad, y: b.top - a.top - pad, w: b.width + pad * 2, h: b.height + pad * 2 }];
+    };
+    const fx = attachHover(groundRef.current, { ...(p ? p.fx : {}), avoid });
     return () => fx.destroy();
   }, [p]);
   // Request Access: a short form under the password field. It goes to the
@@ -803,10 +812,10 @@ function Gate({ onEnter, partner }) {
   return (
     <div className="gate" ref={groundRef} data-partner={p ? p.slug : undefined}>
       <div className="gate-center">
-        <div className="gate-stack">
+        <div className="gate-stack" ref={stackRef}>
           {p ? (
             <div className="gate-lockup">
-              <div className="gate-mark gate-mark-sm" aria-hidden="true"><CombMark /></div>
+              <span className="gate-wordmark">Project Honeycomb</span>
               <span className="gate-lockup-x" aria-hidden="true">×</span>
               <div className={p.logoPlate ? 'gate-logo gate-logo-plate' : 'gate-logo'}>
                 <img src={p.logo} alt={p.logoAlt} />
@@ -817,7 +826,7 @@ function Gate({ onEnter, partner }) {
           )}
           {p && (
             <p className="gate-eyebrow gate-partner">
-              Project Honeycomb <span aria-hidden="true">×</span> {p.name}{p.org ? <><span className="gate-partner-org"> · {p.org}</span></> : null}
+              {p.name}{p.org ? <><span className="gate-partner-org"> · {p.org}</span></> : null}
             </p>
           )}
           <h1 className="gate-title">{p ? <>Welcome to the <em>Honeycomb.</em></> : <>Enter the <em>Honeycomb.</em></>}</h1>

@@ -142,17 +142,18 @@ button{font:inherit;color:inherit}
    (lib/honeycomb-hover.js draws it on a canvas at z-index 0 inside .gate). */
 .gate{position:absolute;inset:0;overflow:hidden;cursor:crosshair;background:radial-gradient(60% 70% at 50% 40%,rgba(252,146,38,.08),transparent 70%),#000}
 .gate input,.gate button,.gate a{cursor:auto}.gate button,.gate a{cursor:pointer}
+.gate>canvas{opacity:.7}
 
-/* A partner's gate: Honeycomb's mark beside the partner's own logo. */
-.gate-lockup{display:flex;align-items:center;justify-content:center;gap:22px;flex-wrap:wrap;max-width:min(640px,92vw)}
-.gate-mark-sm{width:min(150px,34vw)}
+/* A partner's gate: Honeycomb's name beside the partner's own logo. */
+.gate-lockup{display:flex;align-items:center;justify-content:center;gap:20px;max-width:min(760px,92vw)}
+.gate-wordmark{font-family:'Montserrat',system-ui,sans-serif;font-weight:600;font-size:15px;letter-spacing:.16em;text-transform:uppercase;color:#f2bf49;white-space:nowrap}
 .gate-lockup-x{font-family:var(--font-ui);font-size:20px;color:var(--text-muted)}
 .gate-logo img{display:block;height:auto}
 .gate-logo-plate{background:#fff;padding:14px 18px;border-radius:3px;box-shadow:0 18px 50px rgba(0,0,0,.45)}
-.gate-logo-plate img{width:min(330px,72vw)}
-@media (max-width:600px){.gate-lockup{flex-direction:column;gap:16px}.gate-lockup-x{display:none}.gate-mark-sm{width:min(120px,34vw)}}
+.gate-logo-plate img{width:min(300px,72vw)}
+@media (max-width:600px){.gate-lockup{flex-direction:column;gap:14px}.gate-lockup-x{display:none}}
 .gate[data-partner="john-mack"] .gate-logo img{width:min(320px,72vw)}
-.gate[data-partner] .gate-mark-sm+.gate-title,.gate-lockup+.gate-partner{margin-top:30px}
+.gate-lockup+.gate-partner{margin-top:30px}
 
 /* Rice: the shield's navy, the Center for the Impossible's gold, Public Sans. */
 .gate[data-partner="rice"]{
