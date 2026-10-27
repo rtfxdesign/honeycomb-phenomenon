@@ -41,7 +41,8 @@ export interface Session {
 // No fallback: with HONEYCOMB_PASSWORD unset, no password opens the site.
 const VISITOR_PASSWORD = process.env.HONEYCOMB_PASSWORD || "";
 const MODERATOR_PASSWORD = process.env.HONEYCOMB_MODERATOR_PASSWORD || "";
-// "tulsa, Merida" → ["tulsa", "Merida"]; a password cannot itself contain a comma
+// "first-word, second-word" → ["first-word", "second-word"]; a password cannot itself contain a comma.
+// Never put a real password in a comment: Netlify's secret scan fails the build when it finds one.
 const list = (v: string) => v.split(",").map((p) => p.trim()).filter(Boolean);
 const VISITOR_PASSWORDS = list(VISITOR_PASSWORD);
 const MODERATOR_PASSWORDS = list(MODERATOR_PASSWORD);
